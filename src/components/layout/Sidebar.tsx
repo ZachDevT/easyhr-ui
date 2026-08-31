@@ -247,6 +247,7 @@ export function Sidebar() {
         {(isHRAdmin || isManager) && (
           <NavGroup label="Company" collapsed={collapsed} defaultOpen={true}>
             <NavItem href="/people" icon={<Users size={16} strokeWidth={2} />} label={isHRAdmin ? 'All People' : 'My Team'} isActive={isActive('/people', true)} collapsed={collapsed} />
+            <NavItem href="/attendance" icon={<Clock size={16} strokeWidth={2} />} label="Team Attendance" isActive={isActive('/attendance')} collapsed={collapsed} />
             <NavItem href="/org-chart" icon={<Network size={16} strokeWidth={2} />} label="Org Chart" isActive={isActive('/org-chart')} collapsed={collapsed} />
             <NavItem href="/reports" icon={<PieChart size={16} strokeWidth={2} />} label="Reports" isActive={isActive('/reports')} collapsed={collapsed} />
           </NavGroup>

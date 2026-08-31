@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatRibbon } from '@/components/ui/StatRibbon';
+import { CurrencySelect } from '@/components/ui/CurrencySelect';
+import { SearchableSelect, SelectOption } from '@/components/ui/SearchableSelect';
 import { Modal } from '@/components/ui/Modal';
 import { ugandaPayrollRecords, payrollTotals, PayrollRecord } from '@/data/ugandaPayroll';
 import { formatCurrency } from '@/utils/payrollCalc';
@@ -455,20 +457,20 @@ export default function PayrollPage() {
           <div className="row gap-20 mb-24">
             <div style={{ flex: 1 }}>
               <label className="text-sm fw-600 text-2 mb-8 block">Operating Country</label>
-              <select className="input" style={{ width: '100%', padding: '12px 16px' }} defaultValue="UG">
-                <option value="UG">Uganda (Active)</option>
-                <option value="KE">Kenya</option>
-                <option value="RW">Rwanda</option>
-                <option value="NG">Nigeria</option>
-              </select>
+              <SearchableSelect
+                value="UG"
+                onChange={(v) => console.log(v)}
+                options={[
+                  { value: 'UG', label: 'Uganda', description: 'Active - URA Rates' },
+                  { value: 'KE', label: 'Kenya', description: 'KRA Rates' },
+                  { value: 'RW', label: 'Rwanda', description: 'RRA Rates' },
+                  { value: 'NG', label: 'Nigeria', description: 'FIRS Rates' },
+                ]}
+              />
             </div>
             <div style={{ flex: 1 }}>
               <label className="text-sm fw-600 text-2 mb-8 block">Currency Display</label>
-              <select className="input" style={{ width: '100%', padding: '12px 16px' }} defaultValue="UGX">
-                <option value="UGX">UGX (Ugandan Shilling)</option>
-                <option value="KES">KES (Kenyan Shilling)</option>
-                <option value="USD">USD (US Dollar)</option>
-              </select>
+              <CurrencySelect value="UGX" onChange={(v) => console.log(v)} />
             </div>
           </div>
           <div className="p-16" style={{ background: '#F9FAFB', border: '1px solid var(--border)', borderRadius: 8 }}>
@@ -491,13 +493,24 @@ export default function PayrollPage() {
               </div>
               <p className="text-xs text-4 mt-4">Used to calculate hourly rates for deductions/overtime.</p>
             </div>
+          </div>
+          
+          <div className="row gap-20 mb-24">
             <div style={{ flex: 1 }}>
-              <label className="text-sm fw-600 text-2 mb-8 block">Overtime Rate Multiplier</label>
+              <label className="text-sm fw-600 text-2 mb-8 block">Standard Overtime Rate (1.5x)</label>
               <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
                 <span className="text-4 fw-600 mr-8">x</span>
                 <input type="number" defaultValue="1.5" step="0.1" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
               </div>
               <p className="text-xs text-4 mt-4">Multiplier applied to base hourly rate for OT.</p>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="text-sm fw-600 text-2 mb-8 block">Holiday / Rest Day Rate (2.0x)</label>
+              <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
+                <span className="text-4 fw-600 mr-8">x</span>
+                <input type="number" defaultValue="2.0" step="0.1" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
+              </div>
+              <p className="text-xs text-4 mt-4">Multiplier for hours worked on public holidays.</p>
             </div>
           </div>
           <button className="btn-primary"><Save size={16} className="mr-8"/> Save Configurations</button>
