@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { DollarSign, Clock, FileText, CheckCircle2, ChevronRight, Download, Filter, Search, Settings, Building, AlertCircle, Edit3, Save, Info, Mail, Paperclip, CalendarDays, TrendingDown, TrendingUp } from 'lucide-react';
+import { DollarSign, Clock, FileText, CheckCircle2, ChevronRight, Download, Filter, Search, Settings, Building, AlertCircle, AlertTriangle, Edit3, Save, Info, Mail, Paperclip, CalendarDays, TrendingDown, TrendingUp } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
@@ -337,40 +337,110 @@ export default function PayrollPage() {
 
           {/* STEP 4: Finalize */}
           {wizardStep === 3 && (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div className="icon-chip mx-auto mb-32" style={{ width: 100, height: 100, background: 'var(--primary-tint)', color: 'var(--primary)' }}>
-                <DollarSign size={48} />
-              </div>
-              <h3 className="text-3xl fw-800 text-1 mb-12">Ready to Process Payroll?</h3>
-              <p className="text-base text-5 mb-40 max-w-lg mx-auto" style={{ lineHeight: 1.6 }}>
-                You are about to finalize payroll for <strong>Aug 1 - Aug 31, 2026</strong>. This will generate payslips and mark statuses as complete. No funds will be moved automatically in this environment.
-              </p>
-              
-              <div className="p-32 mx-auto" style={{ background: '#F9FAFB', borderRadius: 12, border: '1px solid var(--border)', maxWidth: 500, textAlign: 'left' }}>
-                <div className="row-between text-base mb-16"><span className="text-4 fw-600">Total Net Disbursed (To Employees)</span> <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalNet)}</span></div>
-                <div className="row-between text-base mb-16"><span className="text-4 fw-600">Total PAYE Withheld (To URA)</span> <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalPaye)}</span></div>
-                <div className="row-between text-base mb-16"><span className="text-4 fw-600">Total NSSF (15% To Fund)</span> <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalNssfEmployee + payrollTotals.totalNssfEmployer)}</span></div>
-                <div className="row-between text-base mb-16"><span className="text-4 fw-600">Total LST Withheld</span> <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalLst)}</span></div>
-                <div className="divider my-24"/>
-                <div className="row-between text-xl fw-800 text-primary"><span>Total Employer Liability</span> <span>{formatCurrency(payrollTotals.totalEmployerCost)}</span></div>
+            <div style={{ padding: '40px 0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'start' }}>
+                {/* Left: Summary */}
+                <div>
+                  <div className="row gap-12 mb-20">
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <DollarSign size={22} style={{ color: 'var(--primary)' }} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl fw-800 text-1" style={{ lineHeight: 1.2 }}>Payroll Summary</h3>
+                      <p className="text-sm text-5 mt-4">Aug 1 - Aug 31, 2026 &middot; {ugandaPayrollRecords.length} Employees</p>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-sm text-4 fw-600">Net Disbursed <span style={{ fontSize: 11, color: 'var(--text-5)' }}>(To Employees)</span></span>
+                      <span className="fw-800 text-success">{formatCurrency(payrollTotals.totalNet)}</span>
+                    </div>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-sm text-4 fw-600">PAYE Withheld <span style={{ fontSize: 11, color: 'var(--text-5)' }}>(URA)</span></span>
+                      <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalPaye)}</span>
+                    </div>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-sm text-4 fw-600">NSSF (15%) <span style={{ fontSize: 11, color: 'var(--text-5)' }}>(Fund)</span></span>
+                      <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalNssfEmployee + payrollTotals.totalNssfEmployer)}</span>
+                    </div>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-sm text-4 fw-600">LST Withheld</span>
+                      <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalLst)}</span>
+                    </div>
+                    <div style={{ padding: '16px 20px', background: 'var(--primary-tint)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-sm fw-700" style={{ color: 'var(--primary)' }}>Total Employer Liability</span>
+                      <span className="text-lg fw-900" style={{ color: 'var(--primary)' }}>{formatCurrency(payrollTotals.totalEmployerCost)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Checklist + Action */}
+                <div>
+                  <h3 className="text-base fw-700 text-1 mb-16">Pre-flight Checklist</h3>
+                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, marginBottom: 24 }}>
+                    {[
+                      { label: 'Pay period configured', ok: true },
+                      { label: 'All employees reviewed', ok: true },
+                      { label: 'Tax calculations applied (Uganda)', ok: true },
+                      { label: 'Hour adjustments approved', ok: true },
+                      { label: 'No payouts sent - status update only', ok: true },
+                    ].map((item, i, arr) => (
+                      <div key={i} style={{ padding: '12px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 20, height: 20, borderRadius: '50%', background: item.ok ? '#DCFCE7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            {item.ok
+                              ? <path d="M2 5l2 2 4-4" stroke="#16A34A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              : <path d="M3 3l4 4M7 3l-4 4" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round"/>}
+                          </svg>
+                        </div>
+                        <span className="text-sm fw-600 text-2">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '12px 16px', marginBottom: 24, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />
+                    <p className="text-xs" style={{ color: '#92400E', lineHeight: 1.6, margin: 0 }}>
+                      This will <strong>lock this pay period</strong> and generate payslips. No funds will be disbursed automatically.
+                    </p>
+                  </div>
+
+                  <button
+                    className="w-100"
+                    onClick={handleRunPayroll}
+                    disabled={isProcessing}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      padding: '16px 32px', borderRadius: 12, border: 'none',
+                      cursor: isProcessing ? 'not-allowed' : 'pointer',
+                      fontSize: 15, fontWeight: 800, letterSpacing: '0.3px',
+                      background: isProcessing ? '#9CA3AF' : 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
+                      color: 'white',
+                      boxShadow: isProcessing ? 'none' : '0 4px 20px rgba(124,58,237,0.35)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <DollarSign size={18} />
+                    {isProcessing ? 'Processing Payroll...' : 'Process Payroll Run'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
         
-        <div className="card-header row-between" style={{ background: '#F9FAFB', borderTop: '1px solid var(--border)', padding: '24px 48px' }}>
-          <button className="btn-neutral" onClick={() => setWizardStep(Math.max(0, wizardStep - 1))} disabled={wizardStep === 0} style={{ padding: '12px 24px', fontSize: 15 }}>
+        <div className="card-header row-between" style={{ background: '#F9FAFB', borderTop: '1px solid var(--border)', padding: '20px 48px' }}>
+          <button className="btn-neutral" onClick={() => setWizardStep(Math.max(0, wizardStep - 1))} disabled={wizardStep === 0} style={{ padding: '10px 20px', fontSize: 14 }}>
             Back
           </button>
           
           {wizardStep < 3 ? (
-            <button className="btn-primary" onClick={() => setWizardStep(wizardStep + 1)} style={{ padding: '12px 32px', fontSize: 15 }}>
-              Continue to {WIZARD_STEPS[wizardStep + 1]} <ChevronRight size={18}/>
+            <button className="btn-primary" onClick={() => setWizardStep(wizardStep + 1)} style={{ padding: '10px 24px', fontSize: 14 }}>
+              Continue to {WIZARD_STEPS[wizardStep + 1]} <ChevronRight size={16}/>
             </button>
           ) : (
-            <button className="btn-primary" onClick={handleRunPayroll} disabled={isProcessing} style={{ padding: '12px 40px', fontSize: 16, background: 'var(--success)' }}>
-              {isProcessing ? 'Processing...' : 'Complete Payroll Run'}
-            </button>
+            <span className="text-xs text-5">Review summary and click Process above</span>
           )}
         </div>
       </div>
