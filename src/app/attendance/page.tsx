@@ -70,6 +70,24 @@ export default function AttendancePage() {
 
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
+      <style>{`
+        .employee-card .override-btn {
+          opacity: 0;
+          visibility: hidden;
+          transition: all 0.2s ease;
+          height: 0;
+          margin-top: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+        .employee-card:hover .override-btn {
+          opacity: 1;
+          visibility: visible;
+          height: 32px;
+          margin-top: 16px;
+          padding: 6px;
+        }
+      `}</style>
       <PageHeader 
         title="Team Attendance"
         subtitle="Monitor real-time clock-ins, lateness, and manage timesheet overrides."
@@ -94,13 +112,24 @@ export default function AttendancePage() {
 
             <div className="row-between mb-24">
               <div className="row gap-8">
-                <button className={`btn-${filter === 'All' ? 'primary' : 'secondary'}`} style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setFilter('All')}>All Today</button>
-                <button className={`btn-${filter === 'Clocked In' ? 'primary' : 'secondary'}`} style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setFilter('Clocked In')}>Working</button>
-                <button className={`btn-${filter === 'Late' ? 'primary' : 'secondary'}`} style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setFilter('Late')}>Late</button>
-                <button className={`btn-${filter === 'Missing' ? 'primary' : 'secondary'}`} style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setFilter('Missing')}>Missing</button>
+                {/* Filters moved to dropdown */}
               </div>
               
               <div className="row gap-12">
+                <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 12px' }}>
+                  <Filter size={14} className="text-4 mr-8"/>
+                  <select 
+                    value={filter} 
+                    onChange={(e) => setFilter(e.target.value as any)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, cursor: 'pointer', color: 'var(--text-1)', fontWeight: 600 }}
+                  >
+                    <option value="All">All Today</option>
+                    <option value="Clocked In">Working</option>
+                    <option value="Late">Late</option>
+                    <option value="Missing">Missing</option>
+                  </select>
+                </div>
+
                 <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 16px', width: 220 }}>
                   <Search size={14} className="text-4" style={{ marginRight: 8 }} />
                   <input 
@@ -123,18 +152,19 @@ export default function AttendancePage() {
                 return (
                   <Card 
                     key={record.id} 
+                    className="employee-card"
                     style={{ 
                       opacity: isClockedOut ? 0.6 : 1, // Dim if clocked out
                       border: isLate ? '1px solid var(--warning)' : isMissing ? '1px solid var(--error)' : '1px solid var(--border)',
                       boxShadow: isClockedOut ? 'none' : '0 2px 8px rgba(0,0,0,0.02)'
                     }}
                   >
-                    <CardBody style={{ padding: '16px 20px' }}>
-                      <div className="row-between mb-12">
+                    <CardBody style={{ padding: '20px 24px' }}>
+                      <div className="row-between mb-16">
                         <div className="row gap-12">
-                          <Avatar src={record.avatar} name={record.employeeName} size="sm" />
+                          <Avatar src={record.avatar} name={record.employeeName} size="md" />
                           <div>
-                            <div className="text-sm fw-700 text-1" style={{ lineHeight: 1.2 }}>{record.employeeName}</div>
+                            <div className="text-base fw-700 text-1" style={{ lineHeight: 1.2 }}>{record.employeeName}</div>
                             <div className="text-xs text-5 mt-2">{record.department}</div>
                           </div>
                         </div>
@@ -167,8 +197,8 @@ export default function AttendancePage() {
                       </div>
 
                       <button 
-                        className="btn-secondary w-100" 
-                        style={{ justifyContent: 'center', padding: '6px', fontSize: 12 }}
+                        className="btn-secondary w-100 override-btn" 
+                        style={{ justifyContent: 'center', fontSize: 12 }}
                         onClick={() => {
                           setSelectedEmployee(record);
                           setOverrideType(record.status === 'Clocked In' || record.status === 'Late' ? 'Clock Out' : 'Clock In');
