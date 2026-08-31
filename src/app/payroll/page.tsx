@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { DollarSign, Clock, FileText, CheckCircle2, ChevronRight, Download, Filter, Search, Settings, Building, AlertCircle, Edit3, Save, Info } from 'lucide-react';
-import { Card, CardBody } from '@/components/ui/Card';
+import { DollarSign, Clock, FileText, CheckCircle2, ChevronRight, Download, Filter, Search, Settings, Building, AlertCircle, Edit3, Save, Info, Mail, Paperclip, CalendarDays, TrendingDown, TrendingUp } from 'lucide-react';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -21,6 +21,13 @@ export default function PayrollPage() {
   const [payrollRun, setPayrollRun] = useState(false);
   
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+  
+  // New Modals State
+  const [isEmailAllModalOpen, setIsEmailAllModalOpen] = useState(false);
+  const [isSendingEmails, setIsSendingEmails] = useState(false);
+  
+  const [adjustRecord, setAdjustRecord] = useState<PayrollRecord | null>(null);
+  const [adjustProof, setAdjustProof] = useState("");
 
   const handleRunPayroll = () => {
     setIsProcessing(true);
@@ -32,12 +39,30 @@ export default function PayrollPage() {
     }, 2000);
   };
 
+  const handleSendEmails = () => {
+    setIsSendingEmails(true);
+    setTimeout(() => {
+      setIsSendingEmails(false);
+      setIsEmailAllModalOpen(false);
+      alert('Payslips queued for delivery successfully!');
+    }, 1500);
+  };
+
+  // Variances Math
+  const totalOvertimeCost = ugandaPayrollRecords.reduce((acc, r) => acc + r.results.overtimePay, 0);
+  const totalAbsenteeSavings = ugandaPayrollRecords.reduce((acc, r) => acc + r.results.absentDeduction, 0);
+  const totalSickLeaveHours = 24; // Mock
+  const totalPTOHours = 48; // Mock
+
   const renderOverview = () => (
     <div>
       <div className="row-between mb-32">
         <div>
           <h2 className="text-2xl fw-800 text-1">Payroll Dashboard</h2>
-          <p className="text-base text-4 mt-4">Current Cycle: September 2026 (Uganda Regulations applied)</p>
+          <div className="row gap-8 mt-8">
+            <Badge variant="primary">Pay Period: Aug 1 - Aug 31, 2026</Badge>
+            <span className="text-sm text-4">Uganda Regulations</span>
+          </div>
         </div>
         <button className="btn-primary" onClick={() => setActiveTab('Run Payroll')}>
           Run Payroll
@@ -68,7 +93,7 @@ export default function PayrollPage() {
               </tr>
             </thead>
             <tbody>
-              {['August 2026', 'July 2026', 'June 2026'].map((period, i) => (
+              {['July 1 - July 31, 2026', 'June 1 - June 30, 2026', 'May 1 - May 31, 2026'].map((period, i) => (
                 <tr key={i} style={{ borderBottom: i === 2 ? 'none' : '1px solid var(--border)' }}>
                   <td style={{ padding: '20px 32px', fontWeight: 700, fontSize: 15 }}>{period}</td>
                   <td style={{ padding: '20px 32px', fontSize: 15 }}>{formatCurrency(payrollTotals.totalEmployerCost - (i * 500000))}</td>
@@ -89,7 +114,12 @@ export default function PayrollPage() {
   const renderWizard = () => (
     <div style={{ margin: '0 auto' }}>
       <div className="row-between mb-32">
-        <h2 className="text-2xl fw-800 text-1">Run Payroll (September 2026)</h2>
+        <div>
+          <h2 className="text-2xl fw-800 text-1">Run Payroll</h2>
+          <div className="row gap-8 mt-8">
+            <Badge variant="neutral"><CalendarDays size={14} className="mr-4"/> Pay Period: Aug 1, 2026 - Aug 31, 2026</Badge>
+          </div>
+        </div>
         <button className="btn-neutral" onClick={() => setActiveTab('Overview')}>Save & Exit</button>
       </div>
 
@@ -115,14 +145,35 @@ export default function PayrollPage() {
           {/* STEP 1: Time & Attendance */}
           {wizardStep === 0 && (
             <div>
-              <div className="row-between p-32 pb-16">
-                <div>
-                  <h3 className="text-xl fw-800 text-1 mb-8">Review & Edit Hours</h3>
-                  <p className="text-base text-5">Standard month is 173.33 hours. Unworked hours will deduct from base pay, overtime adds 1.5x.</p>
+              <div className="p-32 pb-0">
+                <div className="row-between mb-24">
+                  <div>
+                    <h3 className="text-xl fw-800 text-1 mb-8">Review & Adjust Hours</h3>
+                    <p className="text-base text-5">Standard month is 173.33 hours. Review variances below.</p>
+                  </div>
+                  <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#F9FAFB', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 20px', width: 250 }}>
+                    <Search size={16} className="text-4" style={{ marginRight: 8 }} />
+                    <input type="text" placeholder="Search employees..." style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, width: '100%' }} />
+                  </div>
                 </div>
-                <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#F9FAFB', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 20px', width: 250 }}>
-                  <Search size={16} className="text-4" style={{ marginRight: 8 }} />
-                  <input type="text" placeholder="Search employees..." style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, width: '100%' }} />
+
+                {/* Variance Ribbon */}
+                <div className="row gap-16 mb-32">
+                  <div style={{ flex: 1, background: 'var(--error-tint)', border: '1px solid var(--error)', padding: '16px 20px', borderRadius: 8 }}>
+                    <div className="text-xs fw-700 text-error mb-4 text-uppercase row gap-8"><TrendingUp size={14}/> OVERTIME SPEND</div>
+                    <div className="text-xl fw-800 text-1">+{formatCurrency(totalOvertimeCost)}</div>
+                    <div className="text-xs text-error mt-4">{ugandaPayrollRecords.filter(r => r.overtimeHours > 0).length} employees with overtime</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'var(--success-tint)', border: '1px solid var(--success)', padding: '16px 20px', borderRadius: 8 }}>
+                    <div className="text-xs fw-700 text-success mb-4 text-uppercase row gap-8"><TrendingDown size={14}/> ABSENTEE SAVINGS</div>
+                    <div className="text-xl fw-800 text-1">-{formatCurrency(totalAbsenteeSavings)}</div>
+                    <div className="text-xs text-success mt-4">From unworked standard hours</div>
+                  </div>
+                  <div style={{ flex: 1, background: '#F3F4F6', border: '1px solid var(--border)', padding: '16px 20px', borderRadius: 8 }}>
+                    <div className="text-xs fw-700 text-4 mb-4 text-uppercase row gap-8"><CalendarDays size={14}/> LEAVE TAKEN</div>
+                    <div className="text-xl fw-800 text-1">{totalPTOHours + totalSickLeaveHours} hrs</div>
+                    <div className="text-xs text-5 mt-4">Sick Leave: {totalSickLeaveHours}h, PTO: {totalPTOHours}h</div>
+                  </div>
                 </div>
               </div>
               
@@ -131,9 +182,10 @@ export default function PayrollPage() {
                   <tr style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', color: 'var(--text-4)', fontSize: 13, textTransform: 'uppercase' }}>
                     <th style={{ padding: '16px 32px', fontWeight: 700 }}>Employee</th>
                     <th style={{ padding: '16px 24px', fontWeight: 700 }}>Base Salary</th>
-                    <th style={{ padding: '16px 24px', fontWeight: 700 }}>Expected Hrs</th>
-                    <th style={{ padding: '16px 24px', fontWeight: 700 }}>Absent Hrs</th>
-                    <th style={{ padding: '16px 24px', fontWeight: 700 }}>Overtime Hrs</th>
+                    <th style={{ padding: '16px 24px', fontWeight: 700 }}>Expected</th>
+                    <th style={{ padding: '16px 24px', fontWeight: 700 }}>Absent</th>
+                    <th style={{ padding: '16px 24px', fontWeight: 700 }}>Overtime</th>
+                    <th style={{ padding: '16px 32px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -149,12 +201,25 @@ export default function PayrollPage() {
                         </div>
                       </td>
                       <td style={{ padding: '16px 24px', fontWeight: 600 }}>{formatCurrency(r.baseSalary)}</td>
-                      <td style={{ padding: '16px 24px', color: 'var(--text-4)' }}>173.33</td>
+                      <td style={{ padding: '16px 24px', color: 'var(--text-4)' }}>173.33h</td>
                       <td style={{ padding: '16px 24px' }}>
-                        <div className="input" style={{ width: 80, padding: 8, display: 'inline-block', textAlign: 'center', color: r.absentHours > 0 ? 'var(--error)' : 'inherit', borderColor: r.absentHours > 0 ? 'var(--error)' : 'var(--border)' }}>{r.absentHours}h</div>
+                        {r.absentHours > 0 ? (
+                          <Badge variant="danger">{r.absentHours}h</Badge>
+                        ) : (
+                          <span className="text-4">0h</span>
+                        )}
                       </td>
                       <td style={{ padding: '16px 24px' }}>
-                        <div className="input" style={{ width: 80, padding: 8, display: 'inline-block', textAlign: 'center', color: r.overtimeHours > 0 ? 'var(--warning)' : 'inherit', borderColor: r.overtimeHours > 0 ? 'var(--warning)' : 'var(--border)' }}>{r.overtimeHours}h</div>
+                        {r.overtimeHours > 0 ? (
+                          <Badge variant="warning">{r.overtimeHours}h</Badge>
+                        ) : (
+                          <span className="text-4">0h</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px 32px', textAlign: 'right' }}>
+                        <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setAdjustRecord(r)}>
+                          <Edit3 size={14} className="mr-8"/> Adjust
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -276,7 +341,7 @@ export default function PayrollPage() {
               </div>
               <h3 className="text-3xl fw-800 text-1 mb-12">Ready to Process Payroll?</h3>
               <p className="text-base text-5 mb-40 max-w-lg mx-auto" style={{ lineHeight: 1.6 }}>
-                You are about to finalize payroll for <strong>September 2026</strong>. This will generate payslips and mark statuses as complete. No funds will be moved automatically in this environment.
+                You are about to finalize payroll for <strong>Aug 1 - Aug 31, 2026</strong>. This will generate payslips and mark statuses as complete. No funds will be moved automatically in this environment.
               </p>
               
               <div className="p-32 mx-auto" style={{ background: '#F9FAFB', borderRadius: 12, border: '1px solid var(--border)', maxWidth: 500, textAlign: 'left' }}>
@@ -310,6 +375,137 @@ export default function PayrollPage() {
     </div>
   );
 
+  const renderPaystubs = () => (
+    <div>
+      <div className="row-between mb-32">
+        <div>
+          <h2 className="text-2xl fw-800 text-1">Employee Paystubs</h2>
+          <p className="text-base text-4 mt-4">View and distribute generated payslips to employees.</p>
+        </div>
+        <div className="row gap-16">
+          <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 20px', width: 250 }}>
+            <Search size={16} className="text-4" style={{ marginRight: 8 }} />
+            <input type="text" placeholder="Search employees..." style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, width: '100%' }} />
+          </div>
+          <button className="btn-secondary">
+            <Filter size={16} className="mr-8"/> Filter Period
+          </button>
+          <button className="btn-primary" onClick={() => setIsEmailAllModalOpen(true)}>
+            <Mail size={16} className="mr-8"/> Email All Payslips
+          </button>
+        </div>
+      </div>
+
+      <Card>
+        <CardBody style={{ padding: 0 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: '#F9FAFB', color: 'var(--text-4)', fontSize: 13, textTransform: 'uppercase' }}>
+                <th style={{ padding: '20px 32px', fontWeight: 700 }}>Employee</th>
+                <th style={{ padding: '20px 32px', fontWeight: 700 }}>Period</th>
+                <th style={{ padding: '20px 32px', fontWeight: 700 }}>Net Pay</th>
+                <th style={{ padding: '20px 32px', fontWeight: 700 }}>Delivery Status</th>
+                <th style={{ padding: '20px 32px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ugandaPayrollRecords.map((r, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '20px 32px' }}>
+                    <div className="row gap-16">
+                      <Avatar src={r.avatar} name={r.employeeName} size="md" />
+                      <div>
+                        <div className="text-base fw-700 text-1">{r.employeeName}</div>
+                        <div className="text-xs text-5 mt-2">{r.employeeName.split(' ')[0].toLowerCase()}@easyhr.com</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '20px 32px', fontSize: 14 }}>July 2026</td>
+                  <td style={{ padding: '20px 32px', fontSize: 15, fontWeight: 700 }}>{formatCurrency(r.results.netPay)}</td>
+                  <td style={{ padding: '20px 32px' }}>
+                    {i % 3 === 0 ? <Badge variant="success">Delivered</Badge> : <Badge variant="neutral">Not Sent</Badge>}
+                  </td>
+                  <td style={{ padding: '20px 32px', textAlign: 'right' }}>
+                    <div className="row gap-8 justify-end">
+                      <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => setSelectedRecord(r)}>
+                        View
+                      </button>
+                      <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => alert(`Emailing payslip to ${r.employeeName}`)}>
+                        <Mail size={14}/>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardBody>
+      </Card>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div style={{ maxWidth: 800 }}>
+      <h2 className="text-2xl fw-800 text-1 mb-8">Payroll Settings</h2>
+      <p className="text-base text-4 mb-32">Configure global tax engines, standard work hours, and overtime rules.</p>
+      
+      <Card style={{ marginBottom: 32 }}>
+        <CardHeader title="Tax Jurisdiction" />
+        <CardBody>
+          <div className="row gap-20 mb-24">
+            <div style={{ flex: 1 }}>
+              <label className="text-sm fw-600 text-2 mb-8 block">Operating Country</label>
+              <select className="input" style={{ width: '100%', padding: '12px 16px' }} defaultValue="UG">
+                <option value="UG">Uganda (Active)</option>
+                <option value="KE">Kenya</option>
+                <option value="RW">Rwanda</option>
+                <option value="NG">Nigeria</option>
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="text-sm fw-600 text-2 mb-8 block">Currency Display</label>
+              <select className="input" style={{ width: '100%', padding: '12px 16px' }} defaultValue="UGX">
+                <option value="UGX">UGX (Ugandan Shilling)</option>
+                <option value="KES">KES (Kenyan Shilling)</option>
+                <option value="USD">USD (US Dollar)</option>
+              </select>
+            </div>
+          </div>
+          <div className="p-16" style={{ background: '#F9FAFB', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div className="text-sm fw-700 text-1 mb-8">Uganda Tax Engine Details</div>
+            <div className="text-sm text-5 mb-4">PAYE Brackets: 2024/2025 applied (Includes 10% Solidarity Tax &gt; 10M)</div>
+            <div className="text-sm text-5">NSSF: 5% Employee / 10% Employer</div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Work Hours & Multipliers" />
+        <CardBody>
+          <div className="row gap-20 mb-24">
+            <div style={{ flex: 1 }}>
+              <label className="text-sm fw-600 text-2 mb-8 block">Standard Monthly Hours</label>
+              <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
+                <Clock size={16} className="text-4 mr-8"/>
+                <input type="number" defaultValue="173.33" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
+              </div>
+              <p className="text-xs text-4 mt-4">Used to calculate hourly rates for deductions/overtime.</p>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="text-sm fw-600 text-2 mb-8 block">Overtime Rate Multiplier</label>
+              <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
+                <span className="text-4 fw-600 mr-8">x</span>
+                <input type="number" defaultValue="1.5" step="0.1" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
+              </div>
+              <p className="text-xs text-4 mt-4">Multiplier applied to base hourly rate for OT.</p>
+            </div>
+          </div>
+          <button className="btn-primary"><Save size={16} className="mr-8"/> Save Configurations</button>
+        </CardBody>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
       {/* Top Banner */}
@@ -327,76 +523,154 @@ export default function PayrollPage() {
             <CheckCircle2 size={32} />
             <div>
               <div className="text-lg fw-800">Payroll Completed Successfully!</div>
-              <div className="text-sm mt-4 fw-600">Payslips have been generated and sent to employees. Tax liabilities logged for remittance.</div>
+              <div className="text-sm mt-4 fw-600">Payslips have been generated and tax liabilities logged for remittance. You can now distribute payslips in the Paystubs tab.</div>
             </div>
           </div>
         )}
         
         {activeTab === 'Overview' && renderOverview()}
         {activeTab === 'Run Payroll' && renderWizard()}
+        {activeTab === 'Paystubs' && renderPaystubs()}
+        {activeTab === 'Settings' && renderSettings()}
         
       </div>
 
-      {/* Payslip Modal */}
+      {/* Adjust Hours Modal */}
+      <Modal isOpen={!!adjustRecord} onClose={() => setAdjustRecord(null)} title="Adjust Employee Hours" width={500} footer={
+        <div className="row-between w-100">
+          <button className="btn-neutral" onClick={() => setAdjustRecord(null)}>Cancel</button>
+          <button className="btn-primary" onClick={() => { alert('Hours adjusted and proof attached!'); setAdjustRecord(null); }}>Save Adjustments</button>
+        </div>
+      }>
+        {adjustRecord && (
+          <div>
+            <div className="row gap-16 mb-24 pb-24" style={{ borderBottom: '1px solid var(--border)' }}>
+              <Avatar src={adjustRecord.avatar} name={adjustRecord.employeeName} size="md" />
+              <div>
+                <div className="text-base fw-700 text-1">{adjustRecord.employeeName}</div>
+                <div className="text-sm text-5">{adjustRecord.department}</div>
+              </div>
+            </div>
+            
+            <div className="grid-2 gap-20 mb-24">
+              <div>
+                <label className="text-sm fw-600 text-2 mb-8 block">Absent Hours (Unpaid)</label>
+                <input type="number" defaultValue={adjustRecord.absentHours} className="input w-100" />
+              </div>
+              <div>
+                <label className="text-sm fw-600 text-2 mb-8 block">Overtime Hours (1.5x)</label>
+                <input type="number" defaultValue={adjustRecord.overtimeHours} className="input w-100" />
+              </div>
+              <div>
+                <label className="text-sm fw-600 text-2 mb-8 block">Sick Leave (Paid)</label>
+                <input type="number" defaultValue={0} className="input w-100" />
+              </div>
+              <div>
+                <label className="text-sm fw-600 text-2 mb-8 block">PTO (Paid)</label>
+                <input type="number" defaultValue={0} className="input w-100" />
+              </div>
+            </div>
+
+            <div className="mb-24">
+              <label className="text-sm fw-600 text-2 mb-8 block">Justification / Notes</label>
+              <textarea 
+                className="input w-100" 
+                rows={3} 
+                placeholder="E.g. Approved overtime for project launch..."
+                value={adjustProof}
+                onChange={(e) => setAdjustProof(e.target.value)}
+              />
+            </div>
+
+            <div className="p-16" style={{ border: '1px dashed var(--border)', borderRadius: 8, background: '#F9FAFB', textAlign: 'center' }}>
+              <Paperclip size={24} className="text-4 mb-8 mx-auto" />
+              <div className="text-sm fw-600 text-2">Attach Proof (Timesheet/Approval)</div>
+              <div className="text-xs text-5 mt-4">Upload PDF, JPG, PNG</div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Email All Modal */}
+      <Modal isOpen={isEmailAllModalOpen} onClose={() => !isSendingEmails && setIsEmailAllModalOpen(false)} title="Send Payslips to Employees" width={450} footer={
+        <div className="row-between w-100">
+          <button className="btn-neutral" onClick={() => setIsEmailAllModalOpen(false)} disabled={isSendingEmails}>Cancel</button>
+          <button className="btn-primary" onClick={handleSendEmails} disabled={isSendingEmails} style={{ background: 'var(--primary)' }}>
+            {isSendingEmails ? 'Sending Emails...' : 'Yes, Send Payslips'}
+          </button>
+        </div>
+      }>
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div className="icon-chip mx-auto mb-24" style={{ width: 80, height: 80, background: 'var(--primary-tint)', color: 'var(--primary)' }}>
+            <Mail size={40} />
+          </div>
+          <h3 className="text-xl fw-800 text-1 mb-12">Deliver {ugandaPayrollRecords.length} Payslips</h3>
+          <p className="text-base text-5">
+            This will email the finalized payslips for the period <strong>July 2026</strong> to all {ugandaPayrollRecords.length} employees securely as a PDF attachment.
+          </p>
+        </div>
+      </Modal>
+
+      {/* Payslip Preview Modal */}
       <Modal isOpen={!!selectedRecord} onClose={() => setSelectedRecord(null)} title="Employee Payslip Preview" width={800} footer={<button className="btn-secondary" onClick={() => setSelectedRecord(null)}>Close Preview</button>}>
         {selectedRecord && (
           <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 32, background: 'white' }}>
             <div className="row-between mb-32" style={{ borderBottom: '2px solid var(--border)', paddingBottom: 24 }}>
               <div className="row gap-20">
-                    <Avatar name={selectedRecord.employeeName} src={selectedRecord.avatar} size="lg" />
-                    <div>
-                      <h2 className="text-xl fw-800 text-1 m-0">{selectedRecord.employeeName}</h2>
-                      <p className="text-sm text-5 mt-4 m-0">{selectedRecord.department} • Uganda Operations</p>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="text-2xl fw-800 text-success">{formatCurrency(selectedRecord.results.netPay)}</div>
-                    <div className="text-sm fw-600 text-4 mt-4">NET PAY</div>
-                  </div>
-                </div>
-
-                <div className="grid-2 gap-40">
-                  {/* Earnings */}
-                  <div>
-                    <h3 className="text-sm fw-800 text-4 mb-16 text-uppercase tracking-wider">Earnings</h3>
-                    <div className="col gap-12">
-                      <div className="row-between text-base"><span className="text-2 fw-600">Base Salary</span> <span className="fw-700">{formatCurrency(selectedRecord.baseSalary)}</span></div>
-                      {selectedRecord.absentHours > 0 && (
-                        <div className="row-between text-base"><span className="text-2 fw-600">Absent Deduction ({selectedRecord.absentHours}h)</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.absentDeduction)}</span></div>
-                      )}
-                      {selectedRecord.overtimeHours > 0 && (
-                        <div className="row-between text-base"><span className="text-2 fw-600">Overtime Pay ({selectedRecord.overtimeHours}h)</span> <span className="fw-700 text-success">+{formatCurrency(selectedRecord.results.overtimePay)}</span></div>
-                      )}
-                      {selectedRecord.allowances > 0 && (
-                        <div className="row-between text-base"><span className="text-2 fw-600">Allowances</span> <span className="fw-700">{formatCurrency(selectedRecord.allowances)}</span></div>
-                      )}
-                      {selectedRecord.bonuses > 0 && (
-                        <div className="row-between text-base"><span className="text-2 fw-600">Bonuses</span> <span className="fw-700">{formatCurrency(selectedRecord.bonuses)}</span></div>
-                      )}
-                      <div className="divider my-8"/>
-                      <div className="row-between text-lg"><span className="text-1 fw-800">Gross Earnings</span> <span className="fw-800 text-primary">{formatCurrency(selectedRecord.results.adjustedGross)}</span></div>
-                    </div>
-                  </div>
-
-                  {/* Deductions */}
-                  <div>
-                    <h3 className="text-sm fw-800 text-4 mb-16 text-uppercase tracking-wider">Taxes & Deductions</h3>
-                    <div className="col gap-12">
-                      <div className="row-between text-base"><span className="text-2 fw-600">NSSF Employee (5%)</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.nssfEmployee)}</span></div>
-                      <div className="row-between text-base"><span className="text-2 fw-600">PAYE Tax</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.paye)}</span></div>
-                      <div className="row-between text-base"><span className="text-2 fw-600">Local Service Tax (LST)</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.lst)}</span></div>
-                      
-                      <div className="divider my-8"/>
-                      <div className="row-between text-lg"><span className="text-1 fw-800">Total Deductions</span> <span className="fw-800 text-error">-{formatCurrency(selectedRecord.results.nssfEmployee + selectedRecord.results.paye + selectedRecord.results.lst)}</span></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-32 p-24" style={{ background: '#F9FAFB', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  <h3 className="text-sm fw-800 text-4 mb-16 text-uppercase tracking-wider">Employer Contributions</h3>
-                  <div className="row-between text-base"><span className="text-2 fw-600">NSSF Employer (10%)</span> <span className="fw-700">{formatCurrency(selectedRecord.results.nssfEmployer)}</span></div>
+                <Avatar name={selectedRecord.employeeName} src={selectedRecord.avatar} size="lg" />
+                <div>
+                  <h2 className="text-xl fw-800 text-1 m-0">{selectedRecord.employeeName}</h2>
+                  <p className="text-sm text-5 mt-4 m-0">{selectedRecord.department} • Uganda Operations</p>
                 </div>
               </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="text-2xl fw-800 text-success">{formatCurrency(selectedRecord.results.netPay)}</div>
+                <div className="text-sm fw-600 text-4 mt-4">NET PAY</div>
+              </div>
+            </div>
+
+            <div className="grid-2 gap-40">
+              {/* Earnings */}
+              <div>
+                <h3 className="text-sm fw-800 text-4 mb-16 text-uppercase tracking-wider">Earnings</h3>
+                <div className="col gap-12">
+                  <div className="row-between text-base"><span className="text-2 fw-600">Base Salary</span> <span className="fw-700">{formatCurrency(selectedRecord.baseSalary)}</span></div>
+                  {selectedRecord.absentHours > 0 && (
+                    <div className="row-between text-base"><span className="text-2 fw-600">Absent Deduction ({selectedRecord.absentHours}h)</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.absentDeduction)}</span></div>
+                  )}
+                  {selectedRecord.overtimeHours > 0 && (
+                    <div className="row-between text-base"><span className="text-2 fw-600">Overtime Pay ({selectedRecord.overtimeHours}h)</span> <span className="fw-700 text-success">+{formatCurrency(selectedRecord.results.overtimePay)}</span></div>
+                  )}
+                  {selectedRecord.allowances > 0 && (
+                    <div className="row-between text-base"><span className="text-2 fw-600">Allowances</span> <span className="fw-700">{formatCurrency(selectedRecord.allowances)}</span></div>
+                  )}
+                  {selectedRecord.bonuses > 0 && (
+                    <div className="row-between text-base"><span className="text-2 fw-600">Bonuses</span> <span className="fw-700">{formatCurrency(selectedRecord.bonuses)}</span></div>
+                  )}
+                  <div className="divider my-8"/>
+                  <div className="row-between text-lg"><span className="text-1 fw-800">Gross Earnings</span> <span className="fw-800 text-primary">{formatCurrency(selectedRecord.results.adjustedGross)}</span></div>
+                </div>
+              </div>
+
+              {/* Deductions */}
+              <div>
+                <h3 className="text-sm fw-800 text-4 mb-16 text-uppercase tracking-wider">Taxes & Deductions</h3>
+                <div className="col gap-12">
+                  <div className="row-between text-base"><span className="text-2 fw-600">NSSF Employee (5%)</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.nssfEmployee)}</span></div>
+                  <div className="row-between text-base"><span className="text-2 fw-600">PAYE Tax</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.paye)}</span></div>
+                  <div className="row-between text-base"><span className="text-2 fw-600">Local Service Tax (LST)</span> <span className="fw-700 text-error">-{formatCurrency(selectedRecord.results.lst)}</span></div>
+                  
+                  <div className="divider my-8"/>
+                  <div className="row-between text-lg"><span className="text-1 fw-800">Total Deductions</span> <span className="fw-800 text-error">-{formatCurrency(selectedRecord.results.nssfEmployee + selectedRecord.results.paye + selectedRecord.results.lst)}</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-32 p-24" style={{ background: '#F9FAFB', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <h3 className="text-sm fw-800 text-4 mb-16 text-uppercase tracking-wider">Employer Contributions</h3>
+              <div className="row-between text-base"><span className="text-2 fw-600">NSSF Employer (10%)</span> <span className="fw-700">{formatCurrency(selectedRecord.results.nssfEmployer)}</span></div>
+            </div>
+          </div>
         )}
       </Modal>
 
