@@ -92,7 +92,7 @@ export default function EmployeeRelationsPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <h3 className="m-0 text-lg fw-700 text-1">{c.employee}</h3>
                         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px' }} className="text-sm text-5">
-                          <Badge variant={c.severity === 'Critical' ? 'error' : c.severity === 'High' ? 'warning' : 'neutral'}>{c.type}</Badge>
+                          <Badge variant={c.severity === 'Critical' ? 'danger' : c.severity === 'High' ? 'warning' : 'neutral'}>{c.type}</Badge>
                           <span>•</span>
                           <span className="fw-600">{c.reason}</span>
                         </div>

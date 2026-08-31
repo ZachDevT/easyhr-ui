@@ -272,7 +272,7 @@ export default function HrOnboardingPage() {
                                   </div>
                                 </td>
                                 <td style={{ padding: '20px 24px' }}>
-                                  <Badge variant={hire.status === 'Completed' ? 'success' : hire.status === 'At Risk' ? 'error' : hire.status === 'On Track' ? 'neutral' : 'warning'}>
+                                  <Badge variant={hire.status === 'Completed' ? 'success' : hire.status === 'At Risk' ? 'danger' : hire.status === 'On Track' ? 'neutral' : 'warning'}>
                                     {hire.status}
                                   </Badge>
                                 </td>

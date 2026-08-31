@@ -132,7 +132,7 @@ export default function SignaturesAdminPage() {
                         <td style={{ padding: '20px 24px', color: 'var(--text-3)', fontSize: 14, fontWeight: 500 }}>{req.dateSent}</td>
                         <td style={{ padding: '20px 24px' }}>
                           <div className="col gap-4">
-                            <Badge variant={req.status === 'Completed' ? 'success' : req.status === 'Refused' ? 'error' : 'warning'}>{req.status}</Badge>
+                            <Badge variant={req.status === 'Completed' ? 'success' : req.status === 'Refused' ? 'danger' : 'warning'}>{req.status}</Badge>
                             {req.status === 'Refused' && (
                               <div className="text-xs text-error fw-600 mt-4" style={{ maxWidth: 200, lineHeight: 1.4 }}>{req.reason}</div>
                             )}

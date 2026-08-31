@@ -68,7 +68,7 @@ export default function ProfilePage() {
             <Avatar 
               name={`${currentUser.firstName} ${currentUser.lastName}`} 
               src={currentUser.avatar} 
-              size="xxl" 
+              size="xl" 
               style={{ width: 100, height: 100, border: '4px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} 
             />
           }
