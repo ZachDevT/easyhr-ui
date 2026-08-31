@@ -87,6 +87,14 @@ export default function AttendancePage() {
           margin-top: 16px;
           padding: 6px;
         }
+        .shift-cell { position: relative; }
+        .shift-cell .edit-shift-btn {
+          opacity: 0;
+          transition: all 0.2s ease;
+        }
+        .shift-cell:hover .edit-shift-btn {
+          opacity: 1;
+        }
       `}</style>
       <PageHeader 
         title="Team Attendance"
@@ -100,19 +108,25 @@ export default function AttendancePage() {
         
         {activeTab === 'Live Attendance' && (
           <div>
-            <StatRibbon
-              stats={[
-                { label: 'Expected Today', value: mockAttendanceRecords.filter(r => r.hasShiftToday).length.toString(), icon: <MonitorPlay size={18}/> },
-                { label: 'Currently Working', value: liveRecords.filter(r => r.status === 'Clocked In' || r.status === 'Late').length.toString(), color: 'var(--success)', icon: <RefreshCw size={18}/> },
-                { label: 'Late Today', value: liveRecords.filter(r => r.status === 'Late').length.toString(), color: 'var(--warning)', icon: <AlertTriangle size={18}/> },
-                { label: 'Absent / Missing', value: liveRecords.filter(r => r.status === 'Missing').length.toString(), color: 'var(--error)', icon: <MonitorStop size={18}/> },
-              ]}
-              style={{ marginBottom: 32 }}
-            />
-
-            <div className="row-between mb-24">
-              <div className="row gap-8">
-                {/* Filters moved to dropdown */}
+            <div className="row-between mb-24" style={{ flexWrap: 'wrap', gap: 16 }}>
+              {/* Compact Inline Stats */}
+              <div className="row gap-16" style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '100px', padding: '6px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                 <div className="row gap-8 pr-16" style={{ borderRight: '1px solid var(--border)' }}>
+                    <MonitorPlay size={14} className="text-4" />
+                    <span className="text-sm fw-700 text-1">{mockAttendanceRecords.filter(r => r.hasShiftToday).length} <span className="text-4 fw-500">Expected</span></span>
+                 </div>
+                 <div className="row gap-8 pr-16" style={{ borderRight: '1px solid var(--border)' }}>
+                    <RefreshCw size={14} className="text-success" />
+                    <span className="text-sm fw-700 text-1">{liveRecords.filter(r => r.status === 'Clocked In' || r.status === 'Late').length} <span className="text-4 fw-500">Working</span></span>
+                 </div>
+                 <div className="row gap-8 pr-16" style={{ borderRight: '1px solid var(--border)' }}>
+                    <AlertTriangle size={14} className="text-warning" />
+                    <span className="text-sm fw-700 text-1">{liveRecords.filter(r => r.status === 'Late').length} <span className="text-4 fw-500">Late</span></span>
+                 </div>
+                 <div className="row gap-8">
+                    <MonitorStop size={14} className="text-error" />
+                    <span className="text-sm fw-700 text-1">{liveRecords.filter(r => r.status === 'Missing').length} <span className="text-4 fw-500">Missing</span></span>
+                 </div>
               </div>
               
               <div className="row gap-12">
@@ -230,7 +244,8 @@ export default function AttendancePage() {
                 <p className="text-sm text-5 mt-4">Assign working shifts to ensure accurate attendance tracking. Employees on 'Off' days will not be flagged as missing.</p>
               </div>
               <div className="row gap-12">
-                <button className="btn-secondary"><CalendarDays size={16} className="mr-8"/> This Week</button>
+                <button className="btn-secondary" onClick={() => alert('Opening Default Weekly Schedules...')}>Manage Defaults</button>
+                <button className="btn-secondary" onClick={() => alert('Opening Shift Profiles...')}>Shift Profiles</button>
                 <button className="btn-primary" onClick={() => alert('Schedule published to team successfully!')}><Send size={16} className="mr-8"/> Publish Schedule</button>
               </div>
             </div>
@@ -262,11 +277,17 @@ export default function AttendancePage() {
                         return (
                           <td key={day} style={{ padding: '16px 8px', textAlign: 'center' }}>
                             <div 
-                              style={{ display: 'inline-block', cursor: 'pointer' }}
+                              className="shift-cell"
+                              style={{ display: 'inline-block', cursor: 'pointer', position: 'relative' }}
                               onClick={() => setAssignShiftEmployee(r)}
                               title="Click to reassign shift"
                             >
-                              {renderShiftBadge(shiftType)}
+                              <div className="row gap-4" style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                {renderShiftBadge(shiftType)}
+                                <div className="edit-shift-btn" style={{ position: 'absolute', right: -12, top: -4, background: 'white', borderRadius: '50%', padding: 4, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                  <Edit3 size={12} className="text-primary"/>
+                                </div>
+                              </div>
                             </div>
                           </td>
                         );
@@ -370,6 +391,14 @@ export default function AttendancePage() {
                   <div className="text-sm fw-700 text-4">Day Off</div>
                 </div>
               </label>
+
+              <div className="divider my-8" />
+              <label className="text-sm fw-600 text-2">Or Custom Hours for this day:</label>
+              <div className="row gap-12 mt-8">
+                <input type="time" className="input flex-1" defaultValue="10:00" />
+                <span className="text-4">to</span>
+                <input type="time" className="input flex-1" defaultValue="14:00" />
+              </div>
             </div>
           </div>
         )}
