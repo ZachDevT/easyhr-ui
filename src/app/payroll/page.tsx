@@ -337,88 +337,86 @@ export default function PayrollPage() {
 
           {/* STEP 4: Finalize */}
           {wizardStep === 3 && (
-            <div style={{ padding: '40px 0' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'start' }}>
+            <div style={{ padding: '48px 48px 40px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start' }}>
                 {/* Left: Summary */}
                 <div>
-                  <div className="row gap-12 mb-20">
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <DollarSign size={22} style={{ color: 'var(--primary)' }} />
+                  <div className="row gap-14 mb-28">
+                    <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg, #EDE9FE, #DDD6FE)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <DollarSign size={22} style={{ color: '#7C3AED' }} />
                     </div>
                     <div>
                       <h3 className="text-xl fw-800 text-1" style={{ lineHeight: 1.2 }}>Payroll Summary</h3>
-                      <p className="text-sm text-5 mt-4">Aug 1 - Aug 31, 2026 &middot; {ugandaPayrollRecords.length} Employees</p>
+                      <p className="text-sm text-5 mt-6">Aug 1 - Aug 31, 2026 &middot; {ugandaPayrollRecords.length} Employees</p>
                     </div>
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="text-sm text-4 fw-600">Net Disbursed <span style={{ fontSize: 11, color: 'var(--text-5)' }}>(To Employees)</span></span>
-                      <span className="fw-800 text-success">{formatCurrency(payrollTotals.totalNet)}</span>
-                    </div>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="text-sm text-4 fw-600">PAYE Withheld <span style={{ fontSize: 11, color: 'var(--text-5)' }}>(URA)</span></span>
-                      <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalPaye)}</span>
-                    </div>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="text-sm text-4 fw-600">NSSF (15%) <span style={{ fontSize: 11, color: 'var(--text-5)' }}>(Fund)</span></span>
-                      <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalNssfEmployee + payrollTotals.totalNssfEmployer)}</span>
-                    </div>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="text-sm text-4 fw-600">LST Withheld</span>
-                      <span className="fw-800 text-1">{formatCurrency(payrollTotals.totalLst)}</span>
-                    </div>
-                    <div style={{ padding: '16px 20px', background: 'var(--primary-tint)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="text-sm fw-700" style={{ color: 'var(--primary)' }}>Total Employer Liability</span>
-                      <span className="text-lg fw-900" style={{ color: 'var(--primary)' }}>{formatCurrency(payrollTotals.totalEmployerCost)}</span>
+                  <div style={{ background: '#FAFAFA', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+                    {[
+                      { label: 'Net Disbursed', note: 'To Employees', value: formatCurrency(payrollTotals.totalNet), color: 'var(--success)' },
+                      { label: 'PAYE Withheld', note: 'URA', value: formatCurrency(payrollTotals.totalPaye), color: 'var(--text-1)' },
+                      { label: 'NSSF (15%)', note: 'NSSF Fund', value: formatCurrency(payrollTotals.totalNssfEmployee + payrollTotals.totalNssfEmployer), color: 'var(--text-1)' },
+                      { label: 'LST Withheld', note: 'Local Govt.', value: formatCurrency(payrollTotals.totalLst), color: 'var(--text-1)' },
+                    ].map((row, i) => (
+                      <div key={i} style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
+                        <div>
+                          <span className="text-sm fw-600 text-2">{row.label}</span>
+                          <span className="text-xs text-5 ml-8">({row.note})</span>
+                        </div>
+                        <span className="fw-800" style={{ color: row.color, fontSize: 15 }}>{row.value}</span>
+                      </div>
+                    ))}
+                    <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, #EDE9FE 0%, #F3F4FF 100%)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-sm fw-800" style={{ color: '#5B21B6' }}>Total Employer Liability</span>
+                      <span style={{ color: '#5B21B6', fontSize: 18, fontWeight: 900 }}>{formatCurrency(payrollTotals.totalEmployerCost)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Right: Checklist + Action */}
-                <div>
-                  <h3 className="text-base fw-700 text-1 mb-16">Pre-flight Checklist</h3>
-                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, marginBottom: 24 }}>
-                    {[
-                      { label: 'Pay period configured', ok: true },
-                      { label: 'All employees reviewed', ok: true },
-                      { label: 'Tax calculations applied (Uganda)', ok: true },
-                      { label: 'Hour adjustments approved', ok: true },
-                      { label: 'No payouts sent - status update only', ok: true },
-                    ].map((item, i, arr) => (
-                      <div key={i} style={{ padding: '12px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: '50%', background: item.ok ? '#DCFCE7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            {item.ok
-                              ? <path d="M2 5l2 2 4-4" stroke="#16A34A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              : <path d="M3 3l4 4M7 3l-4 4" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round"/>}
-                          </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div>
+                    <h3 className="text-sm fw-700 text-4 mb-14" style={{ textTransform: 'uppercase', letterSpacing: '0.6px' }}>Pre-flight Checklist</h3>
+                    <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+                      {[
+                        'Pay period configured',
+                        'All employees reviewed',
+                        'Tax calculations applied (Uganda)',
+                        'Hour adjustments approved',
+                        'No payouts sent — status update only',
+                      ].map((label, i, arr) => (
+                        <div key={i} style={{ padding: '14px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#DCFCE7', border: '1.5px solid #86EFAC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                              <path d="M2.5 5.5l2 2 4-4" stroke="#16A34A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                          <span className="text-sm fw-600 text-2">{label}</span>
                         </div>
-                        <span className="text-sm fw-600 text-2">{item.label}</span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
 
-                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '12px 16px', marginBottom: 24, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />
-                    <p className="text-xs" style={{ color: '#92400E', lineHeight: 1.6, margin: 0 }}>
-                      This will <strong>lock this pay period</strong> and generate payslips. No funds will be disbursed automatically.
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
+                    <p className="text-xs" style={{ color: '#78350F', lineHeight: 1.7, margin: 0 }}>
+                      This will <strong>lock this pay period</strong> and generate payslips for all employees. No funds are moved automatically.
                     </p>
                   </div>
 
                   <button
-                    className="w-100"
                     onClick={handleRunPayroll}
                     disabled={isProcessing}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                      padding: '16px 32px', borderRadius: 12, border: 'none',
+                      padding: '18px 32px', borderRadius: 14, border: 'none',
                       cursor: isProcessing ? 'not-allowed' : 'pointer',
                       fontSize: 15, fontWeight: 800, letterSpacing: '0.3px',
                       background: isProcessing ? '#9CA3AF' : 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
                       color: 'white',
-                      boxShadow: isProcessing ? 'none' : '0 4px 20px rgba(124,58,237,0.35)',
+                      boxShadow: isProcessing ? 'none' : '0 6px 24px rgba(124,58,237,0.4)',
                       transition: 'all 0.2s ease',
+                      width: '100%',
                     }}
                   >
                     <DollarSign size={18} />
