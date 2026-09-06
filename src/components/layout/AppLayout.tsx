@@ -7,7 +7,9 @@ import { TopBar } from './TopBar';
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname.startsWith('/careers')) {
+  const isPublic = pathname === '/' || pathname.startsWith('/auth') || pathname.startsWith('/company/register') || pathname.startsWith('/careers') || pathname.startsWith('/features') || pathname.startsWith('/how-it-works') || pathname.startsWith('/pricing');
+
+  if (isPublic) {
     return <>{children}</>;
   }
 

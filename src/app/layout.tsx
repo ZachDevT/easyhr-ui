@@ -3,6 +3,7 @@ import { RoleProvider } from '@/context/RoleContext';
 import { WidgetProvider } from '@/context/WidgetContext';
 import { HRProvider } from '@/context/HRContext';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OperationsProvider } from '@/context/OperationsContext';
 
 export const metadata = {
   title: 'EasyHR',
@@ -19,11 +20,11 @@ export default function RootLayout({
       <body>
         <RoleProvider>
           <HRProvider>
-            <WidgetProvider>
+            <OperationsProvider><WidgetProvider>
               <AppLayout>
                 {children}
               </AppLayout>
-            </WidgetProvider>
+            </WidgetProvider></OperationsProvider>
           </HRProvider>
         </RoleProvider>
       </body>

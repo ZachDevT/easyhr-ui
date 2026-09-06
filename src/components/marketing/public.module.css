@@ -1,0 +1,305 @@
+/* ============================================================
+   PUBLIC NAV — full-width, edge-to-edge, sticky at top
+   ============================================================ */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s, backdrop-filter 0.3s;
+}
+/* Default: transparent, dark text (works on light hero) */
+.navTransparent {
+  background: transparent;
+  border-bottom: 1px solid transparent;
+}
+/* Scrolled: white frosted glass */
+.navScrolled {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 32px rgba(0, 0, 0, 0.07);
+}
+.navInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 28px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+/* Logo link wrapper — spacing handled by EasyHRLogo component itself */
+.navInner > a:first-child {
+  margin-right: 36px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+.navLink {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'Enzyme', sans-serif;
+  letter-spacing: -0.01em;
+  color: #4b4654;
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+  -webkit-text-stroke: 0.25px currentColor;
+}
+.navLink:hover {
+  color: #1a1520;
+  background: rgba(0, 0, 0, 0.05);
+}
+.navLinkActive {
+  color: #9a33e7 !important;
+  background: rgba(154, 51, 231, 0.06) !important;
+}
+
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.navSignIn {
+  padding: 8px 15px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #514a5a;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+.navSignIn:hover {
+  color: #1a1520;
+  background: rgba(0, 0, 0, 0.05);
+}
+.navCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #a238ff, #ff3ea5);
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: -0.01em;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: 0 4px 18px rgba(162, 56, 255, 0.4);
+}
+.navCta:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.mobileMenu {
+  display: none;
+  background: none;
+  border: none;
+  color: #1a1520;
+  padding: 6px;
+  margin-left: 8px;
+  cursor: pointer;
+}
+
+/* Mobile drawer */
+.drawer {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  z-index: 99;
+  background: rgba(10, 9, 12, 0.97);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px 28px 28px;
+  animation: slideDown 0.18s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.drawerInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drawerLink {
+  padding: 13px 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  transition: color 0.15s;
+}
+.drawerLink:hover {
+  color: #fff;
+}
+.drawerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.drawerActions > a:first-child {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 720px) {
+  .navLinks,
+  .navSignIn {
+    display: none;
+  }
+  .mobileMenu {
+    display: flex;
+    margin-left: auto;
+  }
+  .navActions {
+    display: none;
+  }
+}
+
+/* ============================================================
+   PUBLIC FOOTER — rich, full-width
+   ============================================================ */
+.footer {
+  background: #0a090c;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 72px max(28px, calc((100vw - 1280px) / 2)) 0;
+}
+.footerTop {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 60px;
+  padding-bottom: 64px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.footerBrand {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.footerBrand .brand {
+  gap: 10px;
+  color: #fff;
+  font-size: 18px;
+}
+.footerTagline {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.45);
+}
+.socials {
+  display: flex;
+  gap: 10px;
+}
+.socials a {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.socials a:hover {
+  border-color: rgba(162, 56, 255, 0.5);
+  color: #fff;
+  background: rgba(162, 56, 255, 0.12);
+}
+
+.footerColumns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+}
+.footerCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.footerCol b {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 4px;
+}
+.footerCol a {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footerCol a:hover {
+  color: #fff;
+}
+
+.footerBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.28);
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.footerLegal {
+  display: flex;
+  gap: 20px;
+}
+.footerLegal a {
+  color: rgba(255, 255, 255, 0.28);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footerLegal a:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+.footerBuilt {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+@media (max-width: 1000px) {
+  .footerTop {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .footerColumns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .footerColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+  .footerBottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

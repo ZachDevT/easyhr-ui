@@ -3,8 +3,12 @@
 import { useState } from 'react';
 import { PieChart as PieChartIcon, Download, Users, TrendingDown, Target, Clock, Filter, Calendar } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { Card, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatRibbon } from '@/components/ui/StatRibbon';
+import { employees } from '@/data/employees';
+import { useOperations } from '@/context/OperationsContext';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -47,16 +51,19 @@ const compData = [
 ];
 
 export default function ReportsPage() {
-  const { role } = useRole();
+  const { role, currentUser } = useRole();
+  const { requests } = useOperations();
   const [dateRange, setDateRange] = useState('Year to Date');
 
   if (role === 'Employee') {
     return (
       <div style={{ textAlign: 'center', marginTop: 80 }}>
-        <p className="text-4">You don't have access to this page.</p>
+        <p className="text-4">You don&apos;t have access to this page.</p>
       </div>
     );
   }
+
+  if (role === 'Manager') return <ManagerTeamReport managerName={`${currentUser.firstName} ${currentUser.lastName}`} requests={requests} dateRange={dateRange} setDateRange={setDateRange} />;
 
   return (
     <div className="page-container" style={{ background: 'var(--bg-page)', minHeight: '100%' }}>
@@ -202,7 +209,7 @@ export default function ReportsPage() {
                 <RechartsTooltip 
                   cursor={{ fill: 'var(--primary-tint)' }} 
                   contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontFamily: 'Questrial' }} 
-                  formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Avg Salary']}
+                  formatter={(value: unknown) => [`$${Number(value).toLocaleString()}`, 'Avg Salary']}
                 />
                 <Bar dataKey="avgSalary" fill="url(#compGradient)" radius={[8, 8, 0, 0]} barSize={48}>
                   {compData.map((entry, index) => (
@@ -224,3 +231,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+function ManagerTeamReport({managerName,requests,dateRange,setDateRange}:{managerName:string;requests:ReturnType<typeof useOperations>['requests'];dateRange:string;setDateRange:(value:string)=>void}){const team=employees.filter(e=>e.manager===managerName);const ids=new Set(team.map(e=>e.id));const teamLeave=requests.filter(r=>ids.has(r.employeeId));const attendance=[{day:'Mon',present:team.length,away:0},{day:'Tue',present:Math.max(0,team.length-1),away:1},{day:'Wed',present:team.length,away:0},{day:'Thu',present:team.length,away:0},{day:'Fri',present:Math.max(0,team.length-1),away:1}];return <><PageHeader title="Team Reports" subtitle={`Private manager analytics for ${managerName}’s direct reports only.`} icon={<PieChartIcon size={28}/>} actions={<div className="row gap-8" style={{background:'white',borderRadius:9,padding:'7px 12px',color:'var(--text-1)'}}><Calendar size={14}/><select value={dateRange} onChange={e=>setDateRange(e.target.value)} style={{border:0,outline:0,fontFamily:'inherit'}}><option>Year to Date</option><option>Last Quarter</option><option>Last 30 Days</option></select></div>}/><main style={{padding:'0 24px 32px'}}><StatRibbon stats={[{label:'Direct reports',value:team.length,icon:<Users size={20}/>,color:'var(--primary)'},{label:'Attendance rate',value:'96%',trend:'+2 pts',trendType:'positive',icon:<Clock size={20}/>,color:'var(--success)'},{label:'Pending leave',value:teamLeave.filter(r=>r.status.startsWith('Pending')).length,icon:<Calendar size={20}/>,color:'var(--warning)'},{label:'Goals on track',value:'82%',description:'Team average',icon:<Target size={20}/>,color:'var(--text-4)'}]}/><div style={{display:'grid',gridTemplateColumns:'1.35fr .85fr',gap:20,marginTop:20}}><Card><CardBody><div className="row-between mb-24"><div><h2 className="text-xl fw-800 text-1 m-0">Weekly attendance</h2><p className="text-sm text-4">Present and away across your team</p></div><Badge variant="primary">Team only</Badge></div><div style={{height:280}}><ResponsiveContainer><BarChart data={attendance}><CartesianGrid vertical={false} stroke="var(--border)"/><XAxis dataKey="day" axisLine={false} tickLine={false}/><YAxis allowDecimals={false} axisLine={false} tickLine={false}/><RechartsTooltip/><Bar dataKey="present" stackId="a" fill="#A238FF" radius={[6,6,0,0]}/><Bar dataKey="away" stackId="a" fill="#F3D8FF"/></BarChart></ResponsiveContainer></div></CardBody></Card><Card><CardBody><h2 className="text-xl fw-800 text-1 m-0 mb-4">Team composition</h2><p className="text-sm text-4">Your direct reports by status</p><div style={{padding:'24px 0',textAlign:'center'}}><strong style={{fontSize:48,color:'var(--primary)'}}>{team.length}</strong><div className="text-xs text-5">DIRECT REPORTS</div></div>{team.map(e=><div key={e.id} className="row-between" style={{padding:'11px 0',borderTop:'1px solid var(--border)'}}><span className="text-sm fw-700 text-1">{e.firstName} {e.lastName}</span><Badge variant={e.status==='Active'?'success':'warning'}>{e.status}</Badge></div>)}</CardBody></Card><Card><CardBody><h2 className="text-xl fw-800 text-1 m-0 mb-4">Leave usage</h2><p className="text-sm text-4">Approved and pending hours for your team</p>{team.map(e=>{const rs=teamLeave.filter(r=>r.employeeId===e.id);return <div key={e.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><div className="row-between"><b className="text-sm">{e.firstName} {e.lastName}</b><span className="text-xs text-4">{rs.reduce((s,r)=>s+r.hours,0)}h requested</span></div></div>})}</CardBody></Card><Card><CardBody><h2 className="text-xl fw-800 text-1 m-0 mb-4">Performance pulse</h2><p className="text-sm text-4">Manager planning signals—not company analytics</p><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:18}}><div style={{padding:18,background:'var(--primary-tint)',borderRadius:11}}><strong style={{fontSize:28,color:'var(--primary)'}}>82%</strong><div className="text-xs text-4">Goals on track</div></div><div style={{padding:18,background:'rgba(22,163,74,.09)',borderRadius:11}}><strong style={{fontSize:28,color:'var(--success)'}}>4.3</strong><div className="text-xs text-4">Check-in score</div></div></div></CardBody></Card></div></main></>}

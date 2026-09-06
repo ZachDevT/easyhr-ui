@@ -1,292 +1,420 @@
-"use client";
-import { useState } from 'react';
-import { X } from 'lucide-react';
-import { useRole } from '../context/RoleContext';
-import { useWidgets, MAX_WIDGETS } from '../context/WidgetContext';
-import { CompulsoryMyTimeWidget, CompulsoryTimeOffWidget, WIDGET_MAP, OPTIONAL_WIDGETS } from '../components/widgets';
-import { Modal } from '../components/ui/Modal';
+import Link from "next/link";
+import {
+  ArrowRight,
+  BarChart3,
+  BriefcaseBusiness,
+  CalendarCheck2,
+  Check,
+  Clock3,
+  FileCheck2,
+  Fingerprint,
+  GitBranch,
+  HeartPulse,
+  Network,
+  ShieldCheck,
+  Star,
+  Users2,
+  WalletCards,
+  Zap,
+} from "lucide-react";
+import { PublicNav, PublicFooter } from "@/components/marketing/PublicNav";
+import { HeroSection } from "@/components/marketing/HeroSection";
+import styles from "./landing.module.css";
 
-export default function Dashboard() {
-  const { currentUser } = useRole();
-  const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
-  const initials = `${currentUser.firstName[0]}${currentUser.lastName[0]}`;
+/* eslint-disable react/jsx-key -- static icon tuples are rendered inside elements with stable title keys */
+const capabilities = [
+  {
+    icon: <Users2 />,
+    tag: "Core HR",
+    title: "One trusted home for every employee.",
+    text: "Profiles, documents, roles, departments, org structure and employment history—accurate, secure and always in context.",
+    list: [
+      "Employee system of record",
+      "People directory & org chart",
+      "Role-based access",
+    ],
+    className: styles.violet,
+  },
+  {
+    icon: <Clock3 />,
+    tag: "Time & leave",
+    title: "Requests move. Balances stay right.",
+    text: "Employees request leave, managers decide, HR verifies, and balances update through one transparent workflow.",
+    list: [
+      "Manager → HR approvals",
+      "Attendance & shift planning",
+      "Live leave balances",
+    ],
+    className: styles.peach,
+  },
+  {
+    icon: <WalletCards />,
+    tag: "Payroll & rewards",
+    title: "Turn approved work into confident payroll.",
+    text: "Bring attendance, leave, benefits and compensation together for a cleaner payroll process and clearer employee rewards.",
+    list: [
+      "Payroll-ready time",
+      "Payslips & compensation history",
+      "Benefits & total rewards",
+    ],
+    className: styles.mint,
+  },
+  {
+    icon: <Star />,
+    tag: "Performance",
+    title: "Help people know where they stand.",
+    text: "Goals, feedback, reviews and engagement signals give managers a useful rhythm for developing their teams.",
+    list: [
+      "Goals & review cycles",
+      "1:1s and feedback",
+      "Pulse surveys & eNPS",
+    ],
+    className: styles.blue,
+  },
+];
+const modules = [
+  [<BriefcaseBusiness />, "Hiring", "Jobs, candidates, interviews and offers"],
+  [
+    <GitBranch />,
+    "Onboarding",
+    "Reusable journeys from signed offer to day one",
+  ],
+  [
+    <CalendarCheck2 />,
+    "Time off",
+    "Policies, approvals, calendars and balances",
+  ],
+  [<Clock3 />, "Attendance", "Clocking, timesheets, corrections and shifts"],
+  [
+    <FileCheck2 />,
+    "Documents",
+    "Templates, e-signatures, expiry and audit history",
+  ],
+  [<WalletCards />, "Payroll", "Runs, payslips, benefits and total rewards"],
+  [<Star />, "Performance", "Goals, reviews, feedback and development"],
+  [<HeartPulse />, "Engagement", "Surveys, eNPS and employee relations"],
+  [<BarChart3 />, "Insights", "Scoped reports for managers and HR"],
+  [<ShieldCheck />, "Permissions", "Purpose-built access for every role"],
+  [<Zap />, "Workflows", "Configurable actions and approval chains"],
+  [<Network />, "Organization", "Departments, job architecture and org design"],
+];
 
-  const { activeWidgets, removeWidget, addWidget, reorderWidgets } = useWidgets();
-  
-  const [isEditing, setIsEditing] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  
-  // Drag and drop state
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIdx(index);
-    e.dataTransfer.effectAllowed = 'move';
-    // Small timeout to allow UI update after drag starts without breaking the drag image
-    setTimeout(() => e.target && (e.target as HTMLElement).classList.add('dragging'), 0);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIdx === null || draggedIdx === index) return;
-    reorderWidgets(draggedIdx, index);
-    setDraggedIdx(index);
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    setDraggedIdx(null);
-    if (e.target) (e.target as HTMLElement).classList.remove('dragging');
-  };
-
-  function togglePicker(id: string) {
-    if (activeWidgets.includes(id)) {
-      removeWidget(id);
-    } else {
-      addWidget(id);
-    }
-  }
-
+export default function LandingPage() {
   return (
-    <>
-      {/* Profile header */}
-      <div className="row-between mb-24">
-        <div className="row gap-16">
-          <div
-            className="avatar"
-            style={{ width: 84, height: 84, fontSize: 28, backgroundImage: 'var(--gradient)' }}
-          >
-            {currentUser.avatar
-              ? <img src={currentUser.avatar} alt={fullName} />
-              : <span>{initials}</span>
-            }
+    <div className={styles.site}>
+      <PublicNav />
+      <main>
+        {/* ── HERO ─────────────────────────────────────── */}
+        <HeroSection />
+
+        <section className={styles.proof}>
+          <p>One calm workspace for ambitious people teams</p>
+          <div>
+            <b>ACACIA</b>
+            <b>NILEWORKS</b>
+            <b>KAMPALA LABS</b>
+            <b>SUMMIT</b>
+            <b>ORBITAL</b>
+          </div>
+        </section>
+
+        <section className={styles.problem}>
+          <div>
+            <span className={styles.kicker}>Your work, connected</span>
+            <h2>
+              Stop running your company across fifteen disconnected tools.
+            </h2>
+          </div>
+          <p>
+            EasyHR turns fragmented people tasks into one clear operating
+            rhythm—from the moment someone applies to their last day and every
+            milestone between.
+          </p>
+        </section>
+
+        <section id="solutions" className={styles.capabilities}>
+          {capabilities.map((c, i) => (
+            <article key={c.title} className={c.className}>
+              <div className={styles.capCopy}>
+                <div className={styles.capIcon}>{c.icon}</div>
+                <span>{c.tag}</span>
+                <h3>{c.title}</h3>
+                <p>{c.text}</p>
+                <ul>
+                  {c.list.map((x) => (
+                    <li key={x}>
+                      <Check />
+                      {x}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/features">
+                  Explore {c.tag.toLowerCase()} <ArrowRight />
+                </Link>
+              </div>
+              <div className={styles.capVisual}>
+                {i === 0 ? (
+                  <PeopleVisual />
+                ) : i === 1 ? (
+                  <ApprovalVisual />
+                ) : i === 2 ? (
+                  <PayrollVisual />
+                ) : (
+                  <PerformanceVisual />
+                )}
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <section className={styles.moduleSection}>
+          <div className={styles.sectionHeading}>
+            <span className={styles.kicker}>The complete platform</span>
+            <h2>
+              Everything your people team needs.
+              <br />
+              <em>Nothing they don&apos;t.</em>
+            </h2>
+            <p>
+              Start with the essentials. Add advanced modules as your company
+              grows.
+            </p>
+          </div>
+          <div className={styles.moduleGrid}>
+            {modules.map(([icon, title, text]) => (
+              <Link href="/features" key={String(title)}>
+                <span>{icon}</span>
+                <div>
+                  <b>{title}</b>
+                  <p>{text}</p>
+                </div>
+                <ArrowRight />
+              </Link>
+            ))}
+          </div>
+          <Link href="/features" className={styles.allFeatures}>
+            Explore every EasyHR module <ArrowRight />
+          </Link>
+        </section>
+
+        <section className={styles.humanSection}>
+          <div className={styles.humanCopy}>
+            <span className={styles.kicker}>Made for real teams</span>
+            <h2>HR software people actually want to use.</h2>
+            <p>
+              Employees get simple self-service. Managers get the context to
+              lead. HR gets company-wide control without exposing confidential
+              information.
+            </p>
+            <div className={styles.roleTabs}>
+              <article>
+                <b>Employee</b>
+                <span>Profile, time, requests, documents, directory</span>
+              </article>
+              <article>
+                <b>Manager</b>
+                <span>My team, approvals, attendance, team insights</span>
+              </article>
+              <article>
+                <b>HR & Admin</b>
+                <span>Company data, policies, payroll, workflows, reports</span>
+              </article>
+            </div>
+            <Link href="/how-it-works">
+              See the experience for every role <ArrowRight />
+            </Link>
+          </div>
+        </section>
+
+        <section className={styles.security} id="security">
+          <div className={styles.securityIntro}>
+            <Fingerprint />
+            <span className={styles.kicker}>Designed around trust</span>
+            <h2>
+              People data is personal.
+              <br />
+              We treat it that way.
+            </h2>
+            <p>
+              Company isolation, deliberate permissions, auditable workflows and
+              role-aware experiences are built into the product foundation.
+            </p>
+            <Link href="/features">
+              Explore security & permissions <ArrowRight />
+            </Link>
+          </div>
+          <div className={styles.securityCards}>
+            <article>
+              <ShieldCheck />
+              <b>Tenant-isolated workspaces</b>
+              <p>
+                Every company&apos;s people and configuration stay within its own
+                secure workspace.
+              </p>
+            </article>
+            <article>
+              <Users2 />
+              <b>Least-privilege access</b>
+              <p>
+                Employees, managers and HR see deliberately different levels of
+                information.
+              </p>
+            </article>
+            <article>
+              <FileCheck2 />
+              <b>Complete activity history</b>
+              <p>
+                Approvals, signatures and sensitive changes remain traceable and
+                accountable.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section className={styles.pricingCta}>
+          <div>
+            <span>Free for teams under 10</span>
+            <h2>A better way to run your people operations starts here.</h2>
+            <p>
+              Build your workspace, invite your team and try every feature
+              included in your plan. Your first paid month is free.
+            </p>
           </div>
           <div>
-            <h1
-              className="gradient-text fw-800"
-              style={{ fontSize: 32, letterSpacing: '-1px' }}
-            >
-              Hi, {currentUser.firstName}
-            </h1>
-            <p className="text-sm text-4 mt-4" style={{ fontWeight: 500 }}>{currentUser.title}</p>
+            <Link href="/company/register">
+              Start free today <ArrowRight />
+            </Link>
+            <Link href="/pricing">See simple pricing</Link>
           </div>
-        </div>
+        </section>
+      </main>
+      <PublicFooter />
+    </div>
+  );
+}
 
-        <div className="row gap-10">
-          <button className="btn-neutral" style={{ padding: '8px 20px' }}>Edit</button>
-          <button 
-            className={isEditing ? "btn-primary" : "widget-manage-btn"} 
-            onClick={() => setIsEditing(!isEditing)} 
-            style={{ padding: '8px 16px' }}
-          >
-            {isEditing ? 'Done Editing' : 'Manage Widgets'}
-            {!isEditing && <span className="limit-chip" style={{ marginLeft: 6 }}>{activeWidgets.length}/{MAX_WIDGETS}</span>}
-          </button>
-        </div>
+function PeopleVisual() {
+  return (
+    <div className={styles.peopleVisual}>
+      <div className={styles.pvHeader}>
+        <b>People</b>
+        <button>+ Add employee</button>
       </div>
-
-      {/* Main Layout: Left Column (Compulsory) + Right Column (Optional Widgets) */}
-      <div className="dash-grid" style={{ gridTemplateColumns: '360px 1fr', gap: 24, alignItems: 'stretch' }}>
-        
-        {/* Left Column - Compulsory */}
-        <div className="col gap-16">
-          <CompulsoryMyTimeWidget />
-          <CompulsoryTimeOffWidget />
+      {[
+        ["AM", "Amina Hassan", "Marketing Manager", "Kampala"],
+        ["DK", "David Kimani", "Sales Representative", "Kisumu"],
+        ["GO", "Grace Otieno", "Finance Analyst", "Nairobi"],
+      ].map((p, i) => (
+        <div className={styles.employeeRow} key={p[1]}>
+          <i>{p[0]}</i>
+          <span>
+            <b>{p[1]}</b>
+            <small>{p[2]}</small>
+          </span>
+          <em>{p[3]}</em>
+          <strong className={i === 1 ? styles.away : ""}>
+            {i === 1 ? "Away" : "Active"}
+          </strong>
         </div>
-
-        {/* Right Column - Optional Widgets in a Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, alignItems: 'stretch' }}>
-          
-          {activeWidgets.length === 0 && (
-            <div
-              className="card"
-              style={{ gridColumn: '1 / -1', padding: 48, textAlign: 'center' }}
-            >
-              <p className="text-4 mb-12 text-sm">No optional widgets on your dashboard.</p>
-              {!isEditing && <button className="btn-primary" onClick={() => setIsEditing(true)}>Add Widgets</button>}
-            </div>
-          )}
-
-          {/* Render Active Widgets */}
-          {activeWidgets.map((id, index) => {
-            const Comp = WIDGET_MAP[id];
-            if (!Comp) return null;
-            return (
-              <div 
-                key={id}
-                draggable={isEditing}
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
-                style={{ 
-                  cursor: isEditing ? 'grab' : 'default',
-                  opacity: draggedIdx === index ? 0.4 : 1,
-                  transition: 'opacity 0.2s',
-                  position: 'relative'
-                }}
-              >
-                <div style={isEditing ? { pointerEvents: 'none' } : {}}>
-                  <Comp onRemove={isEditing ? () => removeWidget(id) : undefined} />
-                </div>
-                {isEditing && (
-                  <button 
-                    className="edit-remove-badge"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeWidget(id);
-                    }}
-                  >
-                    <X size={14} strokeWidth={3} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Render Empty Placeholders in Edit Mode */}
-          {isEditing && Array.from({ length: MAX_WIDGETS - activeWidgets.length }).map((_, i) => (
-            <div 
-              key={`empty-${i}`} 
-              className="card widget-placeholder"
-              onClick={() => setPickerOpen(true)}
-            >
-              <div className="widget-placeholder-content">
-                <span className="plus-icon">+</span>
-                <p>Click to add widget</p>
-              </div>
-            </div>
-          ))}
-
-        </div>
+      ))}
+    </div>
+  );
+}
+function ApprovalVisual() {
+  return (
+    <div className={styles.approvalVisual}>
+      <header>
+        <span>
+          <i>DK</i>
+          <b>
+            David Kimani<small>Sales Representative</small>
+          </b>
+        </span>
+        <em>Manager review</em>
+      </header>
+      <div className={styles.leaveDates}>
+        <span>
+          <small>FROM</small>
+          <b>14 Sep</b>
+        </span>
+        <ArrowRight />
+        <span>
+          <small>TO</small>
+          <b>18 Sep</b>
+        </span>
+        <strong>5 days</strong>
       </div>
-
-      {/* CSS for Placeholders & Dragging */}
-      <style>{`
-        .widget-placeholder {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px dashed var(--card-border) !important;
-          background: transparent !important;
-          min-height: 160px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .widget-placeholder:hover {
-          border-color: var(--primary) !important;
-          background: var(--primary-tint) !important;
-        }
-        .widget-placeholder-content {
-          text-align: center;
-          color: var(--text-5);
-        }
-        .widget-placeholder:hover .widget-placeholder-content {
-          color: var(--primary);
-        }
-        .plus-icon {
-          font-size: 24px;
-          font-weight: 300;
-          display: block;
-          margin-bottom: 4px;
-        }
-        .dragging {
-          transform: scale(1.02);
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        .edit-remove-badge {
-          position: absolute;
-          top: -10px;
-          right: -10px;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          background: #ef4444;
-          color: white;
-          border: 3px solid var(--body-bg);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-          z-index: 10;
-          transition: transform 0.15s;
-        }
-        .edit-remove-badge:hover {
-          transform: scale(1.1);
-          background: #dc2626;
-        }
-        /* Hide the internal remove btn in edit mode to avoid confusion with the badge */
-        .widget-remove-btn { display: none !important; }
-      `}</style>
-
-      {/* Add Widget Picker Modal */}
-      <Modal
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        title="Widget Library"
-        footer={<button className="btn-primary w-full" onClick={() => setPickerOpen(false)}>Done</button>}
-      >
-        <p className="text-sm text-5 mb-16 text-center">
-          Customize your dashboard with up to <strong>{MAX_WIDGETS}</strong> optional widgets.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {OPTIONAL_WIDGETS.map((w, i) => {
-            const sel = activeWidgets.includes(w.id);
-            const dis = !sel && activeWidgets.length >= MAX_WIDGETS;
-            return (
-              <div
-                key={w.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '16px 0',
-                  borderBottom: i === OPTIONAL_WIDGETS.length - 1 ? 'none' : '1px solid var(--card-border)'
-                }}
-              >
-                <div style={{ 
-                  width: 42, 
-                  height: 42, 
-                  borderRadius: 12, 
-                  background: 'var(--primary-tint)', 
-                  color: 'var(--primary)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  {w.icon}
-                </div>
-                <div style={{ flex: 1, marginLeft: 16 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{w.label}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-5)', marginTop: 2 }}>{w.desc}</div>
-                </div>
-                {sel ? (
-                  <span style={{ 
-                    fontSize: 12, 
-                    fontWeight: 700, 
-                    color: 'var(--primary)', 
-                    background: 'var(--primary-tint)', 
-                    padding: '6px 12px', 
-                    borderRadius: 20 
-                  }}>
-                    Added
-                  </span>
-                ) : (
-                  <button 
-                    className="btn-secondary btn-sm" 
-                    disabled={dis} 
-                    onClick={() => togglePicker(w.id)}
-                    style={{ padding: '6px 16px', borderRadius: 20 }}
-                  >
-                    + Add
-                  </button>
-                )}
-              </div>
-            );
-          })}
+      <div className={styles.balance}>
+        <span>Vacation balance after approval</span>
+        <b>7 days remaining</b>
+        <i>
+          <em />
+        </i>
+      </div>
+      <footer>
+        <button>Decline</button>
+        <button>Approve request</button>
+      </footer>
+    </div>
+  );
+}
+function PayrollVisual() {
+  return (
+    <div className={styles.payrollVisual}>
+      <header>
+        <span>September payroll</span>
+        <em>Ready for review</em>
+      </header>
+      <strong>UGX 84,620,000</strong>
+      <small>Net pay for 42 employees</small>
+      <div>
+        {[
+          ["Gross pay", "UGX 112.4M", "100%"],
+          ["Deductions", "UGX 27.8M", "24%"],
+          ["Net pay", "UGX 84.6M", "76%"],
+        ].map((x) => (
+          <span key={x[0]}>
+            <b>{x[0]}</b>
+            <i>
+              <em style={{ width: x[2] }} />
+            </i>
+            <small>{x[1]}</small>
+          </span>
+        ))}
+      </div>
+      <button>
+        Review payroll <ArrowRight />
+      </button>
+    </div>
+  );
+}
+function PerformanceVisual() {
+  return (
+    <div className={styles.performanceVisual}>
+      <header>
+        <div>
+          <small>TEAM GOALS</small>
+          <b>Q3 progress</b>
         </div>
-      </Modal>
-
-    </>
+        <strong>82%</strong>
+      </header>
+      <div className={styles.goalRing}>
+        <span>
+          <b>18</b>
+          <small>goals on track</small>
+        </span>
+      </div>
+      <div className={styles.goalLegend}>
+        <span>
+          <i /> On track <b>18</b>
+        </span>
+        <span>
+          <i /> At risk <b>4</b>
+        </span>
+        <span>
+          <i /> Completed <b>9</b>
+        </span>
+      </div>
+    </div>
   );
 }

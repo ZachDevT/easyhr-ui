@@ -17,8 +17,6 @@ import {
   Network,
   Scale,
   Book,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   CalendarRange,
@@ -27,9 +25,18 @@ import {
   Gift,
   PanelLeftClose,
   PanelLeftOpen,
+  Sparkles,
+  GitBranch,
+  Award,
+  Settings2,
+  ShieldCheck,
+  FolderOpen,
+  Inbox,
+  UserMinus,
 } from 'lucide-react';
 import { useRole } from '../../context/RoleContext';
 import { Avatar } from '../ui/Avatar';
+import { EasyHRLogo, EasyHRMark } from '../marketing/EasyHRLogo';
 
 interface NavItemProps {
   href: string;
@@ -171,28 +178,11 @@ export function Sidebar() {
         }}
       >
         {/* Logo */}
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', overflow: 'hidden', flex: 1 }}>
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 7,
-              backgroundImage: 'var(--gradient)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: 13,
-              fontWeight: 800,
-              flexShrink: 0,
-            }}
-          >
-            E
-          </div>
-          {!collapsed && (
-            <span style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
-              EasyHR
-            </span>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', overflow: 'hidden', flex: 1, paddingLeft: collapsed ? 0 : 4 }}>
+          {collapsed ? (
+            <EasyHRMark size={28} />
+          ) : (
+            <EasyHRLogo size={28} />
           )}
         </Link>
 
@@ -232,7 +222,7 @@ export function Sidebar() {
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0' }}>
 
-        <NavItem href="/" icon={<Home size={16} strokeWidth={2} />} label="Home" isActive={isActive('/', true)} collapsed={collapsed} />
+        <NavItem href="/dashboard" icon={<Home size={16} strokeWidth={2} />} label="Home" isActive={isActive('/dashboard', true)} collapsed={collapsed} />
 
         {/* MY INFO */}
         <NavGroup label="My Info" collapsed={collapsed} defaultOpen={true}>
@@ -241,14 +231,19 @@ export function Sidebar() {
           <NavItem href="/time-off" icon={<CalendarDays size={16} strokeWidth={2} />} label="Time Off" isActive={isActive('/time-off')} collapsed={collapsed} />
           <NavItem href="/my-signatures" icon={<FileSignature size={16} strokeWidth={2} />} label="My Signatures" isActive={isActive('/my-signatures')} collapsed={collapsed} />
           <NavItem href="/my-onboarding" icon={<ClipboardList size={16} strokeWidth={2} />} label="My Onboarding" isActive={isActive('/my-onboarding')} collapsed={collapsed} />
+          <NavItem href="/org-chart" icon={<Network size={16} strokeWidth={2} />} label="Org Chart" isActive={isActive('/org-chart')} collapsed={collapsed} />
+          {!isManager && !isHRAdmin && <NavItem href="/people" icon={<Users size={16} strokeWidth={2} />} label="People Directory" isActive={isActive('/people', true)} collapsed={collapsed} />}
+          {!isManager && <NavItem href="/inbox" icon={<Inbox size={16} strokeWidth={2} />} label={isHRAdmin ? 'HR Approval Inbox' : 'Notifications'} isActive={isActive('/inbox')} collapsed={collapsed} />}
         </NavGroup>
 
         {/* COMPANY (Manager + HR Admin) */}
         {(isHRAdmin || isManager) && (
           <NavGroup label="Company" collapsed={collapsed} defaultOpen={true}>
-            <NavItem href="/people" icon={<Users size={16} strokeWidth={2} />} label={isHRAdmin ? 'All People' : 'My Team'} isActive={isActive('/people', true)} collapsed={collapsed} />
+            {isManager && <NavItem href="/my-team" icon={<Users size={16} strokeWidth={2} />} label="My Team" isActive={isActive('/my-team')} collapsed={collapsed} />}
+            {isManager && <NavItem href="/team-requests" icon={<ClipboardList size={16} strokeWidth={2} />} label="Team Requests" isActive={isActive('/team-requests')} collapsed={collapsed} />}
+            <NavItem href="/people" icon={<Users size={16} strokeWidth={2} />} label="People Directory" isActive={isActive('/people', true)} collapsed={collapsed} />
             <NavItem href="/attendance" icon={<Clock size={16} strokeWidth={2} />} label="Team Attendance" isActive={isActive('/attendance')} collapsed={collapsed} />
-            <NavItem href="/org-chart" icon={<Network size={16} strokeWidth={2} />} label="Org Chart" isActive={isActive('/org-chart')} collapsed={collapsed} />
+            <NavItem href="/shift-scheduling" icon={<CalendarRange size={16} strokeWidth={2} />} label="Shift Scheduling" isActive={isActive('/shift-scheduling')} collapsed={collapsed} />
             <NavItem href="/reports" icon={<PieChart size={16} strokeWidth={2} />} label="Reports" isActive={isActive('/reports')} collapsed={collapsed} />
           </NavGroup>
         )}
@@ -260,9 +255,13 @@ export function Sidebar() {
             <NavItem href="/hiring" icon={<Briefcase size={16} strokeWidth={2} />} label="Hiring" isActive={isActive('/hiring')} collapsed={collapsed} />
             <NavItem href="/promotions" icon={<TrendingUp size={16} strokeWidth={2} />} label="Promotions" isActive={isActive('/promotions')} collapsed={collapsed} />
             <NavItem href="/performance" icon={<Star size={16} strokeWidth={2} />} label="Performance" isActive={isActive('/performance')} collapsed={collapsed} />
+            <NavItem href="/engagement" icon={<Sparkles size={16} strokeWidth={2} />} label="Engagement" isActive={isActive('/engagement')} collapsed={collapsed} />
+            <NavItem href="/workflows" icon={<GitBranch size={16} strokeWidth={2} />} label="Workflows" isActive={isActive('/workflows')} collapsed={collapsed} />
             <NavItem href="/signatures" icon={<FileSignature size={16} strokeWidth={2} />} label="Signatures" isActive={isActive('/signatures', true)} collapsed={collapsed} />
             <NavItem href="/departments" icon={<Network size={16} strokeWidth={2} />} label="Departments" isActive={isActive('/departments')} collapsed={collapsed} />
             <NavItem href="/employee-relations" icon={<Scale size={16} strokeWidth={2} />} label="Employee Relations" isActive={isActive('/employee-relations')} collapsed={collapsed} />
+            <NavItem href="/offboarding" icon={<UserMinus size={16} strokeWidth={2} />} label="Offboarding" isActive={isActive('/offboarding')} collapsed={collapsed} />
+            <NavItem href="/documents" icon={<FolderOpen size={16} strokeWidth={2} />} label="Employee Documents" isActive={isActive('/documents')} collapsed={collapsed} />
             <NavItem href="/policies" icon={<Book size={16} strokeWidth={2} />} label="Policies & Rules" isActive={isActive('/policies')} collapsed={collapsed} />
             <NavItem href="/payroll" icon={<DollarSign size={16} strokeWidth={2} />} label="Payroll" isActive={isActive('/payroll')} collapsed={collapsed} />
           </NavGroup>
@@ -273,6 +272,9 @@ export function Sidebar() {
           <NavGroup label="Settings" collapsed={collapsed} defaultOpen={false}>
             <NavItem href="/holidays" icon={<CalendarRange size={16} strokeWidth={2} />} label="Company Holidays" isActive={isActive('/holidays')} collapsed={collapsed} />
             <NavItem href="/benefits" icon={<Gift size={16} strokeWidth={2} />} label="Benefits" isActive={isActive('/benefits')} collapsed={collapsed} />
+            <NavItem href="/total-rewards" icon={<Award size={16} strokeWidth={2} />} label="Total Rewards" isActive={isActive('/total-rewards')} collapsed={collapsed} />
+            <NavItem href="/company-settings" icon={<Settings2 size={16} strokeWidth={2} />} label="Company Settings" isActive={isActive('/company-settings')} collapsed={collapsed} />
+            <NavItem href="/roles-permissions" icon={<ShieldCheck size={16} strokeWidth={2} />} label="Roles & Permissions" isActive={isActive('/roles-permissions')} collapsed={collapsed} />
           </NavGroup>
         )}
 
