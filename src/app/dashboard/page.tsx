@@ -1,339 +1,292 @@
 "use client";
-
-import Link from "next/link";
-import { useState } from "react";
-import {
-  ArrowRight,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  FileSignature,
-  GripVertical,
-  LayoutDashboard,
-  Plus,
-  SlidersHorizontal,
-  Sparkles,
-  X,
-} from "lucide-react";
-import { useRole } from "@/context/RoleContext";
-import { MAX_WIDGETS, useWidgets } from "@/context/WidgetContext";
-import {
-  CompulsoryMyTimeWidget,
-  CompulsoryTimeOffWidget,
-  OPTIONAL_WIDGETS,
-  WIDGET_MAP,
-} from "@/components/widgets";
-import { Modal } from "@/components/ui/Modal";
-import styles from "./dashboard.module.css";
+import { useState } from 'react';
+import { X } from 'lucide-react';
+import { useRole } from '@/context/RoleContext';
+import { useWidgets, MAX_WIDGETS } from '@/context/WidgetContext';
+import { CompulsoryMyTimeWidget, CompulsoryTimeOffWidget, WIDGET_MAP, OPTIONAL_WIDGETS } from '@/components/widgets';
+import { Modal } from '@/components/ui/Modal';
 
 export default function Dashboard() {
-  const { currentUser, role } = useRole();
-  const { activeWidgets, addWidget, removeWidget, reorderWidgets } =
-    useWidgets();
-  const [isEditing, setIsEditing] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const { currentUser } = useRole();
   const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
   const initials = `${currentUser.firstName[0]}${currentUser.lastName[0]}`;
 
-  const handleDragStart = (event: React.DragEvent, index: number) => {
+  const { activeWidgets, removeWidget, addWidget, reorderWidgets } = useWidgets();
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  
+  // Drag and drop state
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIdx(index);
-    event.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = 'move';
+    // Small timeout to allow UI update after drag starts without breaking the drag image
+    setTimeout(() => e.target && (e.target as HTMLElement).classList.add('dragging'), 0);
   };
-  const handleDragOver = (event: React.DragEvent, index: number) => {
-    event.preventDefault();
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
     if (draggedIdx === null || draggedIdx === index) return;
     reorderWidgets(draggedIdx, index);
     setDraggedIdx(index);
   };
-  const toggleWidget = (id: string) =>
-    activeWidgets.includes(id) ? removeWidget(id) : addWidget(id);
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedIdx(null);
+    if (e.target) (e.target as HTMLElement).classList.remove('dragging');
+  };
+
+  function togglePicker(id: string) {
+    if (activeWidgets.includes(id)) {
+      removeWidget(id);
+    } else {
+      addWidget(id);
+    }
+  }
 
   return (
-    <div className={styles.dashboard}>
-      <section className={styles.welcome}>
-        <div className={styles.greeting}>
-          <div className={styles.avatar}>
-            {currentUser.avatar ? (
-              <img src={currentUser.avatar} alt={fullName} />
-            ) : (
-              initials
-            )}
-            <i />
+    <>
+      {/* Profile header */}
+      <div className="row-between mb-24">
+        <div className="row gap-16">
+          <div
+            className="avatar"
+            style={{ width: 84, height: 84, fontSize: 28, backgroundImage: 'var(--gradient)' }}
+          >
+            {currentUser.avatar
+              ? <img src={currentUser.avatar} alt={fullName} />
+              : <span>{initials}</span>
+            }
           </div>
           <div>
-            <span className={styles.eyebrow}>
-              Your workspace · Monday, 2 September
-            </span>
-            <h1>Good morning, {currentUser.firstName}.</h1>
-            <p>
-              Here&apos;s a clear view of your day, your requests, and the
-              moments that need you.
-            </p>
+            <h1
+              className="gradient-text fw-800"
+              style={{ fontSize: 32, letterSpacing: '-1px' }}
+            >
+              Hi, {currentUser.firstName}
+            </h1>
+            <p className="text-sm text-4 mt-4" style={{ fontWeight: 500 }}>{currentUser.title}</p>
           </div>
         </div>
-        <div className={styles.welcomeActions}>
-          <Link href="/time-off">
-            <CalendarDays /> Request leave
-          </Link>
-          <button
-            onClick={() => setIsEditing((current) => !current)}
-            className={isEditing ? styles.editing : ""}
+
+        <div className="row gap-10">
+          <button className="btn-neutral" style={{ padding: '8px 20px' }}>Edit</button>
+          <button 
+            className={isEditing ? "btn-primary" : "widget-manage-btn"} 
+            onClick={() => setIsEditing(!isEditing)} 
+            style={{ padding: '8px 16px' }}
           >
-            <SlidersHorizontal /> {isEditing ? "Done" : "Personalise"}{" "}
-            <span>
-              {activeWidgets.length}/{MAX_WIDGETS}
-            </span>
+            {isEditing ? 'Done Editing' : 'Manage Widgets'}
+            {!isEditing && <span className="limit-chip" style={{ marginLeft: 6 }}>{activeWidgets.length}/{MAX_WIDGETS}</span>}
           </button>
         </div>
-      </section>
+      </div>
 
-      <section className={styles.focusStrip}>
-        <div className={styles.focusTitle}>
-          <span>
-            <Sparkles />
-          </span>
-          <div>
-            <b>Today&apos;s focus</b>
-            <small>Three useful next steps, without the noise.</small>
-          </div>
+      {/* Main Layout: Left Column (Compulsory) + Right Column (Optional Widgets) */}
+      <div className="dash-grid" style={{ gridTemplateColumns: '360px 1fr', gap: 24, alignItems: 'stretch' }}>
+        
+        {/* Left Column - Compulsory */}
+        <div className="col gap-16">
+          <CompulsoryMyTimeWidget />
+          <CompulsoryTimeOffWidget />
         </div>
-        <Link href="/my-signatures" className={styles.focusAction}>
-          <span className={styles.focusNumber}>01</span>
-          <div>
-            <b>Sign your offer addendum</b>
-            <small>Document waiting for your signature</small>
-          </div>
-          <ChevronRight />
-        </Link>
-        <Link href="/time-off" className={styles.focusAction}>
-          <span className={styles.focusNumber}>02</span>
-          <div>
-            <b>Plan your October leave</b>
-            <small>18 vacation hours available</small>
-          </div>
-          <ChevronRight />
-        </Link>
-        <Link href="/my-onboarding" className={styles.focusAction}>
-          <span className={styles.focusNumber}>03</span>
-          <div>
-            <b>Complete your profile</b>
-            <small>One detail left to add</small>
-          </div>
-          <ChevronRight />
-        </Link>
-      </section>
 
-      <section className={styles.workspace}>
-        <div className={styles.mainColumn}>
-          <div className={styles.sectionHeading}>
-            <div>
-              <span className={styles.eyebrow}>Run your day</span>
-              <h2>Your essentials</h2>
+        {/* Right Column - Optional Widgets in a Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, alignItems: 'stretch' }}>
+          
+          {activeWidgets.length === 0 && (
+            <div
+              className="card"
+              style={{ gridColumn: '1 / -1', padding: 48, textAlign: 'center' }}
+            >
+              <p className="text-4 mb-12 text-sm">No optional widgets on your dashboard.</p>
+              {!isEditing && <button className="btn-primary" onClick={() => setIsEditing(true)}>Add Widgets</button>}
             </div>
-            <Link href="/time">
-              View time history <ArrowRight />
-            </Link>
-          </div>
-          <div className={styles.essentials}>
-            <div className={styles.timeCard}>
-              <CompulsoryMyTimeWidget />
-            </div>
-            <div className={styles.leaveCard}>
-              <CompulsoryTimeOffWidget />
-            </div>
-          </div>
-          <div className={styles.sectionHeading}>
-            <div>
-              <span className={styles.eyebrow}>Keep in the loop</span>
-              <h2>Your company pulse</h2>
-            </div>
-            <button onClick={() => setPickerOpen(true)}>
-              <Plus /> Add a view
-            </button>
-          </div>
-          <div className={styles.widgetGrid}>
-            {activeWidgets.length === 0 && (
-              <div className={styles.empty}>
-                <LayoutDashboard />
-                <b>Make this space yours</b>
-                <p>
-                  Add the company updates, celebrations, and reminders most
-                  useful to you.
-                </p>
-                <button onClick={() => setPickerOpen(true)}>
-                  Choose views
-                </button>
-              </div>
-            )}
-            {activeWidgets.map((id, index) => {
-              const Widget = WIDGET_MAP[id];
-              if (!Widget) return null;
-              return (
-                <div
-                  key={id}
-                  className={styles.widgetShell}
-                  draggable={isEditing}
-                  onDragStart={(event) => handleDragStart(event, index)}
-                  onDragOver={(event) => handleDragOver(event, index)}
-                  onDragEnd={() => setDraggedIdx(null)}
-                  style={{ opacity: draggedIdx === index ? 0.45 : 1 }}
-                >
-                  {isEditing && (
-                    <div className={styles.dragHint}>
-                      <GripVertical /> Drag to reorder
-                    </div>
-                  )}
-                  <Widget
-                    onRemove={isEditing ? () => removeWidget(id) : undefined}
-                  />
-                  {isEditing && (
-                    <button
-                      className={styles.removeWidget}
-                      aria-label={`Remove ${id}`}
-                      onClick={() => removeWidget(id)}
-                    >
-                      <X />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-            {isEditing &&
-              Array.from({ length: MAX_WIDGETS - activeWidgets.length }).map(
-                (_, index) => (
-                  <button
-                    key={index}
-                    className={styles.addSlot}
-                    onClick={() => setPickerOpen(true)}
-                  >
-                    <Plus />
-                    <span>Add a view</span>
-                  </button>
-                ),
-              )}
-          </div>
-        </div>
-        <aside className={styles.sideColumn}>
-          <article className={styles.profileCard}>
-            <div className={styles.profileTop}>
-              <span className={styles.profileIcon}>{initials}</span>
-              <button aria-label="Profile options">•••</button>
-            </div>
-            <span className={styles.eyebrow}>My profile</span>
-            <h3>{fullName}</h3>
-            <p>
-              {currentUser.title} · {currentUser.department}
-            </p>
-            <div className={styles.profileProgress}>
-              <span>
-                <b>80%</b> complete
-              </span>
-              <i>
-                <em />
-              </i>
-            </div>
-            <Link href="/people/me">
-              Complete profile <ArrowRight />
-            </Link>
-          </article>
-          <article className={styles.upcoming}>
-            <header>
-              <div>
-                <span className={styles.eyebrow}>Coming up</span>
-                <h3>Your week</h3>
-              </div>
-              <Link href="/time-off">Calendar</Link>
-            </header>
-            <div className={styles.event}>
-              <span>
-                <b>04</b>
-                <small>SEP</small>
-              </span>
-              <div>
-                <b>Marketing stand-up</b>
-                <small>09:30 · Main meeting room</small>
-              </div>
-            </div>
-            <div className={styles.event}>
-              <span>
-                <b>05</b>
-                <small>SEP</small>
-              </span>
-              <div>
-                <b>Grace&apos;s birthday</b>
-                <small>Send a note or celebrate together</small>
-              </div>
-            </div>
-            <div className={styles.event}>
-              <span>
-                <b>06</b>
-                <small>SEP</small>
-              </span>
-              <div>
-                <b>Company all-hands</b>
-                <small>15:00 · Company-wide</small>
-              </div>
-            </div>
-          </article>
-          {role !== "Employee" && (
-            <article className={styles.rolePrompt}>
-              <FileSignature />
-              <div>
-                <span>{role} workspace</span>
-                <b>
-                  {role === "Manager"
-                    ? "Your team has 3 items waiting."
-                    : "People operations are in motion."}
-                </b>
-                <Link href={role === "Manager" ? "/team-requests" : "/inbox"}>
-                  Review now <ArrowRight />
-                </Link>
-              </div>
-            </article>
           )}
-        </aside>
-      </section>
+
+          {/* Render Active Widgets */}
+          {activeWidgets.map((id, index) => {
+            const Comp = WIDGET_MAP[id];
+            if (!Comp) return null;
+            return (
+              <div 
+                key={id}
+                draggable={isEditing}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                style={{ 
+                  cursor: isEditing ? 'grab' : 'default',
+                  opacity: draggedIdx === index ? 0.4 : 1,
+                  transition: 'opacity 0.2s',
+                  position: 'relative'
+                }}
+              >
+                <div style={isEditing ? { pointerEvents: 'none' } : {}}>
+                  <Comp onRemove={isEditing ? () => removeWidget(id) : undefined} />
+                </div>
+                {isEditing && (
+                  <button 
+                    className="edit-remove-badge"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeWidget(id);
+                    }}
+                  >
+                    <X size={14} strokeWidth={3} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Render Empty Placeholders in Edit Mode */}
+          {isEditing && Array.from({ length: MAX_WIDGETS - activeWidgets.length }).map((_, i) => (
+            <div 
+              key={`empty-${i}`} 
+              className="card widget-placeholder"
+              onClick={() => setPickerOpen(true)}
+            >
+              <div className="widget-placeholder-content">
+                <span className="plus-icon">+</span>
+                <p>Click to add widget</p>
+              </div>
+            </div>
+          ))}
+
+        </div>
+      </div>
+
+      {/* CSS for Placeholders & Dragging */}
+      <style>{`
+        .widget-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px dashed var(--card-border) !important;
+          background: transparent !important;
+          min-height: 160px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .widget-placeholder:hover {
+          border-color: var(--primary) !important;
+          background: var(--primary-tint) !important;
+        }
+        .widget-placeholder-content {
+          text-align: center;
+          color: var(--text-5);
+        }
+        .widget-placeholder:hover .widget-placeholder-content {
+          color: var(--primary);
+        }
+        .plus-icon {
+          font-size: 24px;
+          font-weight: 300;
+          display: block;
+          margin-bottom: 4px;
+        }
+        .dragging {
+          transform: scale(1.02);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .edit-remove-badge {
+          position: absolute;
+          top: -10px;
+          right: -10px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #ef4444;
+          color: white;
+          border: 3px solid var(--body-bg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          z-index: 10;
+          transition: transform 0.15s;
+        }
+        .edit-remove-badge:hover {
+          transform: scale(1.1);
+          background: #dc2626;
+        }
+        /* Hide the internal remove btn in edit mode to avoid confusion with the badge */
+        .widget-remove-btn { display: none !important; }
+      `}</style>
+
+      {/* Add Widget Picker Modal */}
       <Modal
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        title="Personalise your home"
-        footer={
-          <button
-            className="btn-primary w-full"
-            onClick={() => setPickerOpen(false)}
-          >
-            Done
-          </button>
-        }
+        title="Widget Library"
+        footer={<button className="btn-primary w-full" onClick={() => setPickerOpen(false)}>Done</button>}
       >
-        <p className={styles.modalIntro}>
-          Choose up to {MAX_WIDGETS} views. Your time and leave essentials
-          always stay visible.
+        <p className="text-sm text-5 mb-16 text-center">
+          Customize your dashboard with up to <strong>{MAX_WIDGETS}</strong> optional widgets.
         </p>
-        <div className={styles.widgetPicker}>
-          {OPTIONAL_WIDGETS.map((widget) => {
-            const selected = activeWidgets.includes(widget.id);
-            const disabled = !selected && activeWidgets.length >= MAX_WIDGETS;
+
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {OPTIONAL_WIDGETS.map((w, i) => {
+            const sel = activeWidgets.includes(w.id);
+            const dis = !sel && activeWidgets.length >= MAX_WIDGETS;
             return (
-              <button
-                type="button"
-                key={widget.id}
-                disabled={disabled}
-                className={`${styles.pickerOption} ${selected ? styles.pickerSelected : ""}`}
-                onClick={() => toggleWidget(widget.id)}
+              <div
+                key={w.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '16px 0',
+                  borderBottom: i === OPTIONAL_WIDGETS.length - 1 ? 'none' : '1px solid var(--card-border)'
+                }}
               >
-                <span>{widget.icon}</span>
-                <div>
-                  <b>{widget.label}</b>
-                  <small>{widget.desc}</small>
+                <div style={{ 
+                  width: 42, 
+                  height: 42, 
+                  borderRadius: 12, 
+                  background: 'var(--primary-tint)', 
+                  color: 'var(--primary)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {w.icon}
                 </div>
-                {selected ? <Check /> : <Plus />}
-              </button>
+                <div style={{ flex: 1, marginLeft: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{w.label}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-5)', marginTop: 2 }}>{w.desc}</div>
+                </div>
+                {sel ? (
+                  <span style={{ 
+                    fontSize: 12, 
+                    fontWeight: 700, 
+                    color: 'var(--primary)', 
+                    background: 'var(--primary-tint)', 
+                    padding: '6px 12px', 
+                    borderRadius: 20 
+                  }}>
+                    Added
+                  </span>
+                ) : (
+                  <button 
+                    className="btn-secondary btn-sm" 
+                    disabled={dis} 
+                    onClick={() => togglePicker(w.id)}
+                    style={{ padding: '6px 16px', borderRadius: 20 }}
+                  >
+                    + Add
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
       </Modal>
-    </div>
+
+    </>
   );
 }
