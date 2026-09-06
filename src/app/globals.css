@@ -209,6 +209,11 @@ img { display: block; }
 .sidebar-user-name { font-size: 13px; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-user-role { font-size: 11px; color: var(--text-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* Clock-in status keeps the time widget legible at a glance. */
+.clock-status { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.clock-status-dot { width: 7px; height: 7px; border-radius: 999px; background: #B7B4B7; }
+.clock-status-dot.active { background: #32A66A; box-shadow: 0 0 0 4px rgba(50, 166, 106, 0.12); }
+
 /* ============================================================
    TOPBAR
    ============================================================ */

@@ -49,30 +49,41 @@ export function CompulsoryMyTimeWidget() {
   const [clockModal, setClockModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeProject, setActiveProject] = useState('Production');
+  const [isClocked, setIsClocked] = useState(timeSummary.isClocked);
+  const [clockedAt, setClockedAt] = useState<string | null>(null);
+
+  const toggleClock = () => {
+    const next = !isClocked;
+    setIsClocked(next);
+    timeSummary.isClocked = next;
+    setClockedAt(next ? new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date()) : null);
+  };
 
   return (
     <Card>
       <CardHeader title="My Time" icon={<Clock size={16} strokeWidth={2.5} />} />
       <CardBody>
         <div className="text-center">
-          <p className="text-xs text-2">Not Clocked In</p>
+          <div className="clock-status">
+            <span className={isClocked ? 'clock-status-dot active' : 'clock-status-dot'} />
+            <p className="text-xs text-2">{isClocked ? `Working on ${activeProject}` : 'Not clocked in'}</p>
+          </div>
           <p className="gradient-text mt-6 mb-4" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
             {timeSummary.today}
           </p>
-          <p className="text-xs text-5">Clocked Out: Sep 25 at 5:00 PM</p>
+          <p className="text-xs text-5">{isClocked ? `Started at ${clockedAt ?? '9:00 AM'} · ${activeProject}` : 'Last clocked out: Sep 25 at 5:00 PM'}</p>
 
           <div className="row gap-8 mt-20" style={{ position: 'relative' }}>
             <button
               className="btn-primary w-full"
               style={{ flex: 1, padding: '12px 24px', fontSize: 14 }}
               onClick={() => {
-                // Mimic working thing
-                timeSummary.isClocked = !timeSummary.isClocked;
+                toggleClock();
                 setClockModal(false);
               }}
             >
               <Clock size={16} strokeWidth={2} />
-              {timeSummary.isClocked ? 'Clock Out' : `Clock In: ${activeProject}`}
+              {isClocked ? 'Clock out' : `Clock in · ${activeProject}`}
             </button>
             <button 
               className="btn-circle" 
@@ -118,7 +129,7 @@ export function CompulsoryMyTimeWidget() {
                       setDropdownOpen(false);
                     }}
                   >
-                    {proj}
+                    <span>{proj}</span>{activeProject === proj && <span style={{ color: 'var(--primary)', fontWeight: 800 }}>Selected</span>}
                   </button>
                 ))}
               </div>
@@ -126,7 +137,7 @@ export function CompulsoryMyTimeWidget() {
           </div>
 
           <div className="row mt-16 mb-6" style={{ justifyContent: 'center' }}>
-            <span className="text-5 text-xs">Today &rarr; {timeSummary.today}</span>
+            <span className="text-5 text-xs">Today &rarr; {timeSummary.today}{isClocked ? ' · Session in progress' : ''}</span>
           </div>
           <button
             className="text-xs fw-700"
@@ -282,7 +293,7 @@ export function FeedWidget({ onRemove, preview }: { onRemove?: () => void; previ
       <div className="card-header">
         <div className="card-header-left">
           <div className="card-header-icon"><Megaphone size={16} strokeWidth={2.5} /></div>
-          <h2 className="card-header-title">What's happening at Your Co</h2>
+          <h2 className="card-header-title">What&apos;s happening at Your Co</h2>
         </div>
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
