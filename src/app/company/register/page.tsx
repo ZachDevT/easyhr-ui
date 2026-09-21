@@ -657,9 +657,9 @@ export default function CompanyRegistration() {
               Continue <ArrowRight />
             </button>
           ) : (
-            <Link href="/dashboard" className={styles.next}>
-              Create workspace <CheckCircle2 />
-            </Link>
+            <button className={styles.next} onClick={handleSubmit} disabled={isSubmitting}>
+               {isSubmitting ? "Creating..." : "Create workspace"} <CheckCircle2 />
+            </button>
           )}
         </footer>
       </main>

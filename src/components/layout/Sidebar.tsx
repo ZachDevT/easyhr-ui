@@ -33,6 +33,7 @@ import {
   FolderOpen,
   Inbox,
   UserMinus,
+  LifeBuoy,
 } from 'lucide-react';
 import { useRole } from '../../context/RoleContext';
 import { Avatar } from '../ui/Avatar';
@@ -260,6 +261,7 @@ export function Sidebar() {
             <NavItem href="/signatures" icon={<FileSignature size={16} strokeWidth={2} />} label="Signatures" isActive={isActive('/signatures', true)} collapsed={collapsed} />
             <NavItem href="/departments" icon={<Network size={16} strokeWidth={2} />} label="Departments" isActive={isActive('/departments')} collapsed={collapsed} />
             <NavItem href="/employee-relations" icon={<Scale size={16} strokeWidth={2} />} label="Employee Relations" isActive={isActive('/employee-relations')} collapsed={collapsed} />
+            <NavItem href="/support" icon={<LifeBuoy size={16} strokeWidth={2} />} label="Support Tickets" isActive={isActive('/support', true)} collapsed={collapsed} />
             <NavItem href="/offboarding" icon={<UserMinus size={16} strokeWidth={2} />} label="Offboarding" isActive={isActive('/offboarding')} collapsed={collapsed} />
             <NavItem href="/documents" icon={<FolderOpen size={16} strokeWidth={2} />} label="Employee Documents" isActive={isActive('/documents')} collapsed={collapsed} />
             <NavItem href="/policies" icon={<Book size={16} strokeWidth={2} />} label="Policies & Rules" isActive={isActive('/policies')} collapsed={collapsed} />

@@ -1,4 +1,5 @@
 import './globals.css';
+import { ClerkProvider } from "@clerk/nextjs";
 import { RoleProvider } from '@/context/RoleContext';
 import { WidgetProvider } from '@/context/WidgetContext';
 import { HRProvider } from '@/context/HRContext';
@@ -18,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <ClerkProvider>
         <RoleProvider>
           <HRProvider>
             <OperationsProvider><WidgetProvider>
@@ -27,6 +29,7 @@ export default function RootLayout({
             </WidgetProvider></OperationsProvider>
           </HRProvider>
         </RoleProvider>
+              </ClerkProvider>
       </body>
     </html>
   );

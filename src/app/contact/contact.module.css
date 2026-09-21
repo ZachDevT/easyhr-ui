@@ -1,0 +1,253 @@
+.site {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-page, #F7F7F5);
+}
+
+.main {
+  flex: 1;
+  padding-top: 100px;
+  padding-bottom: 80px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.header {
+  text-align: left;
+  margin-bottom: 56px;
+  max-width: 600px;
+}
+
+.header h1 {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--text-primary, #2B2B26);
+  margin-bottom: 20px;
+  letter-spacing: -0.02em;
+}
+
+.header p {
+  font-size: 20px;
+  color: var(--text-secondary, #8A897E);
+  line-height: 1.6;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 64px;
+  align-items: flex-start;
+}
+
+@media (max-width: 900px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+/* Contact Info Sidebar */
+.contactInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.infoBlock h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.infoBlock p {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.infoLink, .infoText {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--primary, #A238FF);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.infoText {
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.infoLink:hover {
+  opacity: 0.8;
+}
+
+/* Form Card */
+.formCard {
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border, #EAEAE4);
+  border-radius: 20px;
+  padding: 48px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.04);
+}
+
+.formTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+  .formCard {
+    padding: 32px 24px;
+  }
+}
+
+/* File Upload Area */
+.fileUploadArea {
+  position: relative;
+  border: 2px dashed var(--border, #EAEAE4);
+  border-radius: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  transition: all 0.2s;
+  background: var(--bg-page);
+}
+
+.fileUploadArea:hover, .fileUploadArea:focus-within {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+}
+
+.fileInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fileLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.uploadIcon {
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.uploadText {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.uploadText b {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.uploadHint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.submitButton {
+  margin-top: 16px;
+  width: 100%;
+  justify-content: center;
+  padding: 14px;
+  font-size: 15px;
+}
+
+.privacyNote {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.privacyNote a {
+  color: var(--text-primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
+}
+
+.privacyNote a:hover {
+  color: var(--primary);
+  text-decoration-color: var(--primary);
+}
+
+.successState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 0;
+}
+
+.successIcon {
+  color: var(--success, #0F9D58);
+  margin-bottom: 24px;
+}
+
+.successState h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.successState p {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 400px;
+}
