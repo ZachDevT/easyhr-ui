@@ -1,15 +1,23 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Globe2, AlertCircle, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { AuthField, AuthShell, authStyles as s } from '@/components/auth/AuthShell';
-import { useClerk } from '@clerk/nextjs';
+import { useClerk, useAuth } from '@clerk/nextjs';
 
 export default function SignUp() {
   const clerk = useClerk();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const signUp = clerk?.client?.signUp;
   const isLoaded = !!signUp;
+  const router = useRouter();
+
+  useEffect(() => {
+    if (authLoaded && isSignedIn) {
+      router.replace('/dashboard');
+    }
+  }, [authLoaded, isSignedIn, router]);
 
   const [firstName, setFirstName]           = useState('');
   const [lastName, setLastName]             = useState('');
@@ -20,7 +28,6 @@ export default function SignUp() {
   const [code, setCode]                     = useState('');
   const [error, setError]                   = useState('');
   const [isSubmitting, setIsSubmitting]     = useState(false);
-  const router = useRouter();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();

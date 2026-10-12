@@ -1,2 +1,19 @@
-import Link from 'next/link'; import { ArrowRight, KeyRound } from 'lucide-react'; import { AuthField, AuthShell, authStyles as s } from '@/components/auth/AuthShell';
-export default function ResetPassword(){return <AuthShell eyebrow="Choose a new password" title="Protect your account" subtitle="Create a strong password you haven’t used for EasyHR before."><div style={{width:50,height:50,borderRadius:13,background:'var(--primary-tint)',color:'var(--primary)',display:'grid',placeItems:'center',marginBottom:22}}><KeyRound/></div><AuthField label="New password"><input type="password" placeholder="At least 8 characters"/></AuthField><AuthField label="Confirm password"><input type="password" placeholder="Repeat your password"/></AuthField><div className={s.check}>Use 8+ characters with a number and symbol.</div><Link href="/auth/sign-in" className={s.primaryButton}>Update password <ArrowRight size={16}/></Link></AuthShell>}
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import ForgotPassword from "../forgot-password/page";
+import { useAuth } from "@clerk/nextjs";
+
+export default function ResetPassword() {
+  const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      router.replace("/dashboard");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  return <ForgotPassword />;
+}

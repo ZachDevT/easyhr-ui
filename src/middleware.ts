@@ -13,16 +13,20 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const isAuthRoute = createRouteMatcher([
-  '/auth/sign-in(.*)',
-  '/auth/sign-up(.*)'
+  '/auth/(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
   
-  // If user is already signed in and tries to access sign-in or sign-up, redirect them
+  // If user is already authenticated and visits the root site, send directly to dashboard
+  if (userId && req.nextUrl.pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
+
+  // If user is already authenticated and tries to access sign-in, sign-up, or auth recovery, redirect to dashboard
   if (userId && isAuthRoute(req)) {
-    return NextResponse.redirect(new URL('/company/register', req.url));
+    return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   // Protect non-public routes

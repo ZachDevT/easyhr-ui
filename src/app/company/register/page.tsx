@@ -148,24 +148,51 @@ export default function CompanyRegistration() {
     }
   }, [isLoaded, user]);
 
+  const [isCheckingOrg, setIsCheckingOrg] = useState(true);
+
   // Check if authenticated user already has an active organization
   useEffect(() => {
     let isMounted = true;
+
+    // Instant local cache check
+    if (typeof window !== "undefined") {
+      try {
+        const cachedComp = localStorage.getItem("easyhr_company_cache");
+        if (cachedComp) {
+          const parsed = JSON.parse(cachedComp);
+          if (parsed && (parsed.id || parsed.name)) {
+            router.replace("/dashboard");
+            return;
+          }
+        }
+      } catch {}
+    }
+
     async function checkExistingOrg() {
-      if (!isLoaded || !user) return;
+      if (!isLoaded || !user) {
+        if (isLoaded && !user) setIsCheckingOrg(false);
+        return;
+      }
       try {
         const token = await getToken();
-        if (!token) return;
+        if (!token) {
+          if (isMounted) setIsCheckingOrg(false);
+          return;
+        }
         const res = await fetch("http://localhost:8080/api/v1/setup/status", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (isMounted && data.hasOrganization) {
-          router.replace("/dashboard");
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.hasOrganization) {
+            router.replace("/dashboard");
+            return;
+          }
         }
       } catch {
         // Continue normally if check fails
+      } finally {
+        if (isMounted) setIsCheckingOrg(false);
       }
     }
     checkExistingOrg();
@@ -349,6 +376,20 @@ export default function CompanyRegistration() {
       setIsSubmitting(false);
     }
   };
+
+  if (isCheckingOrg && isLoaded && user) {
+    return (
+      <div style={{ display: "grid", placeItems: "center", minHeight: "100vh", background: "#fdfbf9" }}>
+        <div style={{ textAlign: "center" }}>
+          <Loader2 size={36} className="animate-spin" color="var(--primary)" style={{ margin: "0 auto" }} />
+          <p style={{ marginTop: 14, fontSize: 14, color: "var(--text-3)", fontWeight: 500 }}>
+            Verifying your workspace...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <aside>

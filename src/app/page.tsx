@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import {
   ArrowRight,
   BarChart3,
@@ -99,7 +101,12 @@ const modules = [
   [<Network />, "Organization", "Departments, job architecture and org design"],
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { userId } = await auth();
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className={styles.site}>
       <PublicNav />

@@ -1,10 +1,10 @@
 "use client";
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Globe2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { AuthField, AuthShell, authStyles as s } from '@/components/auth/AuthShell';
-import { useSignIn } from '@clerk/nextjs';
+import { useSignIn, useAuth } from '@clerk/nextjs';
 
 type ClerkErrorLike = { errors?: Array<{ longMessage?: string; message?: string }>; message?: string };
 
@@ -24,13 +24,20 @@ function authTimeout<T>(request: Promise<T>): Promise<T> {
 
 export default function SignIn() {
   const { signIn, fetchStatus } = useSignIn();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (authLoaded && isSignedIn) {
+      router.replace('/dashboard');
+    }
+  }, [authLoaded, isSignedIn, router]);
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError]               = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const router = useRouter();
 
   const handleSignIn = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
