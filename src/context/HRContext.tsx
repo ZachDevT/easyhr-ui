@@ -15,6 +15,15 @@ export type Candidate = {
   avatar?: string;
   email: string;
   phone?: string;
+  currentLocation?: string;
+  expectedSalaryGross?: number;
+  currency?: string;
+  noticePeriod?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  coverLetter?: string;
+  resumeUrl?: string;
+  resumeFilename?: string;
 };
 
 export type OnboardingTask = {
@@ -103,11 +112,20 @@ export function HRProvider({ children }: { children: ReactNode }) {
           name: `${a.firstName} ${a.lastName}`.trim(),
           role: a.jobTitle || "Applicant",
           stage: BACKEND_TO_STAGE[a.status] || "Applied",
-          source: "Direct",
+          source: "Career Portal",
           date: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : "Recent",
           rating: 4,
           email: a.email,
           phone: a.phone || "",
+          currentLocation: a.currentLocation || "",
+          expectedSalaryGross: a.expectedSalaryGross || undefined,
+          currency: a.currency || "USD",
+          noticePeriod: a.noticePeriod || "",
+          linkedinUrl: a.linkedinUrl || "",
+          portfolioUrl: a.portfolioUrl || "",
+          coverLetter: a.coverLetter || "",
+          resumeUrl: a.resumeUrl || "",
+          resumeFilename: a.resumeFilename || "",
         }));
         setCandidates(mapped);
       }
