@@ -1,6 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useUser, useAuth } from "@clerk/nextjs";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +25,7 @@ import {
   MessagesSquare,
   MapPin,
   AtSign,
+  AlertCircle,
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { EasyHRLogo } from "@/components/marketing/EasyHRLogo";
@@ -67,13 +70,20 @@ const countries = [
   { value: "GB", label: "United Kingdom", description: "Europe · GBP" },
 ];
 export default function CompanyRegistration() {
+  const router = useRouter();
+  const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
+
   const [step, setStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
   const [form, setForm] = useState({
     creatorFirstName: "",
     creatorLastName: "",
     creatorEmail: "",
     creatorPhone: "",
-    creatorRole: "",
+    creatorRole: "Business Owner / CEO",
     legalName: "",
     displayName: "",
     website: "",
@@ -103,6 +113,30 @@ export default function CompanyRegistration() {
     geofenceLng: 32.5811,
     geofenceRadius: 300,
   });
+
+  // Auto-complete inputs from Clerk user profile
+  useEffect(() => {
+    if (isLoaded && user) {
+      const email = user.primaryEmailAddress?.emailAddress || "";
+      const first = user.firstName || "";
+      const last = user.lastName || "";
+      const phone = user.primaryPhoneNumber?.phoneNumber || "";
+
+      setForm((prev) => ({
+        ...prev,
+        creatorFirstName: prev.creatorFirstName || first,
+        creatorLastName: prev.creatorLastName || last,
+        creatorEmail: prev.creatorEmail || email,
+        creatorPhone: prev.creatorPhone || phone,
+        contactEmail: prev.contactEmail || email,
+        contactPhone: prev.contactPhone || phone,
+        displayName: prev.displayName || (first ? `${first}'s Company` : ""),
+        legalName: prev.legalName || (first ? `${first}'s Company Ltd` : ""),
+        domain: prev.domain || (first ? first.toLowerCase().replace(/[^a-z0-9]/g, "") : "workspace"),
+      }));
+    }
+  }, [isLoaded, user]);
+
   const set = (key: string, value: any) =>
     setForm({ ...form, [key]: value });
 
@@ -113,6 +147,96 @@ export default function CompanyRegistration() {
         ? prev.departments.filter((d) => d !== dept)
         : [...prev.departments, dept],
     }));
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error("Your authentication session has expired. Please sign in again.");
+      }
+
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+
+      // 1. Provision identity in the Go backend
+      try {
+        await fetch("http://localhost:8080/api/v1/auth/provision", {
+          method: "POST",
+          headers,
+        });
+      } catch (provisionErr) {
+        console.warn("Provisioning check:", provisionErr);
+      }
+
+      // 2. Build payload for workspace setup
+      const cleanSubdomain = (form.domain || form.displayName || "workspace")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/^-+|-+$/g, "") || "workspace";
+
+      const payload = {
+        legalName: form.legalName || `${form.displayName || "My Company"} Ltd`,
+        displayName: form.displayName || "My Company",
+        registrationNumber: form.registrationNumber || undefined,
+        taxIdentifier: form.taxId || undefined,
+        countryCode: form.country || "UG",
+        timezone: form.timezone || "Africa/Kampala",
+        currencyCode: (form.currency || "UGX").toUpperCase(),
+        industry: form.industry || "Technology",
+        companySizeBand: form.size || "11–50",
+        websiteUrl: form.website && form.website.startsWith("https://") ? form.website : undefined,
+        contactEmail: form.contactEmail || form.creatorEmail || undefined,
+        contactPhone: form.contactPhone || form.creatorPhone || undefined,
+        subdomain: cleanSubdomain,
+        brandColor: form.color && /^#[0-9A-Fa-f]{6}$/.test(form.color) ? form.color : "#A238FF",
+        initialDepartments: form.departments.length > 0 ? form.departments : ["Operations", "Human Resources"],
+        address: {
+          line1: form.address || "Main Street",
+          city: "Kampala",
+        },
+        headquarters: {
+          name: `${form.displayName || "Main"} Headquarters`,
+          countryCode: form.country || "UG",
+          timezone: form.timezone || "Africa/Kampala",
+          address: {
+            line1: form.address || "Main Street",
+            city: "Kampala",
+          },
+          geofence: form.geofenceEnabled ? {
+            latitude: form.geofenceLat || 0.3136,
+            longitude: form.geofenceLng || 32.5811,
+            radiusMeters: form.geofenceRadius || 300,
+            accuracyToleranceMeters: 50,
+          } : undefined,
+        },
+      };
+
+      const res = await fetch("http://localhost:8080/api/v1/setup/organizations", {
+        method: "POST",
+        headers: {
+          ...headers,
+          "Idempotency-Key": `org-setup-${Date.now()}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || data.message || `Setup failed (${res.status})`);
+      }
+
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("Workspace setup failed:", err);
+      setError(err.message || "Failed to create organization. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   return (
     <div className={styles.page}>
@@ -645,6 +769,23 @@ export default function CompanyRegistration() {
             </>
           )}
         </section>
+        {error && (
+          <div style={{
+            margin: '0 2rem 1rem',
+            padding: '12px 16px',
+            background: '#FEF2F2',
+            border: '1px solid #FCA5A5',
+            borderRadius: '8px',
+            color: '#B91C1C',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{error}</span>
+          </div>
+        )}
         <footer>
           <button
             className={styles.back}
