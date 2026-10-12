@@ -1,18 +1,20 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { useAuth } from "@clerk/nextjs";
 
 export type Candidate = {
-  id: number;
+  id: string;
+  jobId: string;
   name: string;
   role: string;
-  stage: string; // 'Sourced' | 'Applied' | 'Interviewing' | 'Offer' | 'Hired'
+  stage: string; // 'Applied' | 'Screening' | 'Interviewing' | 'Offer' | 'Hired'
   source: string;
   date: string;
   rating: number | null;
-  avatar: string;
+  avatar?: string;
   email: string;
-  phone: string;
+  phone?: string;
 };
 
 export type OnboardingTask = {
@@ -22,83 +24,192 @@ export type OnboardingTask = {
 };
 
 export type OnboardingRecord = {
-  id: number;
-  candidateId: number;
+  id: string;
+  candidateId: string;
   name: string;
   role: string;
   department: string;
   startDate: string;
   progress: number;
-  status: 'On Track' | 'At Risk' | 'Completed' | 'Not Started';
+  status: "On Track" | "At Risk" | "Completed" | "Not Started";
   tasks: OnboardingTask[];
 };
 
 interface HRContextType {
   candidates: Candidate[];
-  updateCandidateStage: (id: number, stage: string) => void;
+  isLoading: boolean;
+  updateCandidateStage: (id: string, stage: string) => Promise<void>;
+  addCandidate: (candidate: Omit<Candidate, "id">) => Promise<void>;
   onboardings: OnboardingRecord[];
-  initiateOnboarding: (candidate: Candidate, startDate: string, department: string) => void;
+  initiateOnboarding: (candidate: Candidate, startDate: string, department: string) => Promise<void>;
+  refresh: () => Promise<void>;
 }
-
-const INITIAL_CANDIDATES: Candidate[] = [
-  { id: 1, name: 'Alex Johnson', role: 'Senior Frontend Engineer', stage: 'Interviewing', source: 'LinkedIn', date: '2 days ago', rating: 4, avatar: 'https://i.pravatar.cc/150?img=11', email: 'alex.j@example.com', phone: '+1 (555) 123-4567' },
-  { id: 2, name: 'Maria Garcia', role: 'Senior Frontend Engineer', stage: 'Applied', source: 'Referral', date: '1 day ago', rating: null, avatar: 'https://i.pravatar.cc/150?img=5', email: 'maria.g@example.com', phone: '+1 (555) 987-6543' },
-  { id: 3, name: 'Wei Chen', role: 'Senior Frontend Engineer', stage: 'Hired', source: 'Direct Website', date: '5 days ago', rating: 5, avatar: 'https://i.pravatar.cc/150?img=12', email: 'wei.c@example.com', phone: '+1 (555) 555-5555' },
-  { id: 4, name: 'Jessica Smith', role: 'Product Manager', stage: 'Hired', source: 'Agency', date: 'Today', rating: null, avatar: 'https://i.pravatar.cc/150?img=47', email: 'jess.s@example.com', phone: '+1 (555) 111-2222' },
-  { id: 5, name: 'David Kim', role: 'Senior Frontend Engineer', stage: 'Interviewing', source: 'Indeed', date: '3 days ago', rating: 3, avatar: 'https://i.pravatar.cc/150?img=15', email: 'david.k@example.com', phone: '+1 (555) 333-4444' },
-];
-
-const INITIAL_ONBOARDINGS: OnboardingRecord[] = [
-  { 
-    id: 101, candidateId: 99, name: 'Michael Chang', role: 'Sales Development Rep', department: 'Sales', startDate: 'Nov 1, 2026', progress: 10, status: 'Not Started',
-    tasks: [
-      { id: 't1', title: 'Sign Offer Letter', completed: true },
-      { id: 't2', title: 'Submit Background Check', completed: false },
-      { id: 't3', title: 'IT Equipment Setup', completed: false },
-    ]
-  },
-  { 
-    id: 102, candidateId: 98, name: 'Sarah Miller', role: 'Product Manager', department: 'Product', startDate: 'Oct 25, 2026', progress: 40, status: 'At Risk',
-    tasks: [
-      { id: 't1', title: 'Sign Offer Letter', completed: true },
-      { id: 't2', title: 'Submit Background Check', completed: true },
-      { id: 't3', title: 'Complete I-9 Form', completed: false },
-      { id: 't4', title: 'IT Equipment Setup', completed: false },
-    ]
-  },
-];
 
 const HRContext = createContext<HRContextType | undefined>(undefined);
 
-export function HRProvider({ children }: { children: ReactNode }) {
-  const [candidates, setCandidates] = useState<Candidate[]>(INITIAL_CANDIDATES);
-  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>(INITIAL_ONBOARDINGS);
+const STAGE_TO_BACKEND: Record<string, string> = {
+  "Applied": "new",
+  "Screening": "screening",
+  "Interviewing": "interviewing",
+  "Offer": "offered",
+  "Hired": "hired",
+};
 
-  const updateCandidateStage = (id: number, stage: string) => {
-    setCandidates(prev => prev.map(c => c.id === id ? { ...c, stage } : c));
+const BACKEND_TO_STAGE: Record<string, string> = {
+  "new": "Applied",
+  "screening": "Screening",
+  "interviewing": "Interviewing",
+  "offered": "Offer",
+  "hired": "Hired",
+  "rejected": "Rejected",
+};
+
+export function HRProvider({ children }: { children: ReactNode }) {
+  const { getToken, isSignedIn } = useAuth();
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("easyhr_onboardings");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchCandidates = useCallback(async () => {
+    if (!isSignedIn) {
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const res = await fetch("http://localhost:8080/api/v1/hiring/applicants", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = json.data || [];
+        const mapped: Candidate[] = rawList.map((a: any) => ({
+          id: a.id,
+          jobId: a.jobId,
+          name: `${a.firstName} ${a.lastName}`.trim(),
+          role: a.jobTitle || "Applicant",
+          stage: BACKEND_TO_STAGE[a.status] || "Applied",
+          source: "Direct",
+          date: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : "Recent",
+          rating: 4,
+          email: a.email,
+          phone: a.phone || "",
+        }));
+        setCandidates(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch applicants", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getToken, isSignedIn]);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [fetchCandidates]);
+
+  const updateCandidateStage = async (id: string, stage: string) => {
+    // Optimistic UI update
+    setCandidates((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, stage } : c))
+    );
+
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const backendStatus = STAGE_TO_BACKEND[stage] || stage.toLowerCase();
+      await fetch(`http://localhost:8080/api/v1/hiring/applicants/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: backendStatus }),
+      });
+    } catch (err) {
+      console.error("Failed to update candidate status", err);
+      fetchCandidates();
+    }
   };
 
-  const initiateOnboarding = (candidate: Candidate, startDate: string, department: string) => {
+  const addCandidate = async (candidate: Omit<Candidate, "id">) => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      // Split name
+      const parts = candidate.name.split(" ");
+      const firstName = parts[0] || "New";
+      const lastName = parts.slice(1).join(" ") || "Candidate";
+
+      await fetch(`http://localhost:8080/api/v1/public/jobs/${candidate.jobId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email: candidate.email,
+          phone: candidate.phone,
+        }),
+      });
+
+      fetchCandidates();
+    } catch (err) {
+      console.error("Failed to add candidate", err);
+    }
+  };
+
+  const initiateOnboarding = async (candidate: Candidate, startDate: string, department: string) => {
     const newRecord: OnboardingRecord = {
-      id: Date.now(),
+      id: `onb-${Date.now()}`,
       candidateId: candidate.id,
       name: candidate.name,
       role: candidate.role,
       department,
       startDate,
       progress: 0,
-      status: 'On Track',
+      status: "On Track",
       tasks: [
-        { id: `t1-${Date.now()}`, title: 'Send Welcome Email', completed: false },
-        { id: `t2-${Date.now()}`, title: 'Setup IT Account', completed: false },
-        { id: `t3-${Date.now()}`, title: 'Collect I-9 Form', completed: false },
-      ]
+        { id: `t1-${Date.now()}`, title: "Sign Offer Letter & Employment Agreement", completed: false },
+        { id: `t2-${Date.now()}`, title: "Complete Personal Profile & Emergency Contacts", completed: false },
+        { id: `t3-${Date.now()}`, title: "Submit Tax & Direct Deposit Documents", completed: false },
+        { id: `t4-${Date.now()}`, title: "IT Equipment & Account Provisioning", completed: false },
+      ],
     };
-    setOnboardings(prev => [newRecord, ...prev]);
+
+    setOnboardings((prev) => {
+      const updated = [newRecord, ...prev];
+      if (typeof window !== "undefined") {
+        localStorage.setItem("easyhr_onboardings", JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   return (
-    <HRContext.Provider value={{ candidates, updateCandidateStage, onboardings, initiateOnboarding }}>
+    <HRContext.Provider
+      value={{
+        candidates,
+        isLoading,
+        updateCandidateStage,
+        addCandidate,
+        onboardings,
+        initiateOnboarding,
+        refresh: fetchCandidates,
+      }}
+    >
       {children}
     </HRContext.Provider>
   );
@@ -106,8 +217,8 @@ export function HRProvider({ children }: { children: ReactNode }) {
 
 export function useHR() {
   const context = useContext(HRContext);
-  if (context === undefined) {
-    throw new Error('useHR must be used within a HRProvider');
+  if (!context) {
+    throw new Error("useHR must be used within an HRProvider");
   }
   return context;
 }

@@ -16,7 +16,7 @@ export default function HrOnboardingPage() {
   const [activeTab, setActiveTab] = useState('New Hires');
   const [viewState, setViewState] = useState<'dashboard' | 'builder'>('dashboard');
   const { candidates, onboardings, initiateOnboarding } = useHR();
-  const [expandedRows, setExpandedRows] = useState<number[]>([]);
+  const [expandedRows, setExpandedRows] = useState<(string | number)[]>([]);
 
   // Wizard State
   const [wizardCandidate, setWizardCandidate] = useState<any>(null);
@@ -25,7 +25,7 @@ export default function HrOnboardingPage() {
   // Find candidates that are 'Hired' but not yet in onboardings
   const pendingHires = candidates.filter(c => c.stage === 'Hired' && !onboardings.some(o => o.candidateId === c.id));
 
-  const toggleRow = (id: number) => {
+  const toggleRow = (id: string | number) => {
     if (expandedRows.includes(id)) {
       setExpandedRows(expandedRows.filter(rId => rId !== id));
     } else {

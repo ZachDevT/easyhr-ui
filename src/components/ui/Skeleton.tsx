@@ -279,3 +279,61 @@ export function DepartmentsSkeleton() {
   );
 }
 
+/**
+ * HiringSkeleton mimics the Kanban pipeline layout of /hiring
+ */
+export function HiringSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", animation: "fadeIn 0.2s ease" }}>
+      {/* Toolbar Skeleton */}
+      <div style={{ padding: 32, borderBottom: "1px solid var(--border)", background: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Skeleton width={100} height={12} />
+            <Skeleton width={260} height={44} radius={8} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Skeleton width={120} height={12} />
+            <Skeleton width={320} height={44} radius={8} />
+          </div>
+        </div>
+        <Skeleton width={110} height={44} radius={8} />
+      </div>
+
+      {/* Kanban Columns Skeleton */}
+      <div style={{ padding: "32px 48px", display: "flex", gap: 24, overflowX: "auto" }}>
+        {[1, 2, 3, 4, 5].map((col) => (
+          <div key={col} style={{ minWidth: 300, width: 300, background: "#F3F4F6", padding: 16, borderRadius: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Skeleton width={12} height={12} radius="50%" />
+                <Skeleton width={90} height={16} />
+              </div>
+              <Skeleton width={30} height={20} radius={8} />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[1, 2].map((card) => (
+                <div key={card} style={{ background: "white", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 14, border: "1px solid rgba(0,0,0,0.06)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <Skeleton width={60} height={18} radius={6} />
+                    <Skeleton width={40} height={18} radius={6} />
+                  </div>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <Skeleton width={44} height={44} radius="50%" />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                      <Skeleton width={110} height={16} />
+                      <Skeleton width={80} height={12} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
