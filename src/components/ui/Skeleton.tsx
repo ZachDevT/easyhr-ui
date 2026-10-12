@@ -223,3 +223,59 @@ export function CompanySettingsSkeleton() {
     </div>
   );
 }
+
+/**
+ * DepartmentsSkeleton mimics the layout of /departments
+ */
+export function DepartmentsSkeleton() {
+  return (
+    <div style={{ padding: "32px 40px", animation: "fadeIn 0.2s ease", display: "flex", flexDirection: "column", gap: 32 }}>
+      {/* Stat Ribbon Skeleton */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Skeleton width={100} height={14} />
+              <Skeleton width={32} height={32} radius={8} />
+            </div>
+            <Skeleton width={60} height={28} />
+            <Skeleton width={120} height={12} />
+          </div>
+        ))}
+      </div>
+
+      {/* Header filter row */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Skeleton width={200} height={24} />
+          <Skeleton width={120} height={14} />
+        </div>
+        <Skeleton width={280} height={40} radius={12} />
+      </div>
+
+      {/* Grid of Department Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Skeleton width={48} height={48} radius={12} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                <Skeleton width={140} height={20} />
+                <Skeleton width={90} height={13} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, paddingTop: 16, borderTop: "1px dashed var(--border)" }}>
+              {[1, 2, 3].map((s) => (
+                <div key={s} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <Skeleton width={50} height={11} />
+                  <Skeleton width={30} height={20} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
