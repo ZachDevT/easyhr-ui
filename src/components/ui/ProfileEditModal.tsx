@@ -40,11 +40,11 @@ export function ProfileEditModal({ isOpen, onClose }: ProfileEditModalProps) {
     setSuccess(false);
 
     try {
-      // 1. If avatar changed and is a new data URL, upload to Cloudflare R2
+      // 1. If avatar changed and is a new data URL, upload avatar
       if (avatarDataUrl && avatarDataUrl !== userProfile?.avatarUrl && avatarDataUrl.startsWith("data:")) {
         const uploadedUrl = await uploadAvatar(avatarDataUrl);
         if (!uploadedUrl) {
-          throw new Error("Failed to upload avatar to Cloudflare storage.");
+          throw new Error("Failed to upload profile photo.");
         }
       }
 
@@ -110,9 +110,9 @@ export function ProfileEditModal({ isOpen, onClose }: ProfileEditModalProps) {
         <div style={{ display: "flex", justifyContent: "center" }}>
           <div style={{ width: "100%", maxWidth: "340px" }}>
             <FilePicker
-              label="Profile Photo (stored in Cloudflare R2)"
+              label="Profile Photo"
               value={avatarDataUrl}
-              onChange={(url) => setAvatarDataUrl(url)}
+              onChange={(url) => setAvatarDataUrl(url || "")}
               accept="image/png,image/jpeg,image/webp"
               maxSizeMB={5}
               placeholderText="Upload your avatar"

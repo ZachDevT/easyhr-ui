@@ -133,7 +133,7 @@ export default function SupportDashboard() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <strong style={{ color: 'var(--text-primary)', fontSize: 14 }}>{ticket.subject}</strong>
-                        <Badge color={getStatusColor(ticket.status) as any}>{ticket.status}</Badge>
+                        <Badge variant={getStatusColor(ticket.status) as any}>{ticket.status}</Badge>
                       </div>
                       <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', gap: 6, alignItems: 'center' }}>
                         <span>{ticket.user.name}</span>
@@ -172,7 +172,7 @@ export default function SupportDashboard() {
                     <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{selectedTicket.user.email}</div>
                   </div>
                 </div>
-                <Badge color={getStatusColor(selectedTicket.status) as any}>{selectedTicket.status}</Badge>
+                <Badge variant={getStatusColor(selectedTicket.status) as any}>{selectedTicket.status}</Badge>
               </div>
               <h4 style={{ margin: '0 0 8px', fontSize: 16, color: 'var(--text-primary)' }}>{selectedTicket.subject}</h4>
               <p style={{ margin: 0, fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.5, background: 'var(--bg-page)', padding: 16, borderRadius: 8 }}>

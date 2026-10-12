@@ -57,14 +57,47 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
+const CACHE_KEYS = {
+  company: "easyhr_company_cache",
+  user: "easyhr_user_cache",
+  locations: "easyhr_locations_cache",
+};
+
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { user: clerkUser } = useUser();
 
-  const [company, setCompany] = useState<CompanyData | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
-  const [locations, setLocations] = useState<LocationItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [company, setCompany] = useState<CompanyData | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(CACHE_KEYS.company);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [userProfile, setUserProfile] = useState<UserProfileData | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(CACHE_KEYS.user);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [locations, setLocations] = useState<LocationItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(CACHE_KEYS.locations);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
+
+  const [isLoading, setIsLoading] = useState(!company);
 
   const applyBrandColor = useCallback((color: string) => {
     if (!color || typeof document === "undefined") return;
@@ -74,6 +107,13 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.setProperty("--gradient", `linear-gradient(135deg, ${cleanColor} 0%, #2D144B 100%)`);
     document.documentElement.style.setProperty("--primary-tint", `${cleanColor}18`);
   }, []);
+
+  // Immediate brand color injection on mount from cached company
+  useEffect(() => {
+    if (company?.brandColor) {
+      applyBrandColor(company.brandColor);
+    }
+  }, [company?.brandColor, applyBrandColor]);
 
   const refresh = useCallback(async () => {
     if (!isSignedIn) {
@@ -125,13 +165,22 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         setCompany(comp);
         setUserProfile(prof);
         applyBrandColor(comp.brandColor);
+
+        try {
+          localStorage.setItem(CACHE_KEYS.company, JSON.stringify(comp));
+          localStorage.setItem(CACHE_KEYS.user, JSON.stringify(prof));
+        } catch {}
       }
 
       // Fetch locations
       const locRes = await fetch("http://localhost:8080/api/v1/locations", { headers });
       if (locRes.ok) {
         const locData = await locRes.json();
-        setLocations(locData.data || []);
+        const locs = locData.data || [];
+        setLocations(locs);
+        try {
+          localStorage.setItem(CACHE_KEYS.locations, JSON.stringify(locs));
+        } catch {}
       }
     } catch (err) {
       console.warn("Could not load company/user details:", err);

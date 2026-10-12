@@ -115,8 +115,8 @@ export default function CompanySettingsPage() {
     }
   };
 
-  const handleLogoUpload = async (newLogoUrl: string) => {
-    setLogoDataUrl(newLogoUrl);
+  const handleLogoUpload = async (newLogoUrl: string | null) => {
+    setLogoDataUrl(newLogoUrl || "");
     if (!newLogoUrl || !newLogoUrl.startsWith("data:")) return;
 
     setLogoUploading(true);
@@ -460,7 +460,7 @@ export default function CompanySettingsPage() {
             <Card>
               <CardBody>
                 <SectionHeading
-                  title="Company brand logo (Cloudflare R2 Storage)"
+                  title="Company brand logo"
                   description="Your official brand logo will replace the EasyHR mark across the dashboard, employee emails, careers page, and contracts."
                 />
 
@@ -480,7 +480,7 @@ export default function CompanySettingsPage() {
                     }}
                   >
                     <Sparkles size={16} />
-                    <span>Logo successfully uploaded and saved to Cloudflare R2 bucket: <b>easyhr-documents</b>!</span>
+                    <span>Logo successfully uploaded and saved!</span>
                   </div>
                 )}
 
@@ -496,7 +496,7 @@ export default function CompanySettingsPage() {
                   {logoUploading && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, color: "var(--primary)" }}>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>Uploading asset to Cloudflare R2 bucket...</span>
+                      <span>Uploading logo...</span>
                     </div>
                   )}
                 </div>

@@ -22,7 +22,7 @@ export default function SignUp() {
   const [isSubmitting, setIsSubmitting]     = useState(false);
   const router = useRouter();
 
-  const handleSignUp = async (e) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signUp) return;
     setError('');
@@ -32,7 +32,7 @@ export default function SignUp() {
       await signUp.create({ firstName, lastName, emailAddress, password });
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Sign-up error:', err);
       const clerkErr = err?.errors?.[0];
       if (clerkErr?.code === 'form_identifier_exists') {
@@ -45,7 +45,7 @@ export default function SignUp() {
     }
   };
 
-  const handleVerify = async (e) => {
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signUp) return;
     if (code.length < 6) { setError('Please enter the full 6-digit code.'); return; }
@@ -86,7 +86,7 @@ export default function SignUp() {
       }
 
       setError('Unexpected status: ' + result.status);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Verify error:', err);
       const msg = (err?.errors?.[0]?.message ?? '').toLowerCase();
       if (msg.includes('already') && msg.includes('verified')) {
@@ -138,7 +138,7 @@ export default function SignUp() {
         redirectUrl: '/sso-callback',
         redirectUrlComplete: '/company/register',
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Google error:', err);
       setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || err?.message || 'Google sign-up failed.');
       setIsSubmitting(false);
@@ -167,7 +167,7 @@ export default function SignUp() {
                   if (p) { setCode(p); const ins = e.currentTarget.parentElement?.querySelectorAll('input'); if (ins) (ins[Math.min(p.length,5)] as HTMLElement).focus(); }
                 }}
                 onKeyDown={(e) => {
-                  if (e.key==='Backspace' && !code[i] && e.currentTarget.previousElementSibling) e.currentTarget.previousElementSibling.focus();
+                  if (e.key==='Backspace' && !code[i] && e.currentTarget.previousElementSibling) (e.currentTarget.previousElementSibling as HTMLElement).focus();
                 }}
               />
             ))}
