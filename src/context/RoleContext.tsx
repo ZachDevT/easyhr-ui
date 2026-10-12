@@ -14,12 +14,14 @@ interface RoleContextType {
   role: Role;
   setRole: (role: Role) => void;
   currentUser: Employee;
+  isHRAdmin: boolean;
+  isManager: boolean;
+  isEmployee: boolean;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>('HR Admin');
   const { userProfile, company } = useCompany();
   const { user: clerkUser } = useUser();
 
@@ -31,28 +33,52 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const realCompany = company?.name || '';
   const realLocation = company?.city ? `${company.city}, ${company.countryCode}` : '';
 
-  let currentUser: Employee = currentEmployee;
-  if (role === 'Manager') currentUser = currentManager;
-  if (role === 'HR Admin') {
-    currentUser = {
-      ...currentHRAdmin,
-      id: userProfile?.id || clerkUser?.id || 'admin',
-      firstName: realFirstName,
-      lastName: realLastName,
-      email: realEmail,
-      phone: userProfile?.phone || '',
-      avatar: realAvatar, // Empty string means initials or custom avatar, never dummy Sarah Johnson
-      title: realTitle,
-      department: 'Leadership / HR',
-      division: realCompany,
-      location: realLocation,
-      hireDate: '2024-01-01',
-      status: 'Active',
-    };
+  // Dynamically resolve role based on real backend userProfile role
+  const rawRole = (userProfile?.role || '').toLowerCase();
+  let dynamicRole: Role = 'Employee';
+  if (
+    rawRole.includes('admin') ||
+    rawRole.includes('owner') ||
+    rawRole.includes('hr') ||
+    rawRole.includes('founder') ||
+    rawRole.includes('director') ||
+    rawRole.includes('executive')
+  ) {
+    dynamicRole = 'HR Admin';
+  } else if (rawRole.includes('manager') || rawRole.includes('lead') || rawRole.includes('head')) {
+    dynamicRole = 'Manager';
   }
 
+  const [overrideRole, setOverrideRole] = useState<Role | null>(null);
+  const activeRole = overrideRole || dynamicRole;
+
+  const currentUser: Employee = {
+    ...currentHRAdmin,
+    id: userProfile?.id || clerkUser?.id || 'user',
+    firstName: realFirstName,
+    lastName: realLastName,
+    email: realEmail,
+    phone: userProfile?.phone || '',
+    avatar: realAvatar,
+    title: realTitle,
+    department: activeRole === 'HR Admin' ? 'Leadership / HR' : activeRole === 'Manager' ? 'Management' : 'Team Member',
+    division: realCompany,
+    location: realLocation,
+    hireDate: '2024-01-01',
+    status: 'Active',
+  };
+
   return (
-    <RoleContext.Provider value={{ role, setRole, currentUser }}>
+    <RoleContext.Provider
+      value={{
+        role: activeRole,
+        setRole: setOverrideRole,
+        currentUser,
+        isHRAdmin: activeRole === 'HR Admin',
+        isManager: activeRole === 'Manager',
+        isEmployee: activeRole === 'Employee',
+      }}
+    >
       {children}
     </RoleContext.Provider>
   );
