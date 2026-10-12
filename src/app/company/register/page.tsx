@@ -26,8 +26,11 @@ import {
   MapPin,
   AtSign,
   AlertCircle,
+  Clock,
+  Navigation,
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { FilePicker } from "@/components/ui/FilePicker";
 import { EasyHRLogo } from "@/components/marketing/EasyHRLogo";
 import PricingCard from "@/components/ui/PricingCard";
 import dynamic from "next/dynamic";
@@ -94,6 +97,7 @@ export default function CompanyRegistration() {
     currency: "UGX",
     domain: "",
     color: "#A238FF",
+    logoDataUrl: "" as string | null,
     plan: "Starter",
     payment: "mobile-money",
     // New fields
@@ -112,6 +116,10 @@ export default function CompanyRegistration() {
     geofenceLat: 0.3136, // default Kampala
     geofenceLng: 32.5811,
     geofenceRadius: 300,
+    geofenceAccuracyTolerance: 50, // clock-in GPS tolerance in meters
+    clockInGraceMinutes: 15, // grace period for late arrivals
+    workStartTime: "09:00",
+    workEndTime: "17:00",
   });
 
   // Auto-complete inputs from Clerk user profile
@@ -211,7 +219,7 @@ export default function CompanyRegistration() {
             latitude: form.geofenceLat || 0.3136,
             longitude: form.geofenceLng || 32.5811,
             radiusMeters: form.geofenceRadius || 300,
-            accuracyToleranceMeters: 50,
+            accuracyToleranceMeters: form.geofenceAccuracyTolerance || 50,
           } : undefined,
         },
       };
@@ -508,7 +516,101 @@ export default function CompanyRegistration() {
                         value={form.geofenceRadius}
                         onChange={(e) => set("geofenceRadius", parseInt(e.target.value))}
                       />
-                      <span>{form.geofenceRadius}m</span>
+                      <span>Radius: {form.geofenceRadius}m</span>
+                    </div>
+
+                    <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4e4a44", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <Navigation size={12} color="#a238ff" /> GPS Accuracy Tolerance
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                          <input
+                            type="range"
+                            min="10"
+                            max="200"
+                            step="10"
+                            value={form.geofenceAccuracyTolerance}
+                            onChange={(e) => set("geofenceAccuracyTolerance", parseInt(e.target.value))}
+                            style={{ flex: 1, accentColor: "var(--primary)" }}
+                          />
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: "#18151b", minWidth: "40px" }}>
+                            ±{form.geofenceAccuracyTolerance}m
+                          </span>
+                        </div>
+                        <small style={{ fontSize: "10px", color: "#888", display: "block", marginTop: "2px" }}>
+                          Rejects spoofed or weak GPS signals beyond this variance
+                        </small>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4e4a44", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <Clock size={12} color="#a238ff" /> Late Clock-in Grace Window
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                          <select
+                            value={form.clockInGraceMinutes}
+                            onChange={(e) => set("clockInGraceMinutes", parseInt(e.target.value))}
+                            style={{
+                              width: "100%",
+                              height: "38px",
+                              borderRadius: "8px",
+                              border: "1px solid #ddd8d1",
+                              fontSize: "12px",
+                              padding: "0 10px",
+                              background: "#fff"
+                            }}
+                          >
+                            <option value={0}>Strict (0 min grace)</option>
+                            <option value={5}>5 minutes grace</option>
+                            <option value={10}>10 minutes grace</option>
+                            <option value={15}>15 minutes grace (Standard)</option>
+                            <option value={30}>30 minutes grace</option>
+                          </select>
+                        </div>
+                        <small style={{ fontSize: "10px", color: "#888", display: "block", marginTop: "2px" }}>
+                          Minutes before an arrival is flagged as &apos;Late&apos;
+                        </small>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4e4a44" }}>Standard Shift Start</span>
+                        <input
+                          type="time"
+                          value={form.workStartTime}
+                          onChange={(e) => set("workStartTime", e.target.value)}
+                          style={{
+                            width: "100%",
+                            height: "38px",
+                            borderRadius: "8px",
+                            border: "1px solid #ddd8d1",
+                            padding: "0 10px",
+                            fontSize: "12px",
+                            marginTop: "6px",
+                            background: "#fff"
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#4e4a44" }}>Standard Shift End</span>
+                        <input
+                          type="time"
+                          value={form.workEndTime}
+                          onChange={(e) => set("workEndTime", e.target.value)}
+                          style={{
+                            width: "100%",
+                            height: "38px",
+                            borderRadius: "8px",
+                            border: "1px solid #ddd8d1",
+                            padding: "0 10px",
+                            fontSize: "12px",
+                            marginTop: "6px",
+                            background: "#fff"
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -566,24 +668,43 @@ export default function CompanyRegistration() {
                 <div
                   className={styles.logoPreview}
                   style={{
-                    background: `linear-gradient(135deg,${form.color},#FF3EA5)`,
+                    background: form.logoDataUrl
+                      ? "#fff"
+                      : `linear-gradient(135deg,${form.color},#FF3EA5)`,
+                    border: form.logoDataUrl ? "1px solid #e5e0da" : "none",
+                    overflow: "hidden",
+                    display: "grid",
+                    placeItems: "center",
                   }}
                 >
-                  {(form.displayName || "A").charAt(0)}
+                  {form.logoDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.logoDataUrl}
+                      alt="Logo"
+                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                    />
+                  ) : (
+                    (form.displayName || "A").charAt(0)
+                  )}
                 </div>
                 <div>
                   <h3>{form.displayName || "Your company"}</h3>
-                  <p>Workspace preview</p>
+                  <p>Workspace branding preview</p>
                 </div>
               </div>
 
               <div className={styles.formGrid}>
-                <Field label="Company Logo">
-                  <div className={styles.uploadPlaceholder}>
-                    <Camera size={16} />
-                    <span>Upload logo (Optional)</span>
-                  </div>
-                </Field>
+                <div className={styles.full}>
+                  <FilePicker
+                    label="Company Brand Logo"
+                    value={form.logoDataUrl}
+                    onChange={(url) => set("logoDataUrl", url)}
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    maxSizeMB={5}
+                    placeholderText="Click or drop your company logo here"
+                  />
+                </div>
                 <Field label="Brand color">
                   <div className={styles.colorField}>
                     <input
@@ -700,7 +821,27 @@ export default function CompanyRegistration() {
                   icon={<Palette />}
                   label="Workspace"
                   value={`easyhr.app/${form.domain || "acacia-labs"}`}
-                  detail={form.linkedin ? "Socials connected" : "Branded experience"}
+                  detail={
+                    form.logoDataUrl
+                      ? "Custom logo uploaded · Branded"
+                      : form.linkedin
+                      ? "Socials connected · Branded"
+                      : "Branded experience"
+                  }
+                />
+                <Review
+                  icon={<Clock />}
+                  label="Attendance & Geofence"
+                  value={
+                    form.geofenceEnabled
+                      ? `Active (${form.geofenceRadius}m radius)`
+                      : "Standard clock-in"
+                  }
+                  detail={
+                    form.geofenceEnabled
+                      ? `±${form.geofenceAccuracyTolerance}m tolerance · ${form.clockInGraceMinutes}m grace`
+                      : `${form.workStartTime} - ${form.workEndTime} standard shift`
+                  }
                 />
                 <Review
                   icon={<Users2 />}
