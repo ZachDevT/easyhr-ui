@@ -4,9 +4,18 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
-import { FileText, Briefcase, MapPin, Clock, ArrowLeft, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { FileText, Briefcase, MapPin, Clock, ArrowLeft, Loader2, CheckCircle2, Globe, Building } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
+
+interface CompanyPublic {
+  id: string;
+  name: string;
+  logoUrl: string;
+  brandColor: string;
+  industry: string;
+  websiteUrl: string;
+}
 
 interface JobDetail {
   id: string;
@@ -20,8 +29,17 @@ interface JobDetail {
 export default function CareerJobPage() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
+  const orgParam = searchParams.get("orgId") || searchParams.get("organizationId");
   const { getToken } = useAuth();
 
+  const [company, setCompany] = useState<CompanyPublic>({
+    id: "",
+    name: "ProjectEasyHR",
+    logoUrl: "",
+    brandColor: "#4F46E5",
+    industry: "Innovation & Technology",
+    websiteUrl: "",
+  });
   const [job, setJob] = useState<JobDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState(1);
@@ -39,13 +57,31 @@ export default function CareerJobPage() {
   });
 
   useEffect(() => {
-    async function loadJob() {
+    async function loadJobAndCompany() {
       try {
         const token = await getToken();
         const headers: Record<string, string> = {};
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        const res = await fetch("http://localhost:8080/api/v1/jobs", { headers });
+        // 1. Fetch public company profile
+        const compUrl = orgParam
+          ? `http://localhost:8080/api/v1/public/company?organizationId=${orgParam}`
+          : "http://localhost:8080/api/v1/public/company";
+        const compRes = await fetch(compUrl);
+        let currentOrgId = orgParam || "";
+        if (compRes.ok) {
+          const compData: CompanyPublic = await compRes.json();
+          if (compData.name) {
+            setCompany(compData);
+            currentOrgId = compData.id || currentOrgId;
+          }
+        }
+
+        // 2. Fetch jobs
+        const jobsUrl = currentOrgId
+          ? `http://localhost:8080/api/v1/public/jobs?organizationId=${currentOrgId}`
+          : "http://localhost:8080/api/v1/public/jobs";
+        const res = await fetch(jobsUrl, { headers });
         if (res.ok) {
           const list: JobDetail[] = await res.json();
           if (jobId) {
@@ -57,13 +93,13 @@ export default function CareerJobPage() {
           }
         }
       } catch (err) {
-        console.error("Failed to load job", err);
+        console.error("Failed to load job details", err);
       } finally {
         setIsLoading(false);
       }
     }
-    loadJob();
-  }, [jobId, getToken]);
+    loadJobAndCompany();
+  }, [jobId, orgParam, getToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,22 +137,25 @@ export default function CareerJobPage() {
     }
   };
 
+  const brandColor = company.brandColor || "#4F46E5";
+
   if (submitted) {
     return (
-      <div style={{ background: "#F9FAFB", minHeight: "100vh", fontFamily: "var(--font-sans)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 48 }}>
-        <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--success-tint)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
-          <CheckCircle2 size={44} />
-        </div>
-        <h1 className="text-4xl fw-800 text-1 mb-16 text-center">Application Received!</h1>
-        <p className="text-lg text-5 mb-32 text-center max-w-md">
-          Thank you for applying to the <strong>{job?.title}</strong> role at EasyHR. Your application is now in our recruiting pipeline.
-        </p>
-        <div className="row gap-16">
-          <Link href="/careers" className="btn-secondary" style={{ padding: "14px 28px", textDecoration: "none" }}>
-            Browse More Roles
-          </Link>
-          <Link href="/hiring" className="btn-primary" style={{ padding: "14px 28px", textDecoration: "none" }}>
-            View in ATS
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#F9FAFB", padding: 24 }}>
+        <div style={{ background: "white", padding: 48, borderRadius: 20, maxWidth: 540, width: "100%", textAlign: "center", boxShadow: "0 20px 40px rgba(0,0,0,0.08)", border: "1px solid var(--border)" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--success-tint)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
+            <CheckCircle2 size={36} />
+          </div>
+          <h2 className="text-2xl fw-800 text-1 mb-12">Application Submitted!</h2>
+          <p className="text-base text-4 mb-28" style={{ lineHeight: 1.6 }}>
+            Thank you, <strong>{form.firstName}</strong>. Your application for <strong>{job?.title}</strong> at <strong>{company.name}</strong> has been received. Our recruiting team will review your profile and reach out via email.
+          </p>
+          <Link
+            href={`/careers${company.id ? `?orgId=${company.id}` : ""}`}
+            className="btn-primary"
+            style={{ display: "inline-block", textDecoration: "none", padding: "12px 28px", borderRadius: 10, background: brandColor }}
+          >
+            &larr; View More Roles at {company.name}
           </Link>
         </div>
       </div>
@@ -136,155 +175,292 @@ export default function CareerJobPage() {
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#F9FAFB", padding: 40, gap: 16 }}>
         <h2 className="text-2xl fw-800 text-1">Job Opening Not Found</h2>
         <p className="text-base text-4">This job posting may have been closed or removed.</p>
-        <Link href="/careers" className="btn-primary">Back to Careers</Link>
+        <Link href={`/careers${company.id ? `?orgId=${company.id}` : ""}`} className="btn-primary">
+          Back to Careers
+        </Link>
       </div>
     );
   }
 
   return (
     <div style={{ background: "#F9FAFB", minHeight: "100vh", fontFamily: "var(--font-sans)", paddingBottom: 100 }}>
-      {/* Public Header */}
-      <div style={{ background: "#111827", padding: "20px 48px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Link href="/careers" style={{ textDecoration: "none" }}>
-          <div className="row gap-12 align-center">
-            <div style={{ width: 40, height: 40, background: "var(--primary)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 20 }}>
-              E
-            </div>
-            <span className="fw-800 text-xl text-white">EasyHR Careers</span>
+      {/* Dynamic Header with Real Company Logo */}
+      <header
+        style={{
+          background: "#111827",
+          padding: "18px 48px",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Link href={`/careers${company.id ? `?orgId=${company.id}` : ""}`} style={{ textDecoration: "none" }}>
+          <div className="row gap-14 align-center">
+            {company.logoUrl ? (
+              <div
+                style={{
+                  background: "white",
+                  padding: "4px 10px",
+                  borderRadius: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <img
+                  src={company.logoUrl}
+                  alt={company.name}
+                  style={{ height: 28, maxWidth: 120, objectFit: "contain" }}
+                />
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: brandColor,
+                  borderRadius: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
+                  fontWeight: 800,
+                  fontSize: 16,
+                }}
+              >
+                {company.name ? company.name.charAt(0).toUpperCase() : "E"}
+              </div>
+            )}
+            <span className="fw-800 text-lg text-white">{company.name} Careers</span>
           </div>
         </Link>
-        <Link href="/careers" className="text-white row gap-6 align-center text-sm fw-600" style={{ textDecoration: "none", opacity: 0.8 }}>
+        <Link
+          href={`/careers${company.id ? `?orgId=${company.id}` : ""}`}
+          className="text-white row gap-6 align-center text-sm fw-600"
+          style={{ textDecoration: "none", opacity: 0.8 }}
+        >
           <ArrowLeft size={16} /> All Roles
         </Link>
-      </div>
+      </header>
 
-      <div style={{ maxWidth: 840, margin: "40px auto", padding: "0 20px" }}>
-        <Card style={{ border: "none", boxShadow: "0 20px 40px rgba(0,0,0,0.08)", overflow: "visible", borderRadius: 20 }}>
+      <div style={{ maxWidth: 880, margin: "40px auto", padding: "0 24px" }}>
+        <Card style={{ border: "none", boxShadow: "0 20px 40px rgba(0,0,0,0.06)", overflow: "visible", borderRadius: 20 }}>
           <CardBody style={{ padding: 0 }}>
             {/* Job Header */}
             <div style={{ padding: "48px 48px 32px 48px", borderBottom: "1px solid var(--border)" }}>
-              <div className="row gap-12 mb-20">
-                <Badge variant="primary" style={{ background: "var(--primary-tint)", color: "var(--primary)" }}>
-                  {job.departmentName || "Engineering"}
+              <div className="row gap-12 mb-20 align-center">
+                <Badge variant="primary" style={{ background: "var(--primary-tint)", color: brandColor, fontWeight: 700 }}>
+                  {job.departmentName || "General"}
                 </Badge>
                 <Badge variant="neutral">{job.location || "Remote"}</Badge>
-                <Badge variant="neutral">{job.employmentType || "Full-Time"}</Badge>
+                <Badge variant="neutral">{job.employmentType || "Full-time"}</Badge>
               </div>
-              <h1 className="text-4xl fw-800 text-1 m-0 mb-16">{job.title}</h1>
-
-              {step === 1 && (
-                <button
-                  className="btn-primary mt-12"
-                  style={{ padding: "16px 40px", fontSize: 18, borderRadius: 10, cursor: "pointer" }}
-                  onClick={() => setStep(2)}
-                >
-                  Apply for this Role
-                </button>
-              )}
+              <h1 className="text-3xl fw-800 text-1 m-0 mb-16">{job.title}</h1>
+              <div className="row gap-20 text-sm text-5 fw-500">
+                <span className="row gap-6 align-center">
+                  <Building size={16} /> {company.name}
+                </span>
+                <span>&bull;</span>
+                <span className="row gap-6 align-center">
+                  <MapPin size={16} /> {job.location}
+                </span>
+                <span>&bull;</span>
+                <span className="row gap-6 align-center">
+                  <Clock size={16} /> {job.employmentType}
+                </span>
+              </div>
             </div>
 
-            {/* Content */}
-            <div style={{ padding: "48px" }}>
-              {step === 1 ? (
-                <div className="col gap-24 text-base text-2" style={{ lineHeight: 1.7 }}>
-                  <h3 className="text-xl fw-800 text-1 m-0">About the Role</h3>
-                  <p style={{ whiteSpace: "pre-line" }}>{job.description}</p>
+            {/* Content Tabs / Stepper */}
+            <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "#FAFBFD" }}>
+              <button
+                onClick={() => setStep(1)}
+                style={{
+                  flex: 1,
+                  padding: "16px 24px",
+                  background: step === 1 ? "white" : "transparent",
+                  border: "none",
+                  borderBottom: step === 1 ? `2px solid ${brandColor}` : "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: step === 1 ? brandColor : "var(--text-4)",
+                  cursor: "pointer",
+                  transition: "0.2s",
+                }}
+              >
+                1. Role Description
+              </button>
+              <button
+                onClick={() => setStep(2)}
+                style={{
+                  flex: 1,
+                  padding: "16px 24px",
+                  background: step === 2 ? "white" : "transparent",
+                  border: "none",
+                  borderBottom: step === 2 ? `2px solid ${brandColor}` : "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: step === 2 ? brandColor : "var(--text-4)",
+                  cursor: "pointer",
+                  transition: "0.2s",
+                }}
+              >
+                2. Apply for this Position
+              </button>
+            </div>
 
-                  <h3 className="text-xl fw-800 text-1 m-0 mt-16">What We Offer</h3>
-                  <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-                    <li>Competitive salary & equity packages.</li>
-                    <li>Flexible remote-first working culture.</li>
-                    <li>Comprehensive healthcare and retirement contributions.</li>
-                    <li>Generous paid time off and parental leave.</li>
-                  </ul>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="col gap-32">
-                  <div>
-                    <h2 className="text-3xl fw-800 text-1 m-0 mb-8">Submit Your Application</h2>
-                    <p className="text-base text-5 m-0">Please fill out your contact details to apply for {job.title}.</p>
+            <div style={{ padding: "40px 48px" }}>
+              {step === 1 ? (
+                <div>
+                  <div className="prose" style={{ lineHeight: 1.7, color: "var(--text-2)", fontSize: 16 }}>
+                    <h3 className="text-xl fw-800 text-1 mb-16">About the Role</h3>
+                    <p style={{ whiteSpace: "pre-line", marginBottom: 32 }}>{job.description}</p>
+
+                    <h3 className="text-xl fw-800 text-1 mb-16">Why Join {company.name}?</h3>
+                    <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <li>Collaborative, high-impact culture where every team member has a voice.</li>
+                      <li>Competitive compensation, comprehensive benefits, and flexible work options.</li>
+                      <li>Modern technology stack and continuous opportunities for professional growth.</li>
+                    </ul>
                   </div>
 
+                  <div className="mt-40 row-between align-center" style={{ paddingTop: 32, borderTop: "1px solid var(--border)" }}>
+                    <div className="text-sm text-5">Ready to make an impact? We’d love to meet you.</div>
+                    <button
+                      className="btn-primary"
+                      onClick={() => setStep(2)}
+                      style={{ padding: "12px 32px", fontSize: 15, background: brandColor }}
+                    >
+                      Apply Now &rarr;
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit}>
                   {errorMsg && (
-                    <div style={{ padding: "12px 16px", borderRadius: 8, background: "#FEE2E2", border: "1px solid #FCA5A5", color: "#DC2626", display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
-                      <AlertCircle size={18} />
-                      <span>{errorMsg}</span>
+                    <div
+                      className="p-16 mb-24 text-sm"
+                      style={{
+                        background: "#FEF2F2",
+                        border: "1px solid #F87171",
+                        color: "#991B1B",
+                        borderRadius: 10,
+                      }}
+                    >
+                      {errorMsg}
                     </div>
                   )}
 
-                  <div className="grid-2 gap-24">
-                    <div className="col gap-8">
-                      <label className="text-sm fw-700 text-1">First Name *</label>
-                      <input
-                        type="text"
-                        className="input"
-                        placeholder="e.g. Alex"
-                        value={form.firstName}
-                        onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                        required
-                      />
+                  <div className="col gap-24">
+                    <div className="grid-2 gap-20">
+                      <div className="col gap-8">
+                        <label className="text-xs fw-700 text-1 uppercase tracking-wider">
+                          First Name <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Alex"
+                          className="input"
+                          value={form.firstName}
+                          onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                        />
+                      </div>
+                      <div className="col gap-8">
+                        <label className="text-xs fw-700 text-1 uppercase tracking-wider">
+                          Last Name <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Mercer"
+                          className="input"
+                          value={form.lastName}
+                          onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                        />
+                      </div>
                     </div>
-                    <div className="col gap-8">
-                      <label className="text-sm fw-700 text-1">Last Name *</label>
-                      <input
-                        type="text"
-                        className="input"
-                        placeholder="e.g. Mercer"
-                        value={form.lastName}
-                        onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid-2 gap-24">
+                    <div className="grid-2 gap-20">
+                      <div className="col gap-8">
+                        <label className="text-xs fw-700 text-1 uppercase tracking-wider">
+                          Email Address <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="alex@example.com"
+                          className="input"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        />
+                      </div>
+                      <div className="col gap-8">
+                        <label className="text-xs fw-700 text-1 uppercase tracking-wider">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="+1 (555) 000-0000"
+                          className="input"
+                          value={form.phone}
+                          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
                     <div className="col gap-8">
-                      <label className="text-sm fw-700 text-1">Email Address *</label>
+                      <label className="text-xs fw-700 text-1 uppercase tracking-wider">
+                        Portfolio / LinkedIn / GitHub URL
+                      </label>
                       <input
-                        type="email"
+                        type="url"
+                        placeholder="https://linkedin.com/in/alex"
                         className="input"
-                        placeholder="e.g. alex.mercer@example.com"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        required
+                        value={form.portfolioUrl}
+                        onChange={(e) => setForm({ ...form, portfolioUrl: e.target.value })}
                       />
                     </div>
+
                     <div className="col gap-8">
-                      <label className="text-sm fw-700 text-1">Phone Number</label>
-                      <input
-                        type="tel"
+                      <label className="text-xs fw-700 text-1 uppercase tracking-wider">
+                        Why are you excited about {company.name}?
+                      </label>
+                      <textarea
+                        rows={4}
+                        placeholder="Share a brief note about yourself and your background..."
                         className="input"
-                        placeholder="e.g. +1 (555) 000-0000"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        style={{ height: "auto", padding: "12px 16px" }}
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
                       />
                     </div>
-                  </div>
 
-                  <div className="col gap-8">
-                    <label className="text-sm fw-700 text-1">Portfolio or LinkedIn URL</label>
-                    <input
-                      type="url"
-                      className="input"
-                      placeholder="https://linkedin.com/in/..."
-                      value={form.portfolioUrl}
-                      onChange={(e) => setForm({ ...form, portfolioUrl: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="row-between align-center pt-16" style={{ borderTop: "1px solid var(--border)" }}>
-                    <button type="button" className="btn-neutral" onClick={() => setStep(1)} style={{ padding: "14px 28px" }}>
-                      Back to Overview
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="btn-primary row gap-8 align-center"
-                      style={{ padding: "14px 36px", fontSize: 16 }}
-                    >
-                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null}
-                      <span>Submit Application</span>
-                    </button>
+                    <div className="row-between align-center mt-12" style={{ paddingTop: 24, borderTop: "1px solid var(--border)" }}>
+                      <button
+                        type="button"
+                        className="btn-neutral"
+                        onClick={() => setStep(1)}
+                        style={{ padding: "10px 24px" }}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="btn-primary"
+                        style={{ padding: "12px 32px", fontSize: 15, background: brandColor }}
+                      >
+                        {isSubmitting ? (
+                          <span className="row gap-8 align-center">
+                            <Loader2 className="animate-spin" size={16} /> Submitting...
+                          </span>
+                        ) : (
+                          `Submit Application to ${company.name}`
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}
