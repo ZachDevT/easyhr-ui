@@ -62,11 +62,20 @@ export default function SignUp() {
 
       if (result.status === 'missing_requirements') {
         const missing = result.missingFields ?? [];
-        if (missing.length === 1 && missing.includes('username')) {
-          const slug = [firstName, lastName, Date.now().toString(36)].join('.').toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        if (missing.includes('username')) {
+          const f = (firstName || 'user').toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+          const l = (lastName || 'member').toLowerCase().replace(/[^a-z0-9]/g, '') || 'member';
+          const rand = Math.random().toString(36).substring(2, 7);
+          const slug = `${f}_${l}_${rand}`.slice(0, 24);
+
           const updated = await result.update({ username: slug });
+          if (updated.status === 'complete' && updated.createdSessionId) {
+            await clerk.setActive({ session: updated.createdSessionId });
+            router.push('/company/register');
+            return;
+          }
           const retry = await updated.attemptEmailAddressVerification({ code });
-          if (retry.status === 'complete') {
+          if (retry.status === 'complete' && retry.createdSessionId) {
             await clerk.setActive({ session: retry.createdSessionId });
             router.push('/company/register');
             return;
@@ -81,6 +90,22 @@ export default function SignUp() {
       console.error('Verify error:', err);
       const msg = (err?.errors?.[0]?.message ?? '').toLowerCase();
       if (msg.includes('already') && msg.includes('verified')) {
+        if (signUp.status === 'missing_requirements' && signUp.missingFields?.includes('username')) {
+          try {
+            const f = (firstName || 'user').toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+            const l = (lastName || 'member').toLowerCase().replace(/[^a-z0-9]/g, '') || 'member';
+            const rand = Math.random().toString(36).substring(2, 7);
+            const slug = `${f}_${l}_${rand}`.slice(0, 24);
+            const updated = await signUp.update({ username: slug });
+            if (updated.status === 'complete' && updated.createdSessionId) {
+              await clerk.setActive({ session: updated.createdSessionId });
+              router.push('/company/register');
+              return;
+            }
+          } catch (updateErr) {
+            console.error('Username recovery error:', updateErr);
+          }
+        }
         if (signUp.status === 'complete' && signUp.createdSessionId) {
           await clerk.setActive({ session: signUp.createdSessionId });
           router.push('/company/register');
