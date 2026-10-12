@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Clock,
   Navigation,
+  Loader2,
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { FilePicker } from "@/components/ui/FilePicker";
@@ -80,6 +81,8 @@ export default function CompanyRegistration() {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [domainStatus, setDomainStatus] = useState<"idle" | "checking" | "available" | "unavailable">("idle");
+  const [domainError, setDomainError] = useState("");
 
   const [form, setForm] = useState({
     creatorFirstName: "",
@@ -142,8 +145,47 @@ export default function CompanyRegistration() {
         legalName: prev.legalName || (first ? `${first}'s Company Ltd` : ""),
         domain: prev.domain || (first ? first.toLowerCase().replace(/[^a-z0-9]/g, "") : "workspace"),
       }));
+  // Live subdomain availability check
+  useEffect(() => {
+    const rawSubdomain = form.domain.trim();
+    if (!rawSubdomain) {
+      setDomainStatus("idle");
+      setDomainError("");
+      return;
     }
-  }, [isLoaded, user]);
+
+    const clean = rawSubdomain
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/^-+|-+$/g, "");
+
+    if (clean.length < 2) {
+      setDomainStatus("unavailable");
+      setDomainError("Must be at least 2 characters");
+      return;
+    }
+
+    setDomainStatus("checking");
+    setDomainError("");
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`http://localhost:8080/api/v1/public/check-subdomain?subdomain=${encodeURIComponent(clean)}`);
+        const data = await res.json();
+        if (data.available) {
+          setDomainStatus("available");
+          setDomainError("");
+        } else {
+          setDomainStatus("unavailable");
+          setDomainError(data.reason || "This workspace URL is not available");
+        }
+      } catch {
+        setDomainStatus("idle");
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [form.domain]);
 
   const set = (key: string, value: any) =>
     setForm({ ...form, [key]: value });
@@ -735,14 +777,44 @@ export default function CompanyRegistration() {
                   </div>
                 </Field>
                 <Field label="Workspace URL" full>
-                  <div className={styles.domain}>
+                  <div
+                    className={styles.domain}
+                    style={{
+                      borderColor:
+                        domainStatus === "unavailable"
+                          ? "#ef4444"
+                          : domainStatus === "available"
+                          ? "#22c55e"
+                          : undefined,
+                    }}
+                  >
                     <span>easyhr.app/</span>
                     <input
                       value={form.domain}
-                      onChange={(e) => set("domain", e.target.value)}
+                      onChange={(e) => set("domain", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                       placeholder="acacia-labs"
                     />
+                    <div style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "#fff" }}>
+                      {domainStatus === "checking" && (
+                        <Loader2 size={16} className="animate-spin" color="#a238ff" />
+                      )}
+                      {domainStatus === "available" && (
+                        <span style={{ color: "#16a34a", fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", gap: "3px" }}>
+                          <Check size={14} /> Available
+                        </span>
+                      )}
+                      {domainStatus === "unavailable" && (
+                        <span style={{ color: "#dc2626", fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", gap: "3px" }}>
+                          <AlertCircle size={14} /> Taken
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {domainError && (
+                    <small style={{ color: "#dc2626", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                      {domainError}
+                    </small>
+                  )}
                 </Field>
                 <Field label="LinkedIn Profile">
                   <div className={styles.socialGroup}>
@@ -951,7 +1023,21 @@ export default function CompanyRegistration() {
             <ArrowLeft /> {step ? "Back" : "Exit setup"}
           </button>
           {step < 5 ? (
-            <button className={styles.next} onClick={() => setStep(step + 1)}>
+            <button
+              className={styles.next}
+              onClick={() => {
+                if (step === 3 && domainStatus === "unavailable") {
+                  setError("Please choose an available workspace URL before continuing.");
+                  return;
+                }
+                setError("");
+                setStep(step + 1);
+              }}
+              disabled={step === 3 && domainStatus === "checking"}
+              style={{
+                opacity: step === 3 && (domainStatus === "unavailable" || domainStatus === "checking") ? 0.6 : 1,
+              }}
+            >
               Continue <ArrowRight />
             </button>
           ) : (
