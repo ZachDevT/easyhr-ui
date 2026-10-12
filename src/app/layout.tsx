@@ -1,5 +1,6 @@
 import './globals.css';
 import { ClerkProvider } from "@clerk/nextjs";
+import { CompanyProvider } from '@/context/CompanyContext';
 import { RoleProvider } from '@/context/RoleContext';
 import { WidgetProvider } from '@/context/WidgetContext';
 import { HRProvider } from '@/context/HRContext';
@@ -20,16 +21,20 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <ClerkProvider>
-        <RoleProvider>
-          <HRProvider>
-            <OperationsProvider><WidgetProvider>
-              <AppLayout>
-                {children}
-              </AppLayout>
-            </WidgetProvider></OperationsProvider>
-          </HRProvider>
-        </RoleProvider>
-              </ClerkProvider>
+          <CompanyProvider>
+            <RoleProvider>
+              <HRProvider>
+                <OperationsProvider>
+                  <WidgetProvider>
+                    <AppLayout>
+                      {children}
+                    </AppLayout>
+                  </WidgetProvider>
+                </OperationsProvider>
+              </HRProvider>
+            </RoleProvider>
+          </CompanyProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

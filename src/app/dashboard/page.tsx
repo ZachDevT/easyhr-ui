@@ -2,12 +2,15 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
+import { useCompany } from '@/context/CompanyContext';
 import { useWidgets, MAX_WIDGETS } from '@/context/WidgetContext';
 import { CompulsoryMyTimeWidget, CompulsoryTimeOffWidget, WIDGET_MAP, OPTIONAL_WIDGETS } from '@/components/widgets';
 import { Modal } from '@/components/ui/Modal';
+import { ProfileEditModal } from '@/components/ui/ProfileEditModal';
 
 export default function Dashboard() {
   const { currentUser } = useRole();
+  const { company } = useCompany();
   const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
   const initials = `${currentUser.firstName[0]}${currentUser.lastName[0]}`;
 
@@ -15,6 +18,7 @@ export default function Dashboard() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   
   // Drag and drop state
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -67,12 +71,20 @@ export default function Dashboard() {
             >
               Hi, {currentUser.firstName}
             </h1>
-            <p className="text-sm text-4 mt-4" style={{ fontWeight: 500 }}>{currentUser.title}</p>
+            <p className="text-sm text-4 mt-4" style={{ fontWeight: 500 }}>
+              {currentUser.title} {company?.name ? `· ${company.name}` : ''}
+            </p>
           </div>
         </div>
 
         <div className="row gap-10">
-          <button className="btn-neutral" style={{ padding: '8px 20px' }}>Edit</button>
+          <button 
+            className="btn-neutral" 
+            style={{ padding: '8px 20px' }}
+            onClick={() => setProfileModalOpen(true)}
+          >
+            Edit Profile
+          </button>
           <button 
             className={isEditing ? "btn-primary" : "widget-manage-btn"} 
             onClick={() => setIsEditing(!isEditing)} 
@@ -287,6 +299,10 @@ export default function Dashboard() {
         </div>
       </Modal>
 
+      <ProfileEditModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+      />
     </>
   );
 }

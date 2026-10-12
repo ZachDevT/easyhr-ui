@@ -34,10 +34,15 @@ import {
   Inbox,
   UserMinus,
   LifeBuoy,
+  LogOut,
+  UserCheck,
 } from 'lucide-react';
 import { useRole } from '../../context/RoleContext';
+import { useCompany } from '../../context/CompanyContext';
+import { useClerk } from '@clerk/nextjs';
 import { Avatar } from '../ui/Avatar';
 import { EasyHRLogo, EasyHRMark } from '../marketing/EasyHRLogo';
+import { ProfileEditModal } from '../ui/ProfileEditModal';
 
 interface NavItemProps {
   href: string;
@@ -140,8 +145,12 @@ function NavGroup({ label, children, collapsed, defaultOpen = true }: NavGroupPr
 
 export function Sidebar() {
   const { role, currentUser } = useRole();
+  const { company } = useCompany();
+  const { signOut } = useClerk();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const isHRAdmin = role === 'HR Admin';
   const isManager = role === 'Manager';
   const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
@@ -178,9 +187,51 @@ export function Sidebar() {
           gap: 8,
         }}
       >
-        {/* Logo */}
+        {/* Company Brand Logo or EasyHR Mark */}
         <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', overflow: 'hidden', flex: 1, paddingLeft: collapsed ? 0 : 4 }}>
-          {collapsed ? (
+          {company?.logoUrl ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+              <img
+                src={company.logoUrl}
+                alt={company.name}
+                style={{
+                  height: 28,
+                  width: collapsed ? 28 : 'auto',
+                  maxHeight: 28,
+                  maxWidth: collapsed ? 28 : 120,
+                  objectFit: 'contain',
+                  borderRadius: 6,
+                }}
+              />
+              {!collapsed && (
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: '#18151b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {company.name}
+                </span>
+              )}
+            </div>
+          ) : company?.name ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: 7,
+                background: company.brandColor || 'var(--primary)',
+                color: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 800,
+                fontSize: 13,
+                flexShrink: 0,
+              }}>
+                {company.name.charAt(0).toUpperCase()}
+              </div>
+              {!collapsed && (
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: '#18151b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {company.name}
+                </span>
+              )}
+            </div>
+          ) : collapsed ? (
             <EasyHRMark size={28} />
           ) : (
             <EasyHRLogo size={28} />
@@ -292,8 +343,11 @@ export function Sidebar() {
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'flex-start',
           gap: 10,
-          overflow: 'hidden',
+          position: 'relative',
+          cursor: 'pointer',
         }}
+        onClick={() => setUserMenuOpen(!userMenuOpen)}
+        title="Account & profile settings"
       >
         <Avatar src={currentUser.avatar} name={fullName} size="sm" />
         {!collapsed && (
@@ -306,7 +360,104 @@ export function Sidebar() {
             </div>
           </div>
         )}
+
+        {/* User Popover Menu */}
+        {userMenuOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: collapsed ? 10 : 12,
+              width: 190,
+              background: '#fff',
+              border: '1px solid #E5E7EB',
+              borderRadius: 10,
+              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+              padding: '6px',
+              zIndex: 100,
+              marginBottom: 8,
+            }}
+          >
+            <button
+              onClick={() => {
+                setUserMenuOpen(false);
+                setProfileModalOpen(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '8px 10px',
+                border: 'none',
+                background: 'transparent',
+                borderRadius: 6,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: '#374151',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#F3F4F6')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <UserCheck size={14} color="var(--primary)" /> Edit Profile
+            </button>
+            <Link
+              href="/company-settings"
+              onClick={() => setUserMenuOpen(false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 6,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: '#374151',
+                textDecoration: 'none',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#F3F4F6')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Settings2 size={14} color="var(--primary)" /> Company Settings
+            </Link>
+            <div style={{ height: 1, background: '#E5E7EB', margin: '4px 0' }} />
+            <button
+              onClick={() => {
+                setUserMenuOpen(false);
+                signOut({ redirectUrl: '/auth/sign-in' });
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '8px 10px',
+                border: 'none',
+                background: 'transparent',
+                borderRadius: 6,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: '#DC2626',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#FEE2E2')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <LogOut size={14} /> Sign out
+            </button>
+          </div>
+        )}
       </div>
+
+      <ProfileEditModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+      />
     </aside>
   );
 }

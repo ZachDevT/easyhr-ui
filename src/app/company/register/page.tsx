@@ -323,6 +323,19 @@ export default function CompanyRegistration() {
         throw new Error(data.detail || data.message || `Setup failed (${res.status})`);
       }
 
+      // Automatically upload logo to Cloudflare R2 if one was selected
+      if (form.logoDataUrl && form.logoDataUrl.startsWith("data:")) {
+        try {
+          await fetch("http://localhost:8080/api/v1/branding/logo", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ logoDataUrl: form.logoDataUrl }),
+          });
+        } catch (logoErr) {
+          console.warn("Logo initial upload:", logoErr);
+        }
+      }
+
       router.push("/dashboard");
     } catch (err: any) {
       console.error("Workspace setup failed:", err);
