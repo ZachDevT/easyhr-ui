@@ -143,6 +143,27 @@ export default function HrOnboardingPage() {
         if (res.ok) {
           const empJson = await res.json();
           createdEmpId = empJson.id;
+
+          // Dispatch onboarding invitation email to new hire's email
+          try {
+            await fetch("http://localhost:8080/api/v1/onboarding/send-invitation", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                employeeId: createdEmpId,
+                email: wizardCandidate.email,
+                name: `${firstName} ${lastName}`,
+                jobTitle: wizardCandidate.role,
+                startDate: startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                portalUrl: `${window.location.origin}/my-onboarding`,
+              }),
+            });
+          } catch (emailErr) {
+            console.error("Failed to trigger invitation email", emailErr);
+          }
         }
       }
 

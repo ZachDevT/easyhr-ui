@@ -377,5 +377,74 @@ export function PeopleDirectorySkeleton() {
   );
 }
 
+/**
+ * OnboardingPortalSkeleton mimics the layout of /my-onboarding
+ */
+export function OnboardingPortalSkeleton() {
+  return (
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 24, animation: "fadeIn 0.2s ease" }}>
+      {/* Banner Skeleton */}
+      <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <Skeleton width={72} height={72} radius="50%" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Skeleton width={260} height={26} />
+            <Skeleton width={340} height={14} />
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 180 }}>
+          <Skeleton width={120} height={14} />
+          <Skeleton width="100%" height={8} radius={4} />
+        </div>
+      </div>
+
+      {/* Grid with main form and sidebar */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 32, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {/* Stepper bar */}
+          <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 20, display: "flex", justifyContent: "space-between" }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1 }}>
+                <Skeleton width={36} height={36} radius="50%" />
+                <Skeleton width={70} height={12} />
+              </div>
+            ))}
+          </div>
+
+          {/* Form card */}
+          <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 24 }}>
+            <Skeleton width={220} height={24} />
+            <Skeleton width={320} height={14} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 12 }}>
+              <Skeleton width="100%" height={44} radius={8} />
+              <Skeleton width="100%" height={44} radius={8} />
+              <Skeleton width="100%" height={44} radius={8} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
+              <Skeleton width={100} height={40} radius={8} />
+              <Skeleton width={150} height={40} radius={8} />
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar widgets */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+            <Skeleton width={140} height={18} />
+            <Skeleton width="100%" height={16} />
+            <Skeleton width="90%" height={16} />
+            <Skeleton width="80%" height={16} />
+          </div>
+          <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+            <Skeleton width={140} height={18} />
+            <Skeleton width="100%" height={56} radius={8} />
+            <Skeleton width="100%" height={56} radius={8} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 
