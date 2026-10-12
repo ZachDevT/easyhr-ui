@@ -135,31 +135,31 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
         const comp: CompanyData = {
           id: data.organization?.id || "",
-          name: data.organization?.name || "My Company",
-          legalName: data.legalProfile?.legalName || data.organization?.name || "My Company Ltd",
+          name: data.organization?.name || "",
+          legalName: data.legalProfile?.legalName || data.organization?.name || "",
           registrationNumber: data.legalProfile?.registrationNumber || "",
           taxIdentifier: data.legalProfile?.taxIdentifier || "",
           websiteUrl: data.legalProfile?.websiteUrl || "",
           contactEmail: data.legalProfile?.contactEmail || data.user?.email || "",
           contactPhone: data.legalProfile?.contactPhone || "",
-          industry: data.legalProfile?.industry || "Technology",
+          industry: data.legalProfile?.industry || "",
           brandColor: data.workspace?.brandColor || "#A238FF",
           logoUrl: data.workspace?.logoUrl || "",
-          subdomain: data.workspace?.subdomain || "workspace",
+          subdomain: data.workspace?.subdomain || "",
           countryCode: data.organization?.countryCode || "UG",
           timezone: data.organization?.timezone || "Africa/Kampala",
           addressLine1: data.legalProfile?.addressLine1 || "",
-          city: data.legalProfile?.city || "Kampala",
+          city: data.legalProfile?.city || "",
         };
 
         const prof: UserProfileData = {
           id: data.user?.id || "",
-          firstName: data.user?.firstName || clerkUser?.firstName || "HR",
-          lastName: data.user?.lastName || clerkUser?.lastName || "Admin",
+          firstName: data.user?.firstName || clerkUser?.firstName || "",
+          lastName: data.user?.lastName || clerkUser?.lastName || "",
           email: data.user?.email || clerkUser?.primaryEmailAddress?.emailAddress || "",
           phone: data.user?.phone || "",
           avatarUrl: data.user?.avatarUrl || clerkUser?.imageUrl || "",
-          role: data.user?.role || "Company Owner",
+          role: data.user?.role || "Company Administrator",
         };
 
         setCompany(comp);

@@ -42,7 +42,6 @@ import { useCompany } from '../../context/CompanyContext';
 import { useClerk } from '@clerk/nextjs';
 import { Avatar } from '../ui/Avatar';
 import { EasyHRLogo, EasyHRMark } from '../marketing/EasyHRLogo';
-import { ProfileEditModal } from '../ui/ProfileEditModal';
 
 interface NavItemProps {
   href: string;
@@ -149,7 +148,6 @@ export function Sidebar() {
   const { signOut } = useClerk();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const isHRAdmin = role === 'HR Admin';
   const isManager = role === 'Manager';
@@ -379,31 +377,26 @@ export function Sidebar() {
               marginBottom: 8,
             }}
           >
-            <button
-              onClick={() => {
-                setUserMenuOpen(false);
-                setProfileModalOpen(true);
-              }}
+            <Link
+              href="/people/me?tab=Personal"
+              onClick={() => setUserMenuOpen(false)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
                 width: '100%',
                 padding: '8px 10px',
-                border: 'none',
-                background: 'transparent',
                 borderRadius: 6,
                 fontSize: 12.5,
                 fontWeight: 600,
                 color: '#374151',
-                cursor: 'pointer',
-                textAlign: 'left',
+                textDecoration: 'none',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#F3F4F6')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              <UserCheck size={14} color="var(--primary)" /> Edit Profile
-            </button>
+              <UserCheck size={14} color="var(--primary)" /> View & Edit Profile
+            </Link>
             <Link
               href="/company-settings"
               onClick={() => setUserMenuOpen(false)}
@@ -453,11 +446,6 @@ export function Sidebar() {
           </div>
         )}
       </div>
-
-      <ProfileEditModal
-        isOpen={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-      />
     </aside>
   );
 }

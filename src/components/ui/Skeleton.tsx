@@ -1,0 +1,225 @@
+"use client";
+
+import React from "react";
+
+interface SkeletonProps {
+  className?: string;
+  style?: React.CSSProperties;
+  width?: string | number;
+  height?: string | number;
+  radius?: string | number;
+}
+
+export function Skeleton({ className = "", style, width, height, radius }: SkeletonProps) {
+  return (
+    <div
+      className={`shimmer-box ${className}`}
+      style={{
+        width: width ?? "100%",
+        height: height ?? "16px",
+        borderRadius: radius ?? 8,
+        ...style,
+      }}
+    />
+  );
+}
+
+/**
+ * DashboardSkeleton mimics the exact layout of /dashboard
+ */
+export function DashboardSkeleton() {
+  return (
+    <div style={{ padding: "0 4px", animation: "fadeIn 0.2s ease" }}>
+      {/* Profile Header Shimmer */}
+      <div className="row-between mb-24" style={{ alignItems: "center" }}>
+        <div className="row gap-16" style={{ alignItems: "center" }}>
+          <Skeleton width={84} height={84} radius="50%" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Skeleton width={220} height={32} radius={8} />
+            <Skeleton width={160} height={16} radius={6} />
+          </div>
+        </div>
+        <div className="row gap-10">
+          <Skeleton width={110} height={38} radius={8} />
+          <Skeleton width={140} height={38} radius={8} />
+        </div>
+      </div>
+
+      {/* Main Grid: Left Compulsory (360px) + Right Optional */}
+      <div className="dash-grid" style={{ gridTemplateColumns: "360px 1fr", gap: 24 }}>
+        {/* Left Column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* My Time Widget Skeleton */}
+          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24 }}>
+            <div className="row-between mb-20">
+              <Skeleton width={120} height={18} />
+              <Skeleton width={70} height={22} radius={12} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", margin: "24px 0" }}>
+              <Skeleton width={150} height={150} radius="50%" />
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <Skeleton height={42} radius={10} />
+              <Skeleton height={42} radius={10} />
+            </div>
+          </div>
+
+          {/* Time Off Widget Skeleton */}
+          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24 }}>
+            <div className="row-between mb-16">
+              <Skeleton width={130} height={18} />
+              <Skeleton width={80} height={16} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Skeleton height={70} radius={12} />
+              <Skeleton height={70} radius={12} />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Quick Action Ribbon */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Skeleton width={36} height={36} radius={10} />
+                <Skeleton width={90} height={14} />
+                <Skeleton width={50} height={22} />
+              </div>
+            ))}
+          </div>
+
+          {/* Large Card Shimmer */}
+          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="row-between mb-12">
+              <Skeleton width={180} height={20} />
+              <Skeleton width={80} height={16} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderBottom: i === 3 ? "none" : "1px solid #F3F4F6" }}>
+                  <Skeleton width={44} height={44} radius="50%" />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <Skeleton width="40%" height={15} />
+                    <Skeleton width="70%" height={12} />
+                  </div>
+                  <Skeleton width={80} height={24} radius={12} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ProfileMeSkeleton mimics /people/me
+ */
+export function ProfileMeSkeleton() {
+  return (
+    <div style={{ height: "100%", overflowY: "auto", background: "var(--bg-page)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease" }}>
+      {/* Banner Shimmer */}
+      <div style={{ margin: "24px 24px 0 24px" }}>
+        <div style={{ background: "linear-gradient(135deg, #A238FF15 0%, #2D144B15 100%)", border: "1px solid #E5E7EB", borderRadius: 16, padding: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 28 }}>
+            <Skeleton width={100} height={100} radius="50%" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Skeleton width={240} height={28} />
+              <Skeleton width={160} height={16} />
+            </div>
+          </div>
+          {/* Tab bar shimmer */}
+          <div style={{ display: "flex", gap: 12, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
+            {[80, 60, 90, 80, 100, 75, 90].map((w, idx) => (
+              <Skeleton key={idx} width={w} height={32} radius={20} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 48, padding: "24px" }}>
+        {/* Left Vitals Column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+            <Skeleton width={80} height={16} />
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Skeleton width={20} height={20} radius={6} />
+                <Skeleton width="75%" height={14} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Content Column */}
+        <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 32 }}>
+          <div className="row-between mb-24">
+            <Skeleton width={180} height={24} />
+            <Skeleton width={90} height={32} radius={8} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Skeleton width={100} height={13} />
+                <Skeleton height={38} radius={8} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * CompanySettingsSkeleton mimics /company-settings
+ */
+export function CompanySettingsSkeleton() {
+  return (
+    <div style={{ padding: "0 24px", animation: "fadeIn 0.2s ease" }}>
+      <div className="row-between mb-24">
+        <div>
+          <Skeleton width={200} height={28} />
+          <Skeleton width={320} height={16} style={{ marginTop: 8 }} />
+        </div>
+        <Skeleton width={120} height={40} radius={8} />
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+        {[140, 110, 120, 100].map((w, idx) => (
+          <Skeleton key={idx} width={w} height={36} radius={8} />
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.7fr", gap: 20 }}>
+        <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
+          <Skeleton width={180} height={22} />
+          <Skeleton width="80%" height={14} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 12 }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <Skeleton width={120} height={13} />
+                <Skeleton height={38} radius={8} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <Skeleton width={88} height={88} radius={20} />
+          <Skeleton width={140} height={20} />
+          <Skeleton width={100} height={14} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <Skeleton width={90} height={24} radius={12} />
+            <Skeleton width={50} height={24} radius={12} />
+          </div>
+          <Skeleton width="100%" height={50} radius={10} style={{ marginTop: 12 }} />
+        </div>
+      </div>
+    </div>
+  );
+}

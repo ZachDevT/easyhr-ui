@@ -1,31 +1,68 @@
 "use client";
 
-import { useState } from 'react';
-import { Mail, Phone, MapPin, Building, Calendar, Clock, Monitor, User, ChevronDown, ChevronUp, FileText, ChevronRight, CheckCircle2, Target, Stethoscope, Heart, Briefcase, Plus, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Mail, Phone, MapPin, Building, Calendar, Clock, Monitor, User, ChevronDown, ChevronUp, FileText, ChevronRight, CheckCircle2, Target, Stethoscope, Heart, Briefcase, Plus, Search, Camera, Loader2, Sparkles } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
+import { useCompany } from '@/context/CompanyContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardBody } from '@/components/ui/Card';
 import { CompulsoryMyTimeWidget } from '@/components/widgets';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ProfileMeSkeleton } from '@/components/ui/Skeleton';
 
 const TABS = ['Personal', 'Job', 'Documents', 'Time Off', 'Performance', 'Benefits', 'Timesheet', 'Pay Info', 'Emergency'];
 
 export default function ProfilePage() {
   const { currentUser } = useRole();
-  const [activeTab, setActiveTab] = useState('Timesheet');
+  const { userProfile, company, updateProfile, uploadAvatar, isLoading } = useCompany();
+  const searchParams = useSearchParams();
+
+  // If ?tab=Personal is in URL, start on Personal tab; otherwise default to Personal or Timesheet
+  const requestedTab = searchParams?.get('tab');
+  const [activeTab, setActiveTab] = useState(requestedTab || 'Personal');
 
   // Editing state for Personal Tab
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+  const [isSavingPersonal, setIsSavingPersonal] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Avatar upload state
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarSuccess, setAvatarSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const displayFirstName = userProfile?.firstName || currentUser.firstName || 'HR';
+  const displayLastName = userProfile?.lastName || currentUser.lastName || 'Admin';
+  const displayPhone = userProfile?.phone || currentUser.phone || '';
+  const displayEmail = userProfile?.email || currentUser.email || '';
+  const displayRole = userProfile?.role || currentUser.title || 'HR Administrator';
+  const displayCompany = company?.name || currentUser.division || 'EasyHR';
+  const displayLocation = company?.city || currentUser.location || 'Kampala, Uganda';
+
   const [personalForm, setPersonalForm] = useState({
-    firstName: currentUser.firstName,
-    lastName: currentUser.lastName,
-    gender: currentUser.gender,
-    birthDate: currentUser.birthDate,
-    location: currentUser.location,
+    firstName: displayFirstName,
+    lastName: displayLastName,
+    phone: displayPhone,
+    gender: currentUser.gender || 'Prefer not to say',
+    birthDate: currentUser.birthDate || '1992-05-18',
+    location: displayLocation,
     maritalStatus: 'Single',
     ssn: '***-**-1234'
   });
+
+  // Keep form in sync when userProfile loads
+  useEffect(() => {
+    if (userProfile) {
+      setPersonalForm(prev => ({
+        ...prev,
+        firstName: userProfile.firstName || prev.firstName,
+        lastName: userProfile.lastName || prev.lastName,
+        phone: userProfile.phone || prev.phone,
+      }));
+    }
+  }, [userProfile]);
 
   // State for expanded timesheet rows
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -50,10 +87,52 @@ export default function ProfilePage() {
     { day: 'Thu', date: 'Sep 26', hrs: '0h 00m', time: '--', details: [] },
   ];
 
-  const handlePersonalSave = () => {
-    // In a real app, API call goes here
-    setIsEditingPersonal(false);
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    setAvatarSuccess(false);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+        const uploadedUrl = await uploadAvatar(dataUrl);
+        if (uploadedUrl) {
+          setAvatarSuccess(true);
+          setTimeout(() => setAvatarSuccess(false), 3000);
+        }
+        setIsUploadingAvatar(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Avatar upload failed:', err);
+      setIsUploadingAvatar(false);
+    }
   };
+
+  const handlePersonalSave = async () => {
+    setIsSavingPersonal(true);
+    try {
+      const ok = await updateProfile({
+        firstName: personalForm.firstName.trim(),
+        lastName: personalForm.lastName.trim(),
+        phone: personalForm.phone.trim(),
+      });
+      if (ok) {
+        setIsEditingPersonal(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      }
+    } finally {
+      setIsSavingPersonal(false);
+    }
+  };
+
+  if (isLoading && !userProfile) {
+    return <ProfileMeSkeleton />;
+  }
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column' }}>
@@ -62,21 +141,87 @@ export default function ProfilePage() {
       <div style={{ margin: '24px 24px 0 24px' }}>
         <PageHeader 
           variant="card"
-          title={`${currentUser.firstName} ${currentUser.lastName}`}
-          subtitle={currentUser.title}
+          title={`${displayFirstName} ${displayLastName}`}
+          subtitle={`${displayRole} · ${displayCompany}`}
           icon={
-            <Avatar 
-              name={`${currentUser.firstName} ${currentUser.lastName}`} 
-              src={currentUser.avatar} 
-              size="xl" 
-              style={{ width: 100, height: 100, border: '4px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} 
-            />
+            <div
+              className="avatar-hover-container"
+              style={{
+                position: 'relative',
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '4px solid rgba(255,255,255,0.25)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                cursor: 'pointer',
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              title="Click to change photo"
+            >
+              <Avatar 
+                name={`${displayFirstName} ${displayLastName}`} 
+                src={userProfile?.avatarUrl || currentUser.avatar} 
+                size="xl" 
+                style={{ width: '100%', height: '100%', borderRadius: '50%' }} 
+              />
+              <div
+                className="avatar-hover-overlay"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                  userSelect: 'none',
+                }}
+              >
+                {isUploadingAvatar ? (
+                  <Loader2 size={24} className="animate-spin" />
+                ) : (
+                  <>
+                    <Camera size={22} />
+                    <span style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>Change Photo</span>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: 'none' }}
+                onChange={handleAvatarFileChange}
+              />
+            </div>
           }
           tabs={TABS}
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
       </div>
+
+      {avatarSuccess && (
+        <div style={{
+          margin: '12px 24px 0 24px',
+          background: '#F0FDF4',
+          border: '1px solid #86EFAC',
+          borderRadius: '8px',
+          padding: '10px 16px',
+          color: '#15803D',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Sparkles size={16} />
+          <span>Profile photo successfully updated and saved!</span>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 48, padding: '24px', position: 'relative' }}>
@@ -88,22 +233,22 @@ export default function ProfilePage() {
             <h3 className="text-sm fw-600 text-2 mb-12">Vitals</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="row gap-12 text-xs text-4">
-                <Phone size={14} /> <span className="text-1">{currentUser.phone}</span>
+                <Phone size={14} /> <span className="text-1">{displayPhone || 'No phone set'}</span>
               </div>
               <div className="row gap-12 text-xs text-4">
-                <Monitor size={14} /> <span className="text-1">{currentUser.email}</span>
+                <Monitor size={14} /> <span className="text-1">{displayEmail}</span>
               </div>
               <div className="row gap-12 text-xs text-4">
-                <Clock size={14} /> <span className="text-1">12:07 PM local time</span>
+                <Clock size={14} /> <span className="text-1">Active Now</span>
               </div>
               <div className="row gap-12 text-xs text-4">
-                <MapPin size={14} /> <span className="text-1">{currentUser.location}</span>
+                <MapPin size={14} /> <span className="text-1">{displayLocation}</span>
               </div>
               <div className="row gap-12 text-xs text-4">
                 <Building size={14} /> 
                 <div className="text-1">
-                  <div>{currentUser.department}</div>
-                  <div className="text-5 mt-2">Full-Time (In Office)</div>
+                  <div>{displayCompany}</div>
+                  <div className="text-5 mt-2">{displayRole}</div>
                 </div>
               </div>
             </div>
@@ -112,25 +257,14 @@ export default function ProfilePage() {
           <div className="divider mb-24" />
 
           <div className="mb-24">
-            <h3 className="text-sm fw-600 text-2 mb-12">Hire Date</h3>
+            <h3 className="text-sm fw-600 text-2 mb-12">Account Status</h3>
             <div className="row gap-12 text-xs text-4">
               <Calendar size={14} />
               <div className="text-1">
-                <div>{currentUser.hireDate}</div>
-                <div className="text-5 mt-2">2y - 6m - 15d</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="divider mb-24" />
-
-          <div className="mb-24">
-            <h3 className="text-sm fw-600 text-2 mb-12">Manager</h3>
-            <div className="row gap-12">
-              <Avatar name={currentUser.manager || 'No Manager'} size="sm" />
-              <div className="text-xs">
-                <div className="text-1">{currentUser.manager || 'N/A'}</div>
-                <div className="text-5 mt-2">Manager</div>
+                <div className="row gap-8">
+                  <Badge variant="success">Verified Owner</Badge>
+                </div>
+                <div className="text-5 mt-4">Full administrative access</div>
               </div>
             </div>
           </div>
@@ -224,22 +358,53 @@ export default function ProfilePage() {
           {activeTab === 'Personal' && (
             <div>
               <div className="row-between mb-24">
-                <h3 className="text-lg fw-600 text-1">Basic Information</h3>
+                <div>
+                  <h3 className="text-lg fw-600 text-1">Personal Information</h3>
+                  <p className="text-xs text-5 mt-2">Manage your official contact details and profile credentials</p>
+                </div>
                 {!isEditingPersonal && (
-                  <button className="btn-secondary btn-sm" onClick={() => setIsEditingPersonal(true)}>Edit Info</button>
+                  <button className="btn-primary btn-sm" onClick={() => setIsEditingPersonal(true)}>
+                    Edit Info
+                  </button>
                 )}
               </div>
+
+              {saveSuccess && (
+                <div style={{
+                  marginBottom: 20,
+                  background: '#F0FDF4',
+                  border: '1px solid #86EFAC',
+                  borderRadius: 8,
+                  padding: '10px 16px',
+                  color: '#15803D',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}>
+                  <CheckCircle2 size={16} />
+                  <span>Profile changes successfully saved to database!</span>
+                </div>
+              )}
               
               {isEditingPersonal ? (
                 <div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px 24px' }}>
                     <div>
                       <label className="form-label">First Name</label>
-                      <input className="input" value={personalForm.firstName} onChange={e => setPersonalForm({...personalForm, firstName: e.target.value})} />
+                      <input className="input" value={personalForm.firstName} onChange={e => setPersonalForm({...personalForm, firstName: e.target.value})} required />
                     </div>
                     <div>
                       <label className="form-label">Last Name</label>
-                      <input className="input" value={personalForm.lastName} onChange={e => setPersonalForm({...personalForm, lastName: e.target.value})} />
+                      <input className="input" value={personalForm.lastName} onChange={e => setPersonalForm({...personalForm, lastName: e.target.value})} required />
+                    </div>
+                    <div>
+                      <label className="form-label">Phone Number</label>
+                      <input className="input" placeholder="+256 700 000000" value={personalForm.phone} onChange={e => setPersonalForm({...personalForm, phone: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="form-label">Email Address (Managed by Account)</label>
+                      <input className="input" value={displayEmail} disabled style={{ background: '#F3F4F6', color: '#6B7280', cursor: 'not-allowed' }} />
                     </div>
                     <div>
                       <label className="form-label">Gender</label>
@@ -263,28 +428,46 @@ export default function ProfilePage() {
                       </select>
                     </div>
                     <div>
-                      <label className="form-label">Social Security Number</label>
+                      <label className="form-label">National ID / SSN</label>
                       <input type="text" className="input" value={personalForm.ssn} onChange={e => setPersonalForm({...personalForm, ssn: e.target.value})} />
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label">Home Address</label>
-                      <textarea className="input" rows={2} value={`123 Workspace Ave\n${personalForm.location}`} onChange={e => {}} />
+                      <label className="form-label">Home / Office Address</label>
+                      <textarea className="input" rows={2} value={personalForm.location} onChange={e => setPersonalForm({...personalForm, location: e.target.value})} />
                     </div>
                   </div>
                   <div className="row gap-12 mt-32" style={{ justifyContent: 'flex-end' }}>
-                    <button className="btn-neutral" onClick={() => setIsEditingPersonal(false)}>Cancel</button>
-                    <button className="btn-primary" onClick={handlePersonalSave}>Save Changes</button>
+                    <button className="btn-neutral" onClick={() => setIsEditingPersonal(false)} disabled={isSavingPersonal}>
+                      Cancel
+                    </button>
+                    <button className="btn-primary" onClick={handlePersonalSave} disabled={isSavingPersonal}>
+                      {isSavingPersonal ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px 24px' }}>
                   <div>
                     <label className="text-xs text-5 mb-4 block">First Name</label>
-                    <div className="text-sm text-1">{personalForm.firstName}</div>
+                    <div className="text-sm text-1 fw-600">{personalForm.firstName}</div>
                   </div>
                   <div>
                     <label className="text-xs text-5 mb-4 block">Last Name</label>
-                    <div className="text-sm text-1">{personalForm.lastName}</div>
+                    <div className="text-sm text-1 fw-600">{personalForm.lastName}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-5 mb-4 block">Contact Phone</label>
+                    <div className="text-sm text-1">{personalForm.phone || 'No phone set'}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-5 mb-4 block">Official Email</label>
+                    <div className="text-sm text-1">{displayEmail}</div>
                   </div>
                   <div>
                     <label className="text-xs text-5 mb-4 block">Gender</label>
@@ -299,12 +482,12 @@ export default function ProfilePage() {
                     <div className="text-sm text-1">{personalForm.maritalStatus}</div>
                   </div>
                   <div>
-                    <label className="text-xs text-5 mb-4 block">SSN</label>
+                    <label className="text-xs text-5 mb-4 block">National ID / SSN</label>
                     <div className="text-sm text-1">{personalForm.ssn}</div>
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="text-xs text-5 mb-4 block">Home Address</label>
-                    <div className="text-sm text-1">123 Workspace Ave, <br/>{personalForm.location}</div>
+                    <label className="text-xs text-5 mb-4 block">Home / Office Address</label>
+                    <div className="text-sm text-1">{personalForm.location}</div>
                   </div>
                 </div>
               )}

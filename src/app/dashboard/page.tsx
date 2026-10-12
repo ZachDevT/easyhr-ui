@@ -1,24 +1,24 @@
 "use client";
 import { useState } from 'react';
+import Link from 'next/link';
 import { X } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
 import { useCompany } from '@/context/CompanyContext';
 import { useWidgets, MAX_WIDGETS } from '@/context/WidgetContext';
 import { CompulsoryMyTimeWidget, CompulsoryTimeOffWidget, WIDGET_MAP, OPTIONAL_WIDGETS } from '@/components/widgets';
 import { Modal } from '@/components/ui/Modal';
-import { ProfileEditModal } from '@/components/ui/ProfileEditModal';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 
 export default function Dashboard() {
   const { currentUser } = useRole();
-  const { company } = useCompany();
+  const { company, userProfile, isLoading } = useCompany();
   const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
-  const initials = `${currentUser.firstName[0]}${currentUser.lastName[0]}`;
+  const initials = `${currentUser.firstName?.[0] || 'H'}${currentUser.lastName?.[0] || 'A'}`;
 
   const { activeWidgets, removeWidget, addWidget, reorderWidgets } = useWidgets();
   
   const [isEditing, setIsEditing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   
   // Drag and drop state
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -50,6 +50,10 @@ export default function Dashboard() {
     }
   }
 
+  if (isLoading && !userProfile) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <>
       {/* Profile header */}
@@ -78,13 +82,13 @@ export default function Dashboard() {
         </div>
 
         <div className="row gap-10">
-          <button 
+          <Link 
+            href="/people/me?tab=Personal"
             className="btn-neutral" 
-            style={{ padding: '8px 20px' }}
-            onClick={() => setProfileModalOpen(true)}
+            style={{ padding: '8px 20px', display: 'inline-flex', alignItems: 'center' }}
           >
             Edit Profile
-          </button>
+          </Link>
           <button 
             className={isEditing ? "btn-primary" : "widget-manage-btn"} 
             onClick={() => setIsEditing(!isEditing)} 
@@ -298,11 +302,6 @@ export default function Dashboard() {
           })}
         </div>
       </Modal>
-
-      <ProfileEditModal
-        isOpen={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-      />
     </>
   );
 }

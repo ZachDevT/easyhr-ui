@@ -23,27 +23,31 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const { userProfile, company } = useCompany();
   const { user: clerkUser } = useUser();
 
-  const realFirstName = userProfile?.firstName || clerkUser?.firstName || 'HR';
-  const realLastName = userProfile?.lastName || clerkUser?.lastName || 'Admin';
+  const realFirstName = userProfile?.firstName || clerkUser?.firstName || '';
+  const realLastName = userProfile?.lastName || clerkUser?.lastName || '';
   const realEmail = userProfile?.email || clerkUser?.primaryEmailAddress?.emailAddress || '';
   const realAvatar = userProfile?.avatarUrl || clerkUser?.imageUrl || '';
-  const realTitle = userProfile?.role || 'Company Owner';
-  const realCompany = company?.name || 'Company';
+  const realTitle = userProfile?.role || 'Company Administrator';
+  const realCompany = company?.name || '';
+  const realLocation = company?.city ? `${company.city}, ${company.countryCode}` : '';
 
-  let currentUser = currentEmployee;
+  let currentUser: Employee = currentEmployee;
   if (role === 'Manager') currentUser = currentManager;
   if (role === 'HR Admin') {
     currentUser = {
       ...currentHRAdmin,
-      id: userProfile?.id || clerkUser?.id || currentHRAdmin.id,
+      id: userProfile?.id || clerkUser?.id || 'admin',
       firstName: realFirstName,
       lastName: realLastName,
       email: realEmail,
       phone: userProfile?.phone || '',
-      avatar: realAvatar,
+      avatar: realAvatar, // Empty string means initials or custom avatar, never dummy Sarah Johnson
       title: realTitle,
-      department: 'Executive / HR',
+      department: 'Leadership / HR',
       division: realCompany,
+      location: realLocation,
+      hireDate: '2024-01-01',
+      status: 'Active',
     };
   }
 

@@ -978,8 +978,35 @@ tr:hover td { background: #FAFAF8; }
 .list-row:last-child { border-bottom: none; }
 
 /* ============================================================
-   ANIMATIONS
+   ANIMATIONS & SKELETON SHIMMER
    ============================================================ */
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+@keyframes shimmerPulse {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-box {
+  background: linear-gradient(
+    90deg,
+    #F1F2F4 0%,
+    #E4E6EA 35%,
+    #FAFAFA 50%,
+    #E4E6EA 65%,
+    #F1F2F4 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerPulse 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-radius: 8px;
+}
+
+.avatar-hover-container:hover .avatar-hover-overlay {
+  opacity: 1 !important;
+}

@@ -24,6 +24,7 @@ import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimi
 import { useCompany } from "@/context/CompanyContext";
 import { FilePicker } from "@/components/ui/FilePicker";
 import { Modal } from "@/components/ui/Modal";
+import { CompanySettingsSkeleton } from "@/components/ui/Skeleton";
 
 export default function CompanySettingsPage() {
   const {
@@ -160,14 +161,7 @@ export default function CompanySettingsPage() {
   };
 
   if (isLoading && !company) {
-    return (
-      <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
-          <Loader2 size={32} className="animate-spin" color="var(--primary)" />
-          <p style={{ marginTop: 12, color: "var(--text-3)", fontSize: 14 }}>Loading company settings...</p>
-        </div>
-      </div>
-    );
+    return <CompanySettingsSkeleton />;
   }
 
   return (
