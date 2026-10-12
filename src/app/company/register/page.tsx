@@ -245,6 +245,11 @@ export default function CompanyRegistration() {
         await fetch("http://localhost:8080/api/v1/auth/provision", {
           method: "POST",
           headers,
+          body: JSON.stringify({
+            firstName: form.creatorFirstName || user?.firstName || "HR",
+            lastName: form.creatorLastName || user?.lastName || "Admin",
+            email: form.creatorEmail || user?.primaryEmailAddress?.emailAddress || "",
+          }),
         });
       } catch (provisionErr) {
         console.warn("Provisioning check:", provisionErr);
