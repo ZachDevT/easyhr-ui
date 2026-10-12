@@ -26,6 +26,7 @@ export type OnboardingTask = {
 export type OnboardingRecord = {
   id: string;
   candidateId: string;
+  employeeId?: string;
   name: string;
   role: string;
   department: string;
@@ -41,7 +42,9 @@ interface HRContextType {
   updateCandidateStage: (id: string, stage: string) => Promise<void>;
   addCandidate: (candidate: Omit<Candidate, "id">) => Promise<void>;
   onboardings: OnboardingRecord[];
-  initiateOnboarding: (candidate: Candidate, startDate: string, department: string) => Promise<void>;
+  initiateOnboarding: (candidate: Candidate, startDate: string, department: string, employeeId?: string) => Promise<void>;
+  toggleOnboardingTask: (recordId: string, taskId: string) => void;
+  completeOnboarding: (recordId: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -120,7 +123,6 @@ export function HRProvider({ children }: { children: ReactNode }) {
   }, [fetchCandidates]);
 
   const updateCandidateStage = async (id: string, stage: string) => {
-    // Optimistic UI update
     setCandidates((prev) =>
       prev.map((c) => (c.id === id ? { ...c, stage } : c))
     );
@@ -149,7 +151,6 @@ export function HRProvider({ children }: { children: ReactNode }) {
       const token = await getToken();
       if (!token) return;
 
-      // Split name
       const parts = candidate.name.split(" ");
       const firstName = parts[0] || "New";
       const lastName = parts.slice(1).join(" ") || "Candidate";
@@ -171,10 +172,11 @@ export function HRProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const initiateOnboarding = async (candidate: Candidate, startDate: string, department: string) => {
+  const initiateOnboarding = async (candidate: Candidate, startDate: string, department: string, employeeId?: string) => {
     const newRecord: OnboardingRecord = {
       id: `onb-${Date.now()}`,
       candidateId: candidate.id,
+      employeeId,
       name: candidate.name,
       role: candidate.role,
       department,
@@ -198,6 +200,63 @@ export function HRProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const toggleOnboardingTask = (recordId: string, taskId: string) => {
+    setOnboardings((prev) => {
+      const updated = prev.map((record) => {
+        if (record.id !== recordId) return record;
+        const newTasks = record.tasks.map((t) =>
+          t.id === taskId ? { ...t, completed: !t.completed } : t
+        );
+        const completedCount = newTasks.filter((t) => t.completed).length;
+        const progress = Math.round((completedCount / newTasks.length) * 100);
+        const status: "Completed" | "On Track" = progress === 100 ? "Completed" : "On Track";
+        return { ...record, tasks: newTasks, progress, status };
+      });
+      if (typeof window !== "undefined") {
+        localStorage.setItem("easyhr_onboardings", JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const completeOnboarding = async (recordId: string) => {
+    const record = onboardings.find((r) => r.id === recordId);
+    if (!record) return;
+
+    // Mark completed locally
+    setOnboardings((prev) => {
+      const updated = prev.map((r) =>
+        r.id === recordId
+          ? {
+              ...r,
+              progress: 100,
+              status: "Completed" as const,
+              tasks: r.tasks.map((t) => ({ ...t, completed: true })),
+            }
+          : r
+      );
+      if (typeof window !== "undefined") {
+        localStorage.setItem("easyhr_onboardings", JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    // If employeeId is attached, activate in backend
+    if (record.employeeId) {
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`http://localhost:8080/api/v1/employees/${record.employeeId}/activate`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      } catch (err) {
+        console.error("Failed to activate employee", err);
+      }
+    }
+  };
+
   return (
     <HRContext.Provider
       value={{
@@ -207,6 +266,8 @@ export function HRProvider({ children }: { children: ReactNode }) {
         addCandidate,
         onboardings,
         initiateOnboarding,
+        toggleOnboardingTask,
+        completeOnboarding,
         refresh: fetchCandidates,
       }}
     >

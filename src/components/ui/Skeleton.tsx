@@ -336,4 +336,46 @@ export function HiringSkeleton() {
   );
 }
 
+/**
+ * PeopleDirectorySkeleton mimics /people
+ */
+export function PeopleDirectorySkeleton() {
+  return (
+    <div style={{ padding: "0 24px 32px", animation: "fadeIn 0.2s ease" }}>
+      {/* Top filter row skeleton */}
+      <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <Skeleton width={140} height={20} />
+          <div style={{ display: "flex", gap: 12 }}>
+            <Skeleton width={260} height={38} radius={8} />
+            <Skeleton width={160} height={38} radius={8} />
+          </div>
+        </div>
+
+        {/* Employee Cards Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                <Skeleton width={52} height={52} radius="50%" />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                  <Skeleton width={120} height={18} />
+                  <Skeleton width={90} height={13} />
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Skeleton width="85%" height={12} />
+                <Skeleton width="65%" height={12} />
+                <Skeleton width="75%" height={12} />
+              </div>
+              <Skeleton width={70} height={22} radius={12} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 
