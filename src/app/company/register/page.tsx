@@ -145,6 +145,33 @@ export default function CompanyRegistration() {
         legalName: prev.legalName || (first ? `${first}'s Company Ltd` : ""),
         domain: prev.domain || (first ? first.toLowerCase().replace(/[^a-z0-9]/g, "") : "workspace"),
       }));
+    }
+  }, [isLoaded, user]);
+
+  // Check if authenticated user already has an active organization
+  useEffect(() => {
+    let isMounted = true;
+    async function checkExistingOrg() {
+      if (!isLoaded || !user) return;
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch("http://localhost:8080/api/v1/setup/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (isMounted && data.hasOrganization) {
+          router.replace("/dashboard");
+        }
+      } catch {
+        // Continue normally if check fails
+      }
+    }
+    checkExistingOrg();
+    return () => { isMounted = false; };
+  }, [isLoaded, user, getToken, router]);
+
   // Live subdomain availability check
   useEffect(() => {
     const rawSubdomain = form.domain.trim();
