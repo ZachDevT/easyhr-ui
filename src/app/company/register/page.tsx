@@ -202,6 +202,22 @@ export default function CompanyRegistration() {
         contactPhone: form.contactPhone || form.creatorPhone || undefined,
         subdomain: cleanSubdomain,
         brandColor: form.color && /^#[0-9A-Fa-f]{6}$/.test(form.color) ? form.color : "#A238FF",
+        socialLinks: (() => {
+          const links: Record<string, string> = {};
+          const formatUrl = (u: string) => {
+            const trimmed = u.trim();
+            if (!trimmed) return "";
+            if (trimmed.startsWith("https://")) return trimmed;
+            if (trimmed.startsWith("http://")) return trimmed.replace("http://", "https://");
+            return `https://${trimmed}`;
+          };
+          if (form.linkedin?.trim()) links.linkedin = formatUrl(form.linkedin);
+          if (form.twitter?.trim()) links.x = formatUrl(form.twitter);
+          if (form.facebook?.trim()) links.facebook = formatUrl(form.facebook);
+          if (form.tiktok?.trim()) links.tiktok = formatUrl(form.tiktok);
+          if (form.glassdoor?.trim()) links.glassdoor = formatUrl(form.glassdoor);
+          return Object.keys(links).length > 0 ? links : undefined;
+        })(),
         initialDepartments: form.departments.length > 0 ? form.departments : ["Operations", "Human Resources"],
         address: {
           line1: form.address || "Main Street",
