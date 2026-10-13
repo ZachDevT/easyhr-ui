@@ -123,9 +123,9 @@ export function ThreadView({
   }, [getToken]);
 
   // Fetch threads for this applicant
-  const loadThreads = useCallback(async () => {
+  const loadThreads = useCallback(async (isSilent = false) => {
     try {
-      setIsLoadingThreads(true);
+      if (!isSilent) setIsLoadingThreads(true);
       const token = await getToken();
       if (!token) return;
       const res = await fetch(
@@ -141,14 +141,18 @@ export function ThreadView({
         }
       }
     } catch (err) {
-      console.error("Failed to load threads", err);
+      if (!isSilent) console.error("Failed to load threads", err);
     } finally {
-      setIsLoadingThreads(false);
+      if (!isSilent) setIsLoadingThreads(false);
     }
   }, [applicantId, getToken, selectedThread]);
 
   useEffect(() => {
-    loadThreads();
+    loadThreads(false);
+    const interval = setInterval(() => {
+      loadThreads(true);
+    }, 8000);
+    return () => clearInterval(interval);
   }, [loadThreads]);
 
   // Fetch messages when selected thread changes or on poll
