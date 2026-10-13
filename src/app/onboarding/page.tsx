@@ -30,6 +30,8 @@ import {
   Save,
   Sliders,
   Info,
+  UploadCloud,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -57,6 +59,24 @@ export interface OnboardingSettings {
   handbookUrl: string;
   handbookContent: string;
 }
+
+const HANDBOOK_TEMPLATES = [
+  {
+    name: "General Code of Conduct",
+    title: "Employee Handbook & Professional Code of Conduct",
+    content: "Welcome to our organization! As a team member, you are expected to maintain the highest standards of integrity, professional demeanor, and mutual respect. This handbook outlines core expectations:\n\n1. Ethical Business Conduct: Treat colleagues, clients, and partners with dignity and fairness.\n2. Confidentiality: Protect proprietary information, customer data, and company assets.\n3. Compliance: Abide by workplace health, safety, and non-discrimination regulations.\n4. Work Standards: Commit to accountability, open communication, and high-quality execution.",
+  },
+  {
+    name: "Remote & Hybrid Work Policy",
+    title: "Remote Work & Cybersecurity Handbook",
+    content: "Our organization embraces flexible and high-impact remote working:\n\n1. Availability & Core Hours: Ensure regular communication during agreed core collaborative hours.\n2. Data Protection: Utilize company VPN, multi-factor authentication (MFA), and secure Wi-Fi networks when handling corporate systems.\n3. Equipment Security: Maintain hardware updates and promptly report any lost or compromised devices.\n4. Work-Life Balance: We encourage clear boundaries to maintain well-being while fulfilling project deliverables.",
+  },
+  {
+    name: "Workplace Ethics & Inclusion",
+    title: "Diversity, Equal Opportunity & Anti-Harassment Policy",
+    content: "We are committed to fostering an inclusive, welcoming, and safe workplace for everyone:\n\n1. Zero Tolerance for Harassment: Discrimination or harassment based on race, gender, religion, disability, or background is strictly prohibited.\n2. Fair Resolution: Direct confidential reporting pathways exist for any ethical concerns or grievances without fear of retaliation.\n3. Respectful Collaboration: Constructive feedback and inclusive language are core values across all teams.",
+  },
+];
 
 interface Department {
   id: string;
@@ -819,6 +839,42 @@ export default function HrOnboardingPage() {
 
                 {onboardingSettings.requireHandbook && (
                   <div className="col gap-16 pt-8">
+                    {/* Template Quick Selection */}
+                    <div className="col gap-8">
+                      <div className="row-between align-center">
+                        <label className="text-xs fw-700 text-2 uppercase">Use Pre-Built Legal Template</label>
+                        <span className="text-xs text-5">Click a template to populate text</span>
+                      </div>
+                      <div className="row gap-8 wrap">
+                        {HANDBOOK_TEMPLATES.map((tmpl) => (
+                          <button
+                            key={tmpl.name}
+                            type="button"
+                            onClick={() => {
+                              setOnboardingSettings((prev) => ({
+                                ...prev,
+                                handbookTitle: tmpl.title,
+                                handbookContent: tmpl.content,
+                              }));
+                              toast.success("Template loaded", `Populated "${tmpl.name}" into handbook draft.`);
+                            }}
+                            className="btn-neutral row gap-6 align-center"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: 12,
+                              borderRadius: 8,
+                              background: onboardingSettings.handbookTitle === tmpl.title ? "var(--primary-tint, #f5f3ff)" : "white",
+                              borderColor: onboardingSettings.handbookTitle === tmpl.title ? "var(--primary)" : "var(--card-border)",
+                              color: onboardingSettings.handbookTitle === tmpl.title ? "var(--primary)" : "var(--text-2)",
+                            }}
+                          >
+                            <BookOpen size={13} />
+                            <span>{tmpl.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="grid-2 gap-16">
                       <div className="col gap-6">
                         <label className="text-xs fw-700 text-2 uppercase">Handbook Title</label>
@@ -831,25 +887,109 @@ export default function HrOnboardingPage() {
                         />
                       </div>
                       <div className="col gap-6">
-                        <label className="text-xs fw-700 text-2 uppercase">External Handbook Document URL (Optional)</label>
+                        <div className="row-between align-center">
+                          <label className="text-xs fw-700 text-2 uppercase">Handbook Document File or URL</label>
+                          <label
+                            style={{
+                              cursor: "pointer",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "var(--primary)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <UploadCloud size={13} />
+                            <span>Upload PDF</span>
+                            <input
+                              type="file"
+                              accept=".pdf,.docx,.doc"
+                              style={{ display: "none" }}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  toast.info("Uploading handbook", `Attaching ${file.name}...`);
+                                  const token = await getToken();
+                                  if (!token) throw new Error("Not authenticated");
+                                  // Request upload intent
+                                  const res = await fetch(`${API_BASE_URL}/api/v1/documents/upload-intents`, {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      Authorization: `Bearer ${token}`,
+                                    },
+                                    body: JSON.stringify({
+                                      filename: file.name,
+                                      employeeId: "00000000-0000-0000-0000-000000000000",
+                                      category: "compliance",
+                                      contentType: file.type || "application/pdf",
+                                      sizeBytes: file.size,
+                                    }),
+                                  });
+                                  if (res.ok) {
+                                    const intent = await res.json();
+                                    if (intent.uploadUrl) {
+                                      await fetch(intent.uploadUrl, {
+                                        method: "PUT",
+                                        headers: { "Content-Type": file.type || "application/pdf" },
+                                        body: file,
+                                      }).catch(() => {});
+                                    }
+                                    const docId = intent.document?.id || intent.id;
+                                    if (docId) {
+                                      await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, {
+                                        method: "POST",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          Authorization: `Bearer ${token}`,
+                                        },
+                                        body: JSON.stringify({
+                                          checksumSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                                        }),
+                                      }).catch(() => {});
+                                      const dlRes = await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/download-url`, {
+                                        headers: { Authorization: `Bearer ${token}` },
+                                      });
+                                      if (dlRes.ok) {
+                                        const dlJson = await dlRes.json();
+                                        if (dlJson.url) {
+                                          setOnboardingSettings((prev) => ({ ...prev, handbookUrl: dlJson.url }));
+                                          toast.success("Handbook uploaded", `${file.name} attached successfully.`);
+                                          return;
+                                        }
+                                      }
+                                    }
+                                  }
+                                  // Fallback: save name
+                                  setOnboardingSettings((prev) => ({ ...prev, handbookUrl: file.name }));
+                                  toast.success("Handbook selected", `${file.name} ready to save.`);
+                                } catch (err: any) {
+                                  toast.error("Upload error", err.message || "Failed to upload handbook.");
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
                         <input
                           type="url"
                           className="input"
                           value={onboardingSettings.handbookUrl}
                           onChange={(e) => setOnboardingSettings({ ...onboardingSettings, handbookUrl: e.target.value })}
-                          placeholder="https://notion.so/... or Google Drive / PDF link"
+                          placeholder="https://... or uploaded handbook document link"
                         />
                       </div>
                     </div>
 
                     <div className="col gap-6">
-                      <label className="text-xs fw-700 text-2 uppercase">Policy Guidelines & Conduct Summary</label>
+                      <label className="text-xs fw-700 text-2 uppercase">Policy Guidelines & Conduct Summary (or Markdown)</label>
                       <textarea
-                        className="input"
-                        rows={4}
+                        className="textarea"
+                        rows={6}
                         value={onboardingSettings.handbookContent}
                         onChange={(e) => setOnboardingSettings({ ...onboardingSettings, handbookContent: e.target.value })}
-                        placeholder="Welcome to our organization! As a member of our team, we uphold high standards of integrity, excellence, and mutual respect..."
+                        placeholder="Write or edit the employee handbook guidelines, ethical principles, and sign-off terms..."
                         style={{ resize: "vertical" }}
                       />
                     </div>

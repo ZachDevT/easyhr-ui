@@ -18,6 +18,7 @@ import {
   Award,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
+import { useRole } from "@/context/RoleContext";
 import { API_BASE_URL } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -86,6 +87,7 @@ function ScoreStars({ score }: { score: number }) {
 
 export default function PerformancePage() {
   const { getToken } = useAuth();
+  const { isHRAdmin, isManager, currentUser } = useRole();
   const [activeTab, setActiveTab] = useState("Reviews");
 
   // Live state
@@ -287,9 +289,17 @@ export default function PerformancePage() {
   const totalReviews = reviews.length;
   const completionRate = totalReviews > 0 ? Math.round((completedCount / totalReviews) * 100) : 100;
 
-  // Filtered reviews
-  const filteredReviews = useMemo(() => {
-    return reviews.filter((r) => {
+  // Filtered reviews with role-based restriction
+  const visibleReviews = useMemo(() => {
+    let list = reviews;
+    if (!isHRAdmin && !isManager) {
+      list = list.filter(
+        (r) =>
+          r.employeeId === currentUser?.id ||
+          (currentUser?.firstName && r.employeeName.toLowerCase().includes(currentUser.firstName.toLowerCase()))
+      );
+    }
+    return list.filter((r) => {
       const matchesSearch =
         !searchTerm ||
         r.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -298,54 +308,69 @@ export default function PerformancePage() {
       const matchesCycle = cycleFilter === "All" || r.reviewCycle === cycleFilter;
       return matchesSearch && matchesCycle;
     });
-  }, [reviews, searchTerm, cycleFilter]);
+  }, [reviews, searchTerm, cycleFilter, isHRAdmin, isManager, currentUser]);
+
+  const visibleGoals = useMemo(() => {
+    if (isHRAdmin || isManager) return goals;
+    return goals.filter(
+      (g) =>
+        g.employeeId === currentUser?.id ||
+        (currentUser?.firstName && g.employeeName.toLowerCase().includes(currentUser.firstName.toLowerCase()))
+    );
+  }, [goals, isHRAdmin, isManager, currentUser]);
 
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
       <PageHeader
-        title="Performance & Reviews"
-        subtitle="Manage quarterly review cycles, track employee OKRs, and evaluate structured feedback."
+        title={isHRAdmin || isManager ? "Performance & Reviews" : "My Performance & Evaluations"}
+        subtitle={
+          isHRAdmin || isManager
+            ? "Manage quarterly review cycles, track employee OKRs, and evaluate structured feedback."
+            : "Review your performance evaluations, feedback from leadership, and active role goals."
+        }
         icon={<Star size={28} className="text-white" />}
-        tabs={["Reviews", "Goals", "Cycles"]}
+        tabs={isHRAdmin || isManager ? ["Reviews", "Goals", "Cycles"] : ["Reviews", "Goals"]}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         actions={
-          <div className="row gap-12 align-center">
-            {activeTab === "Goals" ? (
-              <button
-                className="btn-primary row gap-8 align-center"
-                style={{
-                  background: "var(--gradient)",
-                  border: "none",
-                  padding: "10px 20px",
-                  borderRadius: 20,
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowGoalModal(true)}
-              >
-                <Plus size={16} /> New Goal
-              </button>
-            ) : (
-              <button
-                className="btn-secondary row gap-8 align-center"
-                style={{
-                  background: "white",
-                  color: "var(--primary)",
-                  border: "none",
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  borderRadius: 20,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowReviewModal(true)}
-              >
-                <Plus size={16} /> New Review
-              </button>
-            )}
-          </div>
+          (isHRAdmin || isManager) ? (
+            <div className="row gap-12 align-center">
+              {activeTab === "Goals" ? (
+                <button
+                  className="btn-primary row gap-8 align-center"
+                  style={{
+                    background: "var(--gradient)",
+                    border: "none",
+                    padding: "10px 20px",
+                    borderRadius: 20,
+                    color: "white",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setShowGoalModal(true)}
+                >
+                  <Plus size={16} /> New Goal
+                </button>
+              ) : (
+                <button
+                  className="btn-secondary row gap-8 align-center"
+                  style={{
+                    background: "white",
+                    color: "var(--primary)",
+                    border: "none",
+                    padding: "10px 20px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    borderRadius: 20,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setShowReviewModal(true)}
+                >
+                  <Plus size={16} /> New Review
+                </button>
+              )}
+            </div>
+          ) : undefined
         }
       />
 
@@ -388,7 +413,7 @@ export default function PerformancePage() {
                 <div className="col gap-4">
                   <h2 className="text-xl fw-800 text-1 m-0">Review Tracker</h2>
                   <span className="text-sm text-4 fw-500">
-                    Live performance records · {filteredReviews.length} evaluations
+                    Live performance records · {visibleReviews.length} evaluations
                   </span>
                 </div>
                 <div className="row gap-12 align-center">
@@ -431,9 +456,9 @@ export default function PerformancePage() {
                   <Loader2 size={32} className="animate-spin text-primary" style={{ margin: "0 auto 12px" }} />
                   <span className="text-sm text-4">Loading performance evaluations...</span>
                 </div>
-              ) : filteredReviews.length > 0 ? (
+              ) : visibleReviews.length > 0 ? (
                 <div className="col gap-12">
-                  {filteredReviews.map((r) => (
+                  {visibleReviews.map((r) => (
                     <Card
                       key={r.id}
                       style={{
@@ -489,15 +514,19 @@ export default function PerformancePage() {
                   <Award size={36} color="var(--primary)" style={{ margin: "0 auto 12px" }} />
                   <h3 className="text-base fw-700 text-1 m-0 mb-4">No reviews recorded yet</h3>
                   <p className="text-sm text-4 m-0 mb-20">
-                    Conduct employee reviews to foster career development and record formal ratings.
+                    {isHRAdmin || isManager
+                      ? "Conduct employee reviews to foster career development and record formal ratings."
+                      : "Your formal quarterly review evaluations and feedback will appear here once submitted by HR or management."}
                   </p>
-                  <button
-                    className="btn-primary"
-                    onClick={() => setShowReviewModal(true)}
-                    style={{ padding: "10px 24px", borderRadius: 20 }}
-                  >
-                    Start First Review
-                  </button>
+                  {(isHRAdmin || isManager) && (
+                    <button
+                      className="btn-primary"
+                      onClick={() => setShowReviewModal(true)}
+                      style={{ padding: "10px 24px", borderRadius: 20 }}
+                    >
+                      Start First Review
+                    </button>
+                  )}
                 </div>
               )}
             </>
@@ -510,16 +539,20 @@ export default function PerformancePage() {
                 <div>
                   <h2 className="text-xl fw-800 text-1 m-0">Active Objectives & Goals (OKRs)</h2>
                   <span className="text-sm text-4 fw-500">
-                    Track individual and team milestones linked to organizational performance.
+                    {isHRAdmin || isManager
+                      ? "Track individual and team milestones linked to organizational performance."
+                      : "Personal milestones and objectives assigned to your profile."}
                   </span>
                 </div>
-                <button
-                  className="btn-primary row gap-8 align-center"
-                  onClick={() => setShowGoalModal(true)}
-                  style={{ padding: "10px 20px", borderRadius: 20 }}
-                >
-                  <Plus size={15} /> Create Goal
-                </button>
+                {(isHRAdmin || isManager) && (
+                  <button
+                    className="btn-primary row gap-8 align-center"
+                    onClick={() => setShowGoalModal(true)}
+                    style={{ padding: "10px 20px", borderRadius: 20 }}
+                  >
+                    <Plus size={15} /> Create Goal
+                  </button>
+                )}
               </div>
 
               {isLoading ? (
@@ -527,9 +560,9 @@ export default function PerformancePage() {
                   <Loader2 size={32} className="animate-spin text-primary" style={{ margin: "0 auto 12px" }} />
                   <span className="text-sm text-4">Loading active goals...</span>
                 </div>
-              ) : goals.length > 0 ? (
+              ) : visibleGoals.length > 0 ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
-                  {goals.map((g) => (
+                  {visibleGoals.map((g) => (
                     <Card key={g.id} style={{ borderRadius: 16, border: "1px solid var(--border)" }}>
                       <CardBody className="col gap-16 p-24">
                         <div className="row-between align-start">
@@ -593,15 +626,19 @@ export default function PerformancePage() {
                   <Target size={36} color="var(--primary)" style={{ margin: "0 auto 12px" }} />
                   <h3 className="text-base fw-700 text-1 m-0 mb-4">No performance goals created yet</h3>
                   <p className="text-sm text-4 m-0 mb-20">
-                    Establish key milestones and measurable targets for your team members.
+                    {isHRAdmin || isManager
+                      ? "Establish key milestones and measurable targets for your team members."
+                      : "No personal performance goals have been established for your profile yet."}
                   </p>
-                  <button
-                    className="btn-primary"
-                    onClick={() => setShowGoalModal(true)}
-                    style={{ padding: "10px 24px", borderRadius: 20 }}
-                  >
-                    Set Up First Goal
-                  </button>
+                  {(isHRAdmin || isManager) && (
+                    <button
+                      className="btn-primary"
+                      onClick={() => setShowGoalModal(true)}
+                      style={{ padding: "10px 24px", borderRadius: 20 }}
+                    >
+                      Set Up First Goal
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -793,7 +830,21 @@ export default function PerformancePage() {
               </Select>
             </div>
             <div className="col gap-6">
-              <label className="text-xs fw-700 text-2">Progress Percentage ({goalForm.completionPercentage}%)</label>
+              <div className="row-between align-center">
+                <label className="text-xs fw-700 text-2">Progress Percentage</label>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "var(--primary)",
+                    background: "var(--primary-tint, #f5f3ff)",
+                    padding: "2px 8px",
+                    borderRadius: 8,
+                  }}
+                >
+                  {goalForm.completionPercentage}%
+                </span>
+              </div>
               <input
                 type="range"
                 min="0"
@@ -801,8 +852,34 @@ export default function PerformancePage() {
                 step="5"
                 value={goalForm.completionPercentage}
                 onChange={(e) => setGoalForm({ ...goalForm, completionPercentage: Number(e.target.value) })}
-                style={{ width: "100%", marginTop: 8 }}
+                style={{
+                  width: "100%",
+                  background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${goalForm.completionPercentage}%, #E4E4E7 ${goalForm.completionPercentage}%, #E4E4E7 100%)`,
+                }}
               />
+              <div style={{ display: "flex", gap: 6, justifyContent: "space-between" }}>
+                {[0, 25, 50, 75, 100].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setGoalForm({ ...goalForm, completionPercentage: pct })}
+                    style={{
+                      flex: 1,
+                      padding: "4px 0",
+                      fontSize: 11,
+                      fontWeight: goalForm.completionPercentage === pct ? 700 : 500,
+                      borderRadius: 6,
+                      border: goalForm.completionPercentage === pct ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                      background: goalForm.completionPercentage === pct ? "var(--primary-tint, #f5f3ff)" : "#FAFAFA",
+                      color: goalForm.completionPercentage === pct ? "var(--primary)" : "#71717A",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

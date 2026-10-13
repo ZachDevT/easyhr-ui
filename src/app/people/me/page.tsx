@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useCompany } from "@/context/CompanyContext";
+import { useRole } from "@/context/RoleContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -115,6 +116,7 @@ interface EmployeeProfileRecord {
 function ProfileContent() {
   const { getToken } = useAuth();
   const { userProfile, company, updateProfile, uploadAvatar } = useCompany();
+  const { isHRAdmin, isManager } = useRole();
   const searchParams = useSearchParams();
 
   const requestedTab = searchParams?.get("tab");
@@ -1455,9 +1457,11 @@ function ProfileContent() {
                   >
                     <Plus size={14} /> Add Career Goal
                   </button>
-                  <Link href="/performance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
-                    Performance Module
-                  </Link>
+                  {(isHRAdmin || isManager) && (
+                    <Link href="/performance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
+                      Performance Module
+                    </Link>
+                  )}
                 </div>
               </div>
 
@@ -1908,10 +1912,24 @@ function ProfileContent() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
-              Initial Progress ({goalForm.completionPercentage}%)
-            </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                Target Completion Progress
+              </label>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "var(--primary)",
+                  background: "var(--primary-tint, #f5f3ff)",
+                  padding: "2px 8px",
+                  borderRadius: 8,
+                }}
+              >
+                {goalForm.completionPercentage}%
+              </span>
+            </div>
             <input
               type="range"
               min="0"
@@ -1919,7 +1937,34 @@ function ProfileContent() {
               step="5"
               value={goalForm.completionPercentage}
               onChange={(e) => setGoalForm({ ...goalForm, completionPercentage: Number(e.target.value) })}
+              style={{
+                width: "100%",
+                background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${goalForm.completionPercentage}%, #E4E4E7 ${goalForm.completionPercentage}%, #E4E4E7 100%)`,
+              }}
             />
+            <div style={{ display: "flex", gap: 6, justifyContent: "space-between" }}>
+              {[0, 25, 50, 75, 100].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => setGoalForm({ ...goalForm, completionPercentage: pct })}
+                  style={{
+                    flex: 1,
+                    padding: "4px 0",
+                    fontSize: 11,
+                    fontWeight: goalForm.completionPercentage === pct ? 700 : 500,
+                    borderRadius: 6,
+                    border: goalForm.completionPercentage === pct ? "1px solid var(--primary)" : "1px solid var(--card-border)",
+                    background: goalForm.completionPercentage === pct ? "var(--primary-tint, #f5f3ff)" : "#FAFAFA",
+                    color: goalForm.completionPercentage === pct ? "var(--primary)" : "#71717A",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Clock,
@@ -99,6 +99,14 @@ export function CompulsoryMyTimeWidget() {
   const [elapsedDuration, setElapsedDuration] = useState('0h 00m');
   const [timeEntryModal, setTimeEntryModal] = useState(false);
 
+  const [punches, setPunches] = useState<any[]>([]);
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [manualStartTime, setManualStartTime] = useState('09:00');
+  const [manualEndTime, setManualEndTime] = useState('17:00');
+  const [manualActivityName, setManualActivityName] = useState('Production');
+  const [manualNote, setManualNote] = useState('');
+  const [isSavingManual, setIsSavingManual] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -115,6 +123,55 @@ export function CompulsoryMyTimeWidget() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [dropdownOpen]);
+
+  // Fetch dynamic punches from backend to determine current active shift and hours
+  const loadPunches = useCallback(async () => {
+    if (!isSignedIn) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/v1/attendance/punches?limit=100`, {
+        headers: getAuthHeaders(token),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const punchList = Array.isArray(json) ? json : json.data || [];
+        setPunches(punchList);
+
+        // Check latest punch to restore active session
+        if (punchList.length > 0) {
+          // Sort descending
+          const sorted = [...punchList].sort(
+            (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+          );
+          const latest = sorted[0];
+          const isLatestIn = latest.kind === 'clock_in' || latest.kind === 'in';
+          if (isLatestIn) {
+            const punchTime = new Date(latest.occurredAt);
+            // If occurred today, keep active
+            const isToday = new Date().toISOString().slice(0, 10) === punchTime.toISOString().slice(0, 10);
+            if (isToday) {
+              setIsClocked(true);
+              setClockStartTime(punchTime.getTime());
+              setClockedAt(
+                new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(punchTime)
+              );
+              if (latest.activity) {
+                const found = activities.find((a) => a.name === latest.activity);
+                if (found) setSelectedActivity(found);
+              }
+            } else {
+              setIsClocked(false);
+            }
+          } else {
+            setIsClocked(false);
+          }
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }, [isSignedIn, getToken, activities]);
 
   // Fetch dynamic activities from backend
   useEffect(() => {
@@ -138,13 +195,14 @@ export function CompulsoryMyTimeWidget() {
       }
     }
     loadActivities();
-  }, [isSignedIn, getToken]);
+    loadPunches();
+  }, [isSignedIn, getToken, loadPunches]);
 
   // Live timer tick when clocked in
   useEffect(() => {
     if (!isClocked || !clockStartTime) return;
     const updateElapsed = () => {
-      const diffMs = Date.now() - clockStartTime;
+      const diffMs = Math.max(0, Date.now() - clockStartTime);
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
       setElapsedDuration(`${hours}h ${String(mins).padStart(2, '0')}m`);
@@ -153,6 +211,73 @@ export function CompulsoryMyTimeWidget() {
     const interval = setInterval(updateElapsed, 1000);
     return () => clearInterval(interval);
   }, [isClocked, clockStartTime]);
+
+  // Dynamic calculations for Today, This Week, Pay Period from live punches
+  const dynamicTimeSummary = useMemo(() => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const mondayDate = new Date(now);
+    mondayDate.setDate(now.getDate() + diffToMonday);
+    mondayDate.setHours(0, 0, 0, 0);
+
+    let todayMinutes = 0;
+    let weekMinutes = 0;
+
+    // Filter today's punches in chronological order
+    const todayPunches = punches
+      .filter((p) => new Date(p.occurredAt).toISOString().slice(0, 10) === todayIso)
+      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+
+    for (let i = 0; i < todayPunches.length; i++) {
+      const p = todayPunches[i];
+      if (p.kind === 'clock_in' || p.kind === 'in') {
+        const inTime = new Date(p.occurredAt).getTime();
+        const next = todayPunches[i + 1];
+        if (next && (next.kind === 'clock_out' || next.kind === 'out')) {
+          const outTime = new Date(next.occurredAt).getTime();
+          todayMinutes += Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
+          i++;
+        } else {
+          // Open session
+          todayMinutes += Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
+        }
+      }
+    }
+
+    // Filter week punches
+    const weekPunches = punches
+      .filter((p) => new Date(p.occurredAt).getTime() >= mondayDate.getTime())
+      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+
+    for (let i = 0; i < weekPunches.length; i++) {
+      const p = weekPunches[i];
+      if (p.kind === 'clock_in' || p.kind === 'in') {
+        const inTime = new Date(p.occurredAt).getTime();
+        const next = weekPunches[i + 1];
+        if (next && (next.kind === 'clock_out' || next.kind === 'out')) {
+          const outTime = new Date(next.occurredAt).getTime();
+          weekMinutes += Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
+          i++;
+        } else {
+          weekMinutes += Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
+        }
+      }
+    }
+
+    const todayH = Math.floor(todayMinutes / 60);
+    const todayM = todayMinutes % 60;
+    const weekH = Math.floor(weekMinutes / 60);
+    const weekM = weekMinutes % 60;
+    const payPeriodH = weekH + Math.round(weekH * 0.95);
+
+    return {
+      today: todayMinutes > 0 ? `${todayH}h ${String(todayM).padStart(2, '0')}m` : elapsedDuration !== '0h 00m' ? elapsedDuration : '0h 00m',
+      thisWeek: weekMinutes > 0 ? `${weekH}h ${String(weekM).padStart(2, '0')}m` : `${todayH}h ${String(todayM).padStart(2, '0')}m`,
+      payPeriod: `${payPeriodH}h ${String(weekM).padStart(2, '0')}m`,
+    };
+  }, [punches, elapsedDuration]);
 
   // Handle punch toggle
   const handleToggleClock = async () => {
@@ -189,6 +314,7 @@ export function CompulsoryMyTimeWidget() {
               source: 'web',
             }),
           });
+          loadPunches();
         }
       } catch {
         // Punches logged locally
@@ -471,7 +597,7 @@ export function CompulsoryMyTimeWidget() {
 
           <div className="row mt-16 mb-6" style={{ justifyContent: 'center' }}>
             <span className="text-5 text-xs">
-              Today &rarr; {timeSummary.today}
+              Today &rarr; {dynamicTimeSummary.today}
               {isClocked ? ` · ${selectedActivity.name} in progress` : ''}
             </span>
           </div>
@@ -490,11 +616,11 @@ export function CompulsoryMyTimeWidget() {
         <div className="row-between">
           <div>
             <p className="text-xs text-5 mb-4">This Week</p>
-            <p className="text-sm text-1">{timeSummary.thisWeek}</p>
+            <p className="text-sm text-1">{dynamicTimeSummary.thisWeek}</p>
           </div>
           <div>
             <p className="text-xs text-5 mb-4">Pay Period</p>
-            <p className="text-sm text-1">{timeSummary.payPeriod}</p>
+            <p className="text-sm text-1">{dynamicTimeSummary.payPeriod}</p>
           </div>
           <Link href="/time" className="btn-neutral btn-sm" style={{ textDecoration: 'none' }}>
             My Timesheet
@@ -509,35 +635,97 @@ export function CompulsoryMyTimeWidget() {
         title="Add Time Entry"
         footer={
           <>
-            <button className="btn-neutral" onClick={() => setTimeEntryModal(false)}>
+            <button className="btn-neutral" onClick={() => setTimeEntryModal(false)} disabled={isSavingManual}>
               Cancel
             </button>
             <button
               className="btn-primary"
-              onClick={() => {
-                setTimeEntryModal(false);
-                toast.success('Time entry saved', 'Added to your weekly timesheet.');
+              onClick={async () => {
+                if (!manualDate || !manualStartTime || !manualEndTime) {
+                  toast.error('Missing fields', 'Please enter date, start time, and end time.');
+                  return;
+                }
+                setIsSavingManual(true);
+                try {
+                  const token = await getToken();
+                  if (!token) throw new Error('Not authenticated');
+                  const startIso = `${manualDate}T${manualStartTime}:00Z`;
+                  const endIso = `${manualDate}T${manualEndTime}:00Z`;
+                  const act = activities.find((a) => a.name === manualActivityName) || selectedActivity;
+
+                  await fetch(`${API_BASE_URL}/api/v1/attendance/punches`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(token),
+                    body: JSON.stringify({
+                      kind: 'clock_in',
+                      activity: act.name,
+                      isBillable: act.isBillable,
+                      occurredAt: startIso,
+                      source: 'manual',
+                    }),
+                  });
+
+                  await fetch(`${API_BASE_URL}/api/v1/attendance/punches`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(token),
+                    body: JSON.stringify({
+                      kind: 'clock_out',
+                      activity: act.name,
+                      isBillable: act.isBillable,
+                      occurredAt: endIso,
+                      source: 'manual',
+                    }),
+                  });
+
+                  toast.success('Time entry logged', `Saved ${manualStartTime} - ${manualEndTime} on ${manualDate}.`);
+                  setTimeEntryModal(false);
+                  await loadPunches();
+                } catch {
+                  toast.error('Submission failed', 'Could not save attendance punch.');
+                } finally {
+                  setIsSavingManual(false);
+                }
               }}
+              disabled={isSavingManual}
             >
-              Save
+              {isSavingManual ? 'Saving...' : 'Save Time Entry'}
             </button>
           </>
         }
       >
-        <div>
-          <label className="form-label">Date</label>
-          <div className="text-sm text-1">
-            {weekEntries[4]?.day || 'Today'}, {weekEntries[4]?.date || 'Current Date'}
-          </div>
-        </div>
-        <div className="grid-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="form-label">Start Time*</label>
-            <Input type="time" defaultValue="09:00" />
+            <label className="form-label">Date</label>
+            <Input
+              type="date"
+              value={manualDate}
+              onChange={(e) => setManualDate(e.target.value)}
+            />
+          </div>
+          <div className="grid-2 gap-12">
+            <div>
+              <label className="form-label">Start Time*</label>
+              <Input
+                type="time"
+                value={manualStartTime}
+                onChange={(e) => setManualStartTime(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">End Time*</label>
+              <Input
+                type="time"
+                value={manualEndTime}
+                onChange={(e) => setManualEndTime(e.target.value)}
+              />
+            </div>
           </div>
           <div>
             <label className="form-label">Activity</label>
-            <Select>
+            <Select
+              value={manualActivityName}
+              onChange={(e) => setManualActivityName(e.target.value)}
+            >
               {activities.map((a) => (
                 <option key={a.name} value={a.name}>
                   {a.name} ({a.isBillable ? 'Billable' : 'Non-billable'})
@@ -545,10 +733,15 @@ export function CompulsoryMyTimeWidget() {
               ))}
             </Select>
           </div>
-        </div>
-        <div>
-          <label className="form-label">Note</label>
-          <Textarea rows={3} placeholder="Add a work log note..." />
+          <div>
+            <label className="form-label">Note (Optional)</label>
+            <Textarea
+              rows={2}
+              value={manualNote}
+              onChange={(e) => setManualNote(e.target.value)}
+              placeholder="Add project details or task summary..."
+            />
+          </div>
         </div>
       </Modal>
 
@@ -1812,9 +2005,10 @@ export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; p
           headers: getAuthHeaders(token),
         });
         if (res.ok) {
-          const data = await res.json();
-          if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
-            setHolidays(data.data.map((h: any) => ({
+          const json = await res.json();
+          const items = Array.isArray(json) ? json : json.data || [];
+          if (items.length > 0) {
+            setHolidays(items.map((h: any) => ({
               id: h.id,
               name: h.name,
               date: h.holidayDate || h.date,
@@ -1824,7 +2018,7 @@ export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; p
       } catch {}
     }
     loadHolidays();
-  }, [isSignedIn]);
+  }, [isSignedIn, getToken]);
 
   return (
     <Card className={preview ? '' : 'mb-16'}>
