@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, Suspense, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   Globe2,
@@ -36,18 +36,21 @@ function authTimeout<T>(request: Promise<T>): Promise<T> {
 type VerificationStage = 'first_factor' | 'second_factor' | null;
 type VerificationMode = 'email_code' | 'totp' | 'phone_code' | 'backup_code';
 
-export default function SignIn() {
+function SignInContent() {
   const { signIn, fetchStatus } = useSignIn();
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect_url') || '/dashboard';
+  const urlEmail = searchParams.get('email') || '';
 
   useEffect(() => {
     if (authLoaded && isSignedIn) {
-      router.replace('/dashboard');
+      router.replace(redirectUrl);
     }
-  }, [authLoaded, isSignedIn, router]);
+  }, [authLoaded, isSignedIn, redirectUrl, router]);
 
-  const [emailAddress, setEmailAddress] = useState('');
+  const [emailAddress, setEmailAddress] = useState(urlEmail);
   const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError]               = useState('');
@@ -125,7 +128,7 @@ export default function SignIn() {
       if (passwordError) throw passwordError;
 
       if (signIn.status === 'complete') {
-        await signIn.finalize({ navigate: () => router.push('/dashboard') });
+        await signIn.finalize({ navigate: () => router.push(redirectUrl) });
         return;
       }
 
@@ -198,7 +201,7 @@ export default function SignIn() {
       if (resultError) throw resultError;
 
       if (signIn.status === 'complete') {
-        await signIn.finalize({ navigate: () => router.push('/dashboard') });
+        await signIn.finalize({ navigate: () => router.push(redirectUrl) });
         return;
       }
 
@@ -533,6 +536,30 @@ export default function SignIn() {
   return (
     <AuthShell eyebrow="Welcome back" title="Sign in to your account"
       subtitle="Use your work email to continue to EasyHR.">
+      {redirectUrl.includes('/my-onboarding') && (
+        <div style={{
+          display: 'flex',
+          gap: 12,
+          padding: '14px 16px',
+          background: '#FAF5FF',
+          border: '1.5px solid #EDE9FE',
+          borderRadius: 10,
+          marginBottom: 18,
+          fontSize: 13,
+          color: '#581C87',
+          lineHeight: 1.5,
+        }}>
+          <div>
+            <strong>Starting your onboarding?</strong> If you have not created your password yet,{' '}
+            <Link
+              href={`/auth/accept-invite?redirect_url=${encodeURIComponent(redirectUrl)}${emailAddress ? `&email=${encodeURIComponent(emailAddress)}` : ''}`}
+              style={{ color: 'var(--primary, #A238FF)', fontWeight: 700, textDecoration: 'underline' }}
+            >
+              activate your invitation here →
+            </Link>
+          </div>
+        </div>
+      )}
       <button type="button" disabled={isSubmitting || fetchStatus === 'fetching'} onClick={signInWithGoogle} className={s.secondaryButton}
         style={{opacity:(isSubmitting || fetchStatus === 'fetching')?0.7:1,cursor:(isSubmitting || fetchStatus === 'fetching')?'not-allowed':'pointer'}}>
         <Globe2 size={17}/> {isSubmitting ? 'Redirecting to Google...' : 'Continue with Google'}
@@ -564,7 +591,20 @@ export default function SignIn() {
           {isSubmitting ? 'Signing in...' : 'Sign in securely'} <ArrowRight size={16}/>
         </button>
       </form>
-      <div className={s.switch}>Don&apos;t have an account? <Link href="/auth/sign-up">Sign up</Link></div>
+      <div className={s.switch}>
+        Don&apos;t have an account?{' '}
+        <Link href={`/auth/sign-up?redirect_url=${encodeURIComponent(redirectUrl)}${emailAddress ? `&email=${encodeURIComponent(emailAddress)}` : ''}`}>
+          Sign up
+        </Link>
+      </div>
     </AuthShell>
+  );
+}
+
+export default function SignIn() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Loading sign in…</div>}>
+      <SignInContent />
+    </Suspense>
   );
 }

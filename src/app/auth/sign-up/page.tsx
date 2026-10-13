@@ -1,33 +1,43 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowRight, Globe2, AlertCircle, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowRight, Globe2, AlertCircle, Eye, EyeOff, RefreshCw, Sparkles } from 'lucide-react';
 import { AuthField, AuthShell, authStyles as s } from '@/components/auth/AuthShell';
 import { useClerk, useAuth } from '@clerk/nextjs';
 
-export default function SignUp() {
+function SignUpContent() {
   const clerk = useClerk();
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const signUp = clerk?.client?.signUp;
-  const isLoaded = !!signUp;
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const redirectUrl = searchParams.get('redirect_url') || '';
+  const initialEmail = searchParams.get('email') || '';
+  const postAuthDestination = redirectUrl || '/company/register';
 
   useEffect(() => {
     if (authLoaded && isSignedIn) {
-      router.replace('/dashboard');
+      router.replace(redirectUrl || '/dashboard');
     }
-  }, [authLoaded, isSignedIn, router]);
+  }, [authLoaded, isSignedIn, redirectUrl, router]);
 
-  const [firstName, setFirstName]           = useState('');
-  const [lastName, setLastName]             = useState('');
-  const [emailAddress, setEmailAddress]     = useState('');
-  const [password, setPassword]             = useState('');
-  const [showPassword, setShowPassword]     = useState(false);
+  const [firstName, setFirstName]                     = useState('');
+  const [lastName, setLastName]                       = useState('');
+  const [emailAddress, setEmailAddress]               = useState(initialEmail);
+  const [password, setPassword]                       = useState('');
+  const [showPassword, setShowPassword]               = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
-  const [code, setCode]                     = useState('');
-  const [error, setError]                   = useState('');
-  const [isSubmitting, setIsSubmitting]     = useState(false);
+  const [code, setCode]                               = useState('');
+  const [error, setError]                             = useState('');
+  const [isSubmitting, setIsSubmitting]               = useState(false);
+
+  useEffect(() => {
+    if (initialEmail && !emailAddress) {
+      setEmailAddress(initialEmail);
+    }
+  }, [initialEmail, emailAddress]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +49,6 @@ export default function SignUp() {
     setError('');
     setIsSubmitting(true);
     try {
-      // Create user WITH password
       await signUp.create({ firstName, lastName, emailAddress, password });
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
@@ -67,7 +76,7 @@ export default function SignUp() {
 
       if (result.status === 'complete') {
         await clerk.setActive({ session: result.createdSessionId });
-        router.push('/company/register');
+        router.push(postAuthDestination);
         return;
       }
 
@@ -82,13 +91,13 @@ export default function SignUp() {
           const updated = await result.update({ username: slug });
           if (updated.status === 'complete' && updated.createdSessionId) {
             await clerk.setActive({ session: updated.createdSessionId });
-            router.push('/company/register');
+            router.push(postAuthDestination);
             return;
           }
           const retry = await updated.attemptEmailAddressVerification({ code });
           if (retry.status === 'complete' && retry.createdSessionId) {
             await clerk.setActive({ session: retry.createdSessionId });
-            router.push('/company/register');
+            router.push(postAuthDestination);
             return;
           }
         }
@@ -110,7 +119,7 @@ export default function SignUp() {
             const updated = await signUp.update({ username: slug });
             if (updated.status === 'complete' && updated.createdSessionId) {
               await clerk.setActive({ session: updated.createdSessionId });
-              router.push('/company/register');
+              router.push(postAuthDestination);
               return;
             }
           } catch (updateErr) {
@@ -119,7 +128,7 @@ export default function SignUp() {
         }
         if (signUp.status === 'complete' && signUp.createdSessionId) {
           await clerk.setActive({ session: signUp.createdSessionId });
-          router.push('/company/register');
+          router.push(postAuthDestination);
           return;
         }
       }
@@ -147,7 +156,7 @@ export default function SignUp() {
       await clerk.client.signIn.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/company/register',
+        redirectUrlComplete: postAuthDestination,
       });
     } catch (err: any) {
       console.error('Google error:', err);
@@ -201,9 +210,38 @@ export default function SignUp() {
     );
   }
 
+  const isInviteFlow = redirectUrl.includes('onboarding');
+
   return (
-    <AuthShell eyebrow="Start your workspace" title="Create your EasyHR account"
-      subtitle="You'll create your company and invite your team next.">
+    <AuthShell
+      eyebrow={isInviteFlow ? "Join your team" : "Start your workspace"}
+      title={isInviteFlow ? "Create your employee account" : "Create your EasyHR account"}
+      subtitle={isInviteFlow ? "Set up your credentials to access your onboarding portal." : "You'll create your company and invite your team next."}
+    >
+      <div style={{
+        marginBottom: '1rem',
+        padding: '0.75rem 1rem',
+        borderRadius: '0.75rem',
+        backgroundColor: '#f5f3ff',
+        border: '1px solid #ddd6fe',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.625rem',
+        fontSize: '0.8125rem',
+        color: '#5b21b6'
+      }}>
+        <Sparkles size={16} style={{ flexShrink: 0, color: '#7c3aed' }} />
+        <div>
+          Received an invitation email from your employer?{' '}
+          <Link
+            href={`/auth/accept-invite${redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : ''}`}
+            style={{ fontWeight: 600, textDecoration: 'underline', color: '#6d28d9' }}
+          >
+            Activate here
+          </Link>
+        </div>
+      </div>
+
       <button type="button" disabled={notReady} onClick={signUpWithGoogle} className={s.secondaryButton}
         style={{opacity:notReady?0.7:1,cursor:notReady?'not-allowed':'pointer'}}>
         <Globe2 size={17}/> {isSubmitting ? 'Redirecting to Google...' : 'Sign up with Google'}
@@ -230,16 +268,29 @@ export default function SignUp() {
         </AuthField>
         <label className={s.check}>
           <input type="checkbox" required/>
-          <span>I agree to the Terms of Service and Privacy Policy and confirm I&apos;m authorized to create a workspace.</span>
+          <span>I agree to the Terms of Service and Privacy Policy and confirm I&apos;m authorized to access this workspace.</span>
         </label>
         {error && <div className={s.errorAlert}><AlertCircle size={18} style={{flexShrink:0,marginTop:1}}/><div>{error}</div></div>}
         <div id="clerk-captcha"/>
         <button type="submit" disabled={notReady} className={s.primaryButton}
           style={{width:'100%',opacity:notReady?0.7:1,cursor:notReady?'not-allowed':'pointer'}}>
-          {isSubmitting ? 'Loading...' : 'Continue to company setup'} <ArrowRight size={16}/>
+          {isSubmitting ? 'Loading...' : (isInviteFlow ? 'Continue to onboarding' : 'Continue to company setup')} <ArrowRight size={16}/>
         </button>
       </form>
-      <div className={s.switch}>Already have an account? <Link href="/auth/sign-in">Sign in</Link></div>
+      <div className={s.switch}>
+        Already have an account?{' '}
+        <Link href={`/auth/sign-in${redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : ''}`}>
+          Sign in
+        </Link>
+      </div>
     </AuthShell>
+  );
+}
+
+export default function SignUp() {
+  return (
+    <Suspense fallback={<div className="min-h-screen grid place-items-center bg-[#fafafa] text-sm text-slate-500">Loading sign up...</div>}>
+      <SignUpContent />
+    </Suspense>
   );
 }

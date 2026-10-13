@@ -50,6 +50,7 @@ const isPublicRoute = createRouteMatcher([
   '/how-it-works(.*)',
   '/contact(.*)',
   '/auth/(.*)',
+  '/my-onboarding(.*)',
   '/sso-callback',
   '/workspace-not-found(.*)',
   '/api/public/(.*)',
@@ -65,6 +66,12 @@ export default clerkMiddleware(async (auth, req) => {
   const rawSubdomain = parseSubdomain(host);
   const pathname = req.nextUrl.pathname;
   const search = req.nextUrl.search;
+
+  // Enforce HTTPS in production to enable Web Crypto and secure cookies
+  const proto = req.headers.get("x-forwarded-proto");
+  if (proto === "http" && !host.includes("localhost")) {
+    return NextResponse.redirect(`https://${host}${pathname}${search}`, 308);
+  }
 
   // 1. Handle "www": canonical redirect to apex
   if (rawSubdomain === "www") {
