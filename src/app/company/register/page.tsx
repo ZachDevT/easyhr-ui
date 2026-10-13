@@ -358,21 +358,23 @@ export default function CompanyRegistration() {
       }
 
       const setupResult = await res.json().catch(() => ({}));
+      const assignedSubdomain = setupResult.subdomain || cleanSubdomain;
 
-      // Automatically upload logo to Cloudflare R2 if one was selected
+      // Automatically upload logo if one was selected
       if (form.logoDataUrl && form.logoDataUrl.startsWith("data:")) {
         try {
           await fetch(`${API_BASE_URL}/api/v1/branding/logo`, {
             method: "POST",
-            headers,
+            headers: {
+              ...headers,
+              "X-EasyHR-Workspace": assignedSubdomain,
+            },
             body: JSON.stringify({ logoDataUrl: form.logoDataUrl }),
           });
         } catch (logoErr) {
           console.warn("Logo initial upload:", logoErr);
         }
       }
-
-      const assignedSubdomain = setupResult.subdomain || cleanSubdomain;
       if (typeof document !== "undefined") {
         const isLocalhost = window.location.hostname.includes("localhost");
         const domainAttr = isLocalhost ? "" : "; Domain=.easyhr.pro";

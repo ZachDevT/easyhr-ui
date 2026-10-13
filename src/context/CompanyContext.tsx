@@ -123,6 +123,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (
+        path.startsWith("/company/register") ||
+        path.startsWith("/auth") ||
+        path.startsWith("/careers") ||
+        path === "/workspace-not-found"
+      ) {
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
       const token = await getToken();
       if (!token) return;
