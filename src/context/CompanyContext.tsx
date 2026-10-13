@@ -172,7 +172,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           } catch {}
           if (typeof window !== "undefined") {
             const path = window.location.pathname;
-            if (!path.startsWith("/company/register") && !path.startsWith("/auth") && !path.startsWith("/careers")) {
+            if (
+              !path.startsWith("/company/register") &&
+              !path.startsWith("/auth") &&
+              !path.startsWith("/careers") &&
+              !path.startsWith("/my-onboarding")
+            ) {
               window.location.href = "/company/register";
               return;
             }
@@ -188,7 +193,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         } catch {}
         if (typeof window !== "undefined") {
           const path = window.location.pathname;
-          if (!path.startsWith("/company/register") && !path.startsWith("/auth") && !path.startsWith("/careers")) {
+          if (
+            !path.startsWith("/company/register") &&
+            !path.startsWith("/auth") &&
+            !path.startsWith("/careers") &&
+            !path.startsWith("/my-onboarding")
+          ) {
             window.location.href = "/company/register";
             return;
           }

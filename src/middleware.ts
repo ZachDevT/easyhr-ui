@@ -153,6 +153,10 @@ export default clerkMiddleware(async (auth, req) => {
 
     // If accessing sign-in / sign-up while authenticated
     if (isAuthRoute(req)) {
+      const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
+      if (redirectUrl && !redirectUrl.startsWith('/auth')) {
+        return NextResponse.redirect(new URL(redirectUrl, req.url));
+      }
       if (pathname.startsWith('/auth/sign-up')) {
         return NextResponse.redirect(new URL('/company/register', req.url));
       }
