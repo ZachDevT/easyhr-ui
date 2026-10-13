@@ -617,15 +617,21 @@ export function EmailComposer({
         />
       </div>
 
-      {/* Action Footer */}
+      {/* Action Footer (Sticky, Non-Scrollable Away) */}
       <div
         style={{
+          position: "sticky",
+          bottom: 0,
+          background: "#FFFFFF",
+          zIndex: 20,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           paddingTop: 16,
+          paddingBottom: 8,
           marginTop: 16,
-          borderTop: "1px solid var(--card-border)",
+          borderTop: "1.5px solid var(--card-border)",
+          boxShadow: "0 -4px 14px rgba(0,0,0,0.03)",
         }}
       >
         <div style={{ fontSize: 12, color: "var(--text-4)" }}>

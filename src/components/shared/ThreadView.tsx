@@ -20,12 +20,15 @@ import {
   Info,
   ChevronDown,
   CornerDownLeft,
+  X,
+  FileText,
+  ShieldCheck,
 } from "lucide-react";
 import { RichTextEditor, RichTextRenderer, SlashCommandMacro } from "@/components/ui/RichTextEditor";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { useCompany } from "@/context/CompanyContext";
-import { EmailComposer, MacroItem } from "./EmailComposer";
+import { MacroItem } from "./EmailComposer";
 import { toast } from "@/components/ui/Toast";
 
 export interface EmailThreadItem {
@@ -74,13 +77,15 @@ export function ThreadView({
   const [messages, setMessages] = useState<EmailMessageItem[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [isComposingNew, setIsComposingNew] = useState(false);
 
-  // Chat-style reply state (Zendesk style with WYSIWYG)
+  // Right-sided dialog (Drawer) state for replying / composing
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<"reply" | "new" | "note">("reply");
   const [replyMode, setReplyMode] = useState<"recruiter" | "candidate">("recruiter");
-  const [replyHtml, setReplyHtml] = useState("<p></p>");
-  const [isSendingReply, setIsSendingReply] = useState(false);
-  const [replyStatus, setReplyStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [drawerSubject, setDrawerSubject] = useState("");
+  const [drawerHtml, setDrawerHtml] = useState("<p></p>");
+  const [isSending, setIsSending] = useState(false);
+  const [drawerStatus, setDrawerStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Macros state
   const [macros, setMacros] = useState<MacroItem[]>([]);
@@ -182,7 +187,6 @@ export function ThreadView({
     if (!selectedThread?.id) return;
     loadMessages(selectedThread.id, false);
 
-    // Poll every 4 seconds for new incoming candidate replies
     const interval = setInterval(() => {
       loadMessages(selectedThread.id, true);
     }, 4000);
@@ -207,14 +211,27 @@ export function ThreadView({
 
   const handleThreadSelect = (thread: EmailThreadItem) => {
     setSelectedThread(thread);
-    setIsComposingNew(false);
-    setReplyHtml("<p></p>");
-    setReplyStatus(null);
+    setIsDrawerOpen(false);
   };
 
-  const handleNewThreadSent = () => {
-    setIsComposingNew(false);
-    loadThreads();
+  // Open right-sided dialog for replying
+  const openReplyDrawer = (mode: "recruiter" | "candidate" = "recruiter") => {
+    setDrawerMode(mode === "candidate" ? "note" : "reply");
+    setReplyMode(mode);
+    setDrawerSubject(selectedThread ? `Re: ${selectedThread.subject}` : `Regarding application for ${candidateRole}`);
+    setDrawerHtml("<p></p>");
+    setDrawerStatus(null);
+    setIsDrawerOpen(true);
+  };
+
+  // Open right-sided dialog for a brand new thread
+  const openNewThreadDrawer = () => {
+    setDrawerMode("new");
+    setReplyMode("recruiter");
+    setDrawerSubject(`Regarding your application for ${candidateRole} - ${company?.name || "EasyHR"}`);
+    setDrawerHtml(`<p>Hi ${candidateName},</p><p></p>`);
+    setDrawerStatus(null);
+    setIsDrawerOpen(true);
   };
 
   // Replace placeholders in macro text
@@ -233,9 +250,13 @@ export function ThreadView({
   const handleApplyMacro = (m: MacroItem | SlashCommandMacro) => {
     const macroHtml = applyMacroPlaceholders(m.bodyHtml);
 
-    setReplyHtml((prev) => {
+    if (drawerMode === "new" && m.subject) {
+      setDrawerSubject(applyMacroPlaceholders(m.subject));
+    }
+
+    setDrawerHtml((prev) => {
       const cleanPrev = prev.replace(/<[^>]*>/g, "").trim();
-      if (!cleanPrev) {
+      if (!cleanPrev || cleanPrev === `Hi ${candidateName},`) {
         return macroHtml;
       }
       return `${prev}<p></p>${macroHtml}`;
@@ -244,35 +265,58 @@ export function ThreadView({
     setMacroSearch("");
     setPreviewMacro(null);
 
-    setReplyStatus({
+    toast.info("Macro applied", `Inserted "${m.title}"`);
+    setDrawerStatus({
       type: "success",
-      text: `Applied macro "${m.title}" into reply.`,
+      text: `Applied macro "${m.title}".`,
     });
-    setTimeout(() => setReplyStatus(null), 3500);
+    setTimeout(() => setDrawerStatus(null), 3000);
   };
 
-  // Send Zendesk chat reply
-  const handleSendChatReply = async () => {
-    if (!selectedThread) return;
-    const cleanContent = replyHtml.replace(/<[^>]*>/g, "").trim();
+  // Send message from the right-sided drawer (Pinned Send Button)
+  const handleSendFromDrawer = async () => {
+    const cleanContent = drawerHtml.replace(/<[^>]*>/g, "").trim();
     if (!cleanContent) {
-      setReplyStatus({ type: "error", text: "Please enter a message to send." });
+      setDrawerStatus({ type: "error", text: "Please enter a message before sending." });
+      return;
+    }
+    if (drawerMode === "new" && !drawerSubject.trim()) {
+      setDrawerStatus({ type: "error", text: "Subject line is required." });
       return;
     }
 
     try {
-      setIsSendingReply(true);
-      setReplyStatus(null);
+      setIsSending(true);
+      setDrawerStatus(null);
       const token = await getToken();
       if (!token) throw new Error("Authentication required");
 
       const senderName = company?.name ? `${company.name} Talent Team` : "Hiring Team";
       const senderEmail = "notifications@recruter.easyhr.pro";
-      const bodyHtml = replyHtml;
 
       let res: Response;
-      if (replyMode === "candidate") {
-        // Log candidate reply
+
+      if (drawerMode === "new") {
+        // Create brand new email thread
+        res = await fetch(`${API_BASE_URL}/api/v1/messaging/threads`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            applicantId,
+            subject: drawerSubject.trim(),
+            bodyHtml: drawerHtml,
+            candidateEmail,
+            candidateName,
+            senderName,
+            senderEmail,
+          }),
+        });
+      } else if (replyMode === "candidate") {
+        // Log candidate response note
+        if (!selectedThread) throw new Error("No thread selected");
         res = await fetch(
           `${API_BASE_URL}/api/v1/messaging/threads/${selectedThread.id}/candidate-reply`,
           {
@@ -282,13 +326,14 @@ export function ThreadView({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              bodyHtml,
+              bodyHtml: drawerHtml,
               senderName: candidateName,
             }),
           }
         );
       } else {
-        // Send email as recruiter
+        // Send email reply to existing thread
+        if (!selectedThread) throw new Error("No thread selected");
         res = await fetch(
           `${API_BASE_URL}/api/v1/messaging/threads/${selectedThread.id}/reply`,
           {
@@ -298,7 +343,7 @@ export function ThreadView({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              bodyHtml,
+              bodyHtml: drawerHtml,
               senderName,
               senderEmail,
               senderType: "recruiter",
@@ -312,25 +357,33 @@ export function ThreadView({
         throw new Error(errJson.detail || errJson.title || "Failed to post message");
       }
 
-      setReplyHtml("<p></p>");
-      toast.success(
-        replyMode === "candidate" ? "Candidate reply recorded" : "Reply sent",
-        replyMode === "candidate" ? "Response logged in thread." : "Email sent to " + selectedThread.candidateEmail
-      );
-      setReplyStatus({
-        type: "success",
-        text: replyMode === "candidate" ? "Candidate reply recorded!" : "Email reply sent to " + selectedThread.candidateEmail,
-      });
-      setTimeout(() => setReplyStatus(null), 3000);
+      const resJson = await res.json();
 
-      // Refresh messages
-      loadMessages(selectedThread.id);
-      loadThreads();
+      if (drawerMode === "new") {
+        toast.success("Email thread started", `Delivered to ${candidateEmail}`);
+        setIsDrawerOpen(false);
+        await loadThreads();
+        if (resJson.data?.id) {
+          setSelectedThread(resJson.data);
+          loadMessages(resJson.data.id);
+        }
+      } else {
+        const targetEmail = selectedThread?.candidateEmail || candidateEmail;
+        toast.success(
+          replyMode === "candidate" ? "Candidate note logged" : "Reply sent successfully",
+          replyMode === "candidate" ? "Saved to thread history." : `Delivered to ${targetEmail}`
+        );
+        setIsDrawerOpen(false);
+        if (selectedThread) {
+          loadMessages(selectedThread.id);
+          loadThreads();
+        }
+      }
     } catch (err: any) {
-      toast.error("Reply failed", err.message || "Failed to deliver message.");
-      setReplyStatus({ type: "error", text: err.message || "Failed to deliver message." });
+      toast.error("Send failed", err.message || "Failed to deliver message.");
+      setDrawerStatus({ type: "error", text: err.message || "Failed to deliver message." });
     } finally {
-      setIsSendingReply(false);
+      setIsSending(false);
     }
   };
 
@@ -340,62 +393,13 @@ export function ThreadView({
       m.shortcut.toLowerCase().includes(macroSearch.toLowerCase())
   );
 
+  const cleanDrawerContent = drawerHtml.replace(/<[^>]*>/g, "").trim();
+
   if (isLoadingThreads) {
     return (
-      <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-4)" }}>
-        <Loader2 className="animate-spin" size={24} style={{ margin: "0 auto 8px auto" }} />
-        <p style={{ margin: 0, fontSize: 13 }}>Loading candidate conversations…</p>
-      </div>
-    );
-  }
-
-  // If user clicked "New Email Thread" or there are no threads yet
-  if (isComposingNew || threads.length === 0) {
-    return (
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 16,
-          border: "1px solid var(--card-border)",
-          padding: 24,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
-            paddingBottom: 16,
-            borderBottom: "1px solid var(--card-border)",
-          }}
-        >
-          <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "var(--text-1)" }}>
-              Send Email to {candidateName}
-            </h3>
-            <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "var(--text-4)" }}>
-              Start an email conversation thread. All outbound messages and candidate replies will appear here like a chat.
-            </p>
-          </div>
-          {threads.length > 0 && (
-            <button
-              onClick={() => setIsComposingNew(false)}
-              className="btn-neutral btn-sm"
-            >
-              Back to Conversation
-            </button>
-          )}
-        </div>
-
-        <EmailComposer
-          applicantId={applicantId}
-          candidateEmail={candidateEmail}
-          candidateName={candidateName}
-          candidateRole={candidateRole}
-          onSent={handleNewThreadSent}
-          onCancel={threads.length > 0 ? () => setIsComposingNew(false) : undefined}
-        />
+      <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-4)" }}>
+        <Loader2 className="animate-spin" size={28} style={{ margin: "0 auto 12px auto", color: "var(--primary)" }} />
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Loading conversation threads…</p>
       </div>
     );
   }
@@ -406,13 +410,14 @@ export function ThreadView({
         display: "grid",
         gridTemplateColumns: "310px 1fr",
         gap: 0,
-        height: 720,
-        maxHeight: "85vh",
-        background: "#fff",
+        height: 740,
+        maxHeight: "calc(100vh - 180px)",
+        minHeight: 560,
+        background: "#FFFFFF",
         borderRadius: 16,
         border: "1px solid var(--card-border)",
         overflow: "hidden",
-        boxShadow: "0 4px 18px rgba(0,0,0,0.04)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
       }}
     >
       {/* ─── Left Sidebar: Threads List ────────────────────────────────────────── */}
@@ -443,70 +448,88 @@ export function ThreadView({
             </span>
           </div>
           <button
-            onClick={() => setIsComposingNew(true)}
+            type="button"
+            onClick={openNewThreadDrawer}
             className="btn-primary"
-            style={{ padding: "4px 10px", fontSize: 11, borderRadius: 6, display: "inline-flex", gap: 4 }}
+            style={{ padding: "5px 12px", fontSize: 11.5, borderRadius: 7, display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 700 }}
           >
-            <Plus size={12} /> New Thread
+            <Plus size={13} /> New Thread
           </button>
         </div>
 
         {/* Thread List */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-          {threads.map((t) => {
-            const isSelected = selectedThread?.id === t.id;
-            return (
-              <div
-                key={t.id}
-                onClick={() => handleThreadSelect(t)}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  cursor: "pointer",
-                  background: isSelected ? "#FFFFFF" : "transparent",
-                  border: isSelected ? "1.5px solid var(--primary)" : "1px solid rgba(0,0,0,0.06)",
-                  boxShadow: isSelected ? "0 4px 12px rgba(162, 56, 255, 0.08)" : "none",
-                  transition: "all 0.15s ease",
-                }}
+        <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          {threads.length === 0 ? (
+            <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--text-4)" }}>
+              <Mail size={28} style={{ margin: "0 auto 10px auto", opacity: 0.4 }} />
+              <p style={{ margin: "0 0 12px 0", fontSize: 12.5, fontWeight: 600 }}>No conversations yet</p>
+              <button
+                type="button"
+                onClick={openNewThreadDrawer}
+                className="btn-primary"
+                style={{ fontSize: 12, padding: "6px 14px", borderRadius: 8 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: isSelected ? "var(--primary)" : "var(--text-1)",
-                      maxWidth: 190,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {t.subject}
-                  </span>
-                  <Badge variant={t.status === "open" ? "success" : "neutral"} style={{ fontSize: 10 }}>
-                    {t.messageCount} msg
-                  </Badge>
+                Send First Email
+              </button>
+            </div>
+          ) : (
+            threads.map((t) => {
+              const isSelected = selectedThread?.id === t.id;
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => handleThreadSelect(t)}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    background: isSelected ? "#FFFFFF" : "transparent",
+                    border: isSelected ? "1.5px solid var(--primary)" : "1px solid rgba(0,0,0,0.06)",
+                    boxShadow: isSelected ? "0 4px 12px rgba(162, 56, 255, 0.08)" : "none",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: isSelected ? "var(--primary)" : "var(--text-1)",
+                        maxWidth: 185,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {t.subject}
+                    </span>
+                    <Badge variant={t.status === "open" ? "success" : "neutral"} style={{ fontSize: 10, padding: "2px 6px" }}>
+                      {t.messageCount} msg
+                    </Badge>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-4)", display: "flex", alignItems: "center", gap: 4 }}>
+                    <Clock size={11} />
+                    <span>{t.lastMessageAt ? new Date(t.lastMessageAt).toLocaleDateString() : ""}</span>
+                    <span style={{ margin: "0 2px" }}>&bull;</span>
+                    <span style={{ maxWidth: 110, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {t.candidateName}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11.5, color: "var(--text-4)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={11} />
-                  <span>{t.lastMessageAt ? new Date(t.lastMessageAt).toLocaleDateString() : ""}</span>
-                  <span style={{ margin: "0 2px" }}>&bull;</span>
-                  <span>{t.candidateName}</span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* ─── Right Column: Zendesk-Style Conversation & Docked Reply ───────────── */}
+      {/* ─── Right Column: Full-Height Thread Feed & Docked Quick Action Bar ────── */}
       <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#FFFFFF", overflow: "hidden" }}>
-        {selectedThread && (
+        {selectedThread ? (
           <>
             {/* Thread Header */}
             <div
               style={{
-                padding: "14px 22px",
+                padding: "16px 24px",
                 borderBottom: "1px solid var(--card-border)",
                 display: "flex",
                 justifyContent: "space-between",
@@ -516,55 +539,76 @@ export function ThreadView({
               }}
             >
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--text-1)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "var(--text-1)" }}>
                     {selectedThread.subject}
-                  </h4>
-                  <Badge variant="success" style={{ fontSize: 10 }}>
+                  </h3>
+                  <Badge variant="success" style={{ fontSize: 10.5, fontWeight: 700 }}>
                     Active Thread
                   </Badge>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-4)", marginTop: 3 }}>
-                  Candidate: <strong style={{ color: "var(--text-2)" }}>{candidateName}</strong> &bull;{" "}
+                <div style={{ fontSize: 12, color: "var(--text-4)", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>Candidate:</span>
+                  <strong style={{ color: "var(--text-2)" }}>{candidateName}</strong>
+                  <span>&bull;</span>
                   <span>{selectedThread.candidateEmail}</span>
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Action Buttons in Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button
                   type="button"
                   onClick={() => loadMessages(selectedThread.id)}
                   className="btn-neutral btn-sm"
-                  title="Refresh messages"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px" }}
+                  title="Refresh conversation"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12 }}
                 >
-                  <RefreshCw size={12} className={isLoadingMessages ? "animate-spin" : ""} />
+                  <RefreshCw size={13} className={isLoadingMessages ? "animate-spin" : ""} />
                   <span>Refresh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openReplyDrawer("recruiter")}
+                  className="btn-primary btn-sm"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 16px", fontSize: 12.5, fontWeight: 700 }}
+                >
+                  <Send size={13} />
+                  <span>Reply via Email</span>
                 </button>
               </div>
             </div>
 
-            {/* Scrollable Conversation Stream */}
+            {/* ─── Spacious, Full-Height Message Feed ─────────────────────────── */}
             <div
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "20px 24px",
+                padding: "24px 28px",
                 display: "flex",
                 flexDirection: "column",
-                gap: 18,
-                background: "#FBFBFA",
+                gap: 20,
+                background: "#F8FAFC",
               }}
             >
               {isLoadingMessages ? (
-                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-4)" }}>
-                  <Loader2 className="animate-spin" size={20} style={{ margin: "0 auto 8px auto" }} />
-                  <p style={{ margin: 0, fontSize: 12 }}>Loading conversation history…</p>
+                <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-4)" }}>
+                  <Loader2 className="animate-spin" size={24} style={{ margin: "0 auto 10px auto", color: "var(--primary)" }} />
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Loading conversation history…</p>
                 </div>
               ) : messages.length === 0 ? (
-                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-4)" }}>
-                  <Mail size={32} style={{ margin: "0 auto 8px auto", opacity: 0.3 }} />
-                  <p style={{ margin: 0, fontSize: 13 }}>No messages in this thread yet.</p>
+                <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-4)" }}>
+                  <Mail size={36} style={{ margin: "0 auto 10px auto", opacity: 0.3 }} />
+                  <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600 }}>No messages in this thread yet.</p>
+                  <button
+                    type="button"
+                    onClick={() => openReplyDrawer("recruiter")}
+                    className="btn-primary"
+                    style={{ marginTop: 14, fontSize: 12.5 }}
+                  >
+                    Send First Message
+                  </button>
                 </div>
               ) : (
                 messages.map((m) => {
@@ -576,58 +620,63 @@ export function ThreadView({
                         display: "flex",
                         flexDirection: "column",
                         alignSelf: isRecruiter ? "flex-end" : "flex-start",
-                        maxWidth: "82%",
-                        background: isRecruiter ? "#FFFFFF" : "#F8FAFC",
+                        width: "100%",
+                        maxWidth: "88%",
+                        background: isRecruiter ? "#FFFFFF" : "#FFFFFF",
                         border: isRecruiter ? "1.5px solid #EDE9FE" : "1.5px solid #E2E8F0",
                         borderRadius: 14,
-                        padding: "16px 18px",
-                        boxShadow: isRecruiter ? "0 2px 8px rgba(162, 56, 255, 0.05)" : "0 2px 6px rgba(0,0,0,0.03)",
+                        padding: "18px 22px",
+                        boxShadow: isRecruiter ? "0 4px 14px rgba(162, 56, 255, 0.05)" : "0 2px 10px rgba(0,0,0,0.03)",
                       }}
                     >
-                      {/* Message meta */}
+                      {/* Message Meta Ribbon */}
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: 16,
-                          marginBottom: 10,
-                          paddingBottom: 8,
-                          borderBottom: "1px solid rgba(0,0,0,0.05)",
+                          marginBottom: 12,
+                          paddingBottom: 10,
+                          borderBottom: "1px solid rgba(0,0,0,0.06)",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 10.5,
                               fontWeight: 800,
                               textTransform: "uppercase",
-                              padding: "2px 7px",
-                              borderRadius: 4,
-                              background: isRecruiter ? "var(--primary-tint, #F3E8FF)" : "#E0E7FF",
+                              padding: "3px 8px",
+                              borderRadius: 5,
+                              background: isRecruiter ? "var(--primary-tint, #F3E8FF)" : "#EEF2FF",
                               color: isRecruiter ? "var(--primary)" : "#3730A3",
-                              letterSpacing: "0.04em",
+                              letterSpacing: "0.05em",
                             }}
                           >
                             {isRecruiter ? "Recruiter" : "Candidate"}
                           </span>
-                          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-1)" }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>
                             {m.senderName}
                           </span>
-                          <span style={{ fontSize: 11, color: "var(--text-4)" }}>
+                          <span style={{ fontSize: 11.5, color: "var(--text-4)" }}>
                             &lt;{m.senderEmail}&gt;
                           </span>
                         </div>
-                        <span style={{ fontSize: 11, color: "var(--text-4)" }}>
-                          {m.createdAt ? new Date(m.createdAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : ""}
-                        </span>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text-4)" }}>
+                          <Clock size={12} />
+                          <span>
+                            {m.createdAt ? new Date(m.createdAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : ""}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Rendered HTML Message Body */}
                       <div
                         style={{
-                          fontSize: 13.5,
-                          lineHeight: 1.6,
+                          fontSize: 14,
+                          lineHeight: 1.7,
                           color: "var(--text-2)",
                           overflowWrap: "break-word",
                         }}
@@ -641,307 +690,495 @@ export function ThreadView({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* ─── Zendesk-Style Docked Chat Reply Box ─────────────────────────── */}
+            {/* ─── Compact Docked Action Bar (Non-Cramped, Height ~60px) ───────── */}
             <div
               style={{
                 borderTop: "1.5px solid var(--card-border)",
                 background: "#FFFFFF",
-                padding: "14px 20px 16px 20px",
+                padding: "12px 24px",
                 flexShrink: 0,
                 display: "flex",
-                flexDirection: "column",
-                gap: 10,
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                boxShadow: "0 -2px 10px rgba(0,0,0,0.02)",
               }}
             >
-              {/* Status Notice */}
-              {replyStatus && (
-                <div
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 8,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: replyStatus.type === "success" ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                    color: replyStatus.type === "success" ? "#065F46" : "#991B1B",
-                    border: `1px solid ${replyStatus.type === "success" ? "#A7F3D0" : "#FECACA"}`,
-                  }}
-                >
-                  {replyStatus.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                  <span>{replyStatus.text}</span>
-                </div>
-              )}
-
-              {/* Mode Bar & Macro Quick Pills (Clean, Spaced, NO Flash Icon) */}
+              {/* Clickable prompt input that triggers the right-sided drawer */}
               <div
+                onClick={() => openReplyDrawer("recruiter")}
                 style={{
+                  flex: 1,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  flexWrap: "wrap",
+                  gap: 10,
+                  padding: "9px 16px",
+                  background: "#F9FAFB",
+                  border: "1px solid var(--card-border)",
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  color: "var(--text-4)",
+                  fontSize: 13,
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--primary)";
+                  e.currentTarget.style.background = "#FFFFFF";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--card-border)";
+                  e.currentTarget.style.background = "#F9FAFB";
                 }}
               >
-                {/* Mode Bar: Email Reply is default; candidate replies appear automatically */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <CornerDownLeft size={14} style={{ color: "var(--primary)" }} />
+                <span>Click here to reply to {candidateName} (opens full composer drawer)…</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => openReplyDrawer("candidate")}
+                  className="btn-neutral btn-sm"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "7px 12px" }}
+                  title="Log a response received outside of email"
+                >
+                  <MessageSquare size={13} />
+                  <span>Log Offline Note</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openReplyDrawer("recruiter")}
+                  className="btn-primary btn-sm"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, padding: "7px 18px" }}
+                >
+                  <Send size={13} />
+                  <span>Reply</span>
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ padding: "80px 24px", textAlign: "center", color: "var(--text-4)", margin: "auto" }}>
+            <Mail size={44} style={{ margin: "0 auto 16px auto", opacity: 0.3 }} />
+            <h3 style={{ margin: "0 0 8px 0", fontSize: 16, fontWeight: 700, color: "var(--text-2)" }}>
+              Select a conversation
+            </h3>
+            <p style={{ margin: "0 0 20px 0", fontSize: 13 }}>
+              Choose a thread from the sidebar or send a new email to {candidateName}.
+            </p>
+            <button
+              type="button"
+              onClick={openNewThreadDrawer}
+              className="btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 18px" }}
+            >
+              <Plus size={14} /> Start New Conversation
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Reusable Right-Sided Dialog (Drawer Sheet) for Mailing & Replying ── */}
+      <Modal
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title={
+          drawerMode === "new"
+            ? `New Email Thread`
+            : replyMode === "candidate"
+            ? `Log Candidate Response`
+            : `Reply to: ${selectedThread?.subject || "Email Conversation"}`
+        }
+        subtitle={
+          drawerMode === "new"
+            ? `Recipient: ${candidateName} • ${candidateEmail}`
+            : `Candidate: ${candidateName} • ${selectedThread?.candidateEmail || candidateEmail}`
+        }
+        width={740}
+        footer={
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-4)" }}>
+              {replyMode === "recruiter" ? (
+                <span>
+                  Delivers from: <strong style={{ color: "var(--primary)" }}>notifications@recruter.easyhr.pro</strong> to <strong>{selectedThread?.candidateEmail || candidateEmail}</strong>
+                </span>
+              ) : (
+                <span>
+                  Logs message received from: <strong>{candidateName}</strong>
+                </span>
+              )}
+              <span style={{ opacity: 0.6 }}>&bull; ⌘+Enter to send</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setIsDrawerOpen(false)}
+                className="btn-neutral"
+                disabled={isSending}
+              >
+                Cancel
+              </button>
+
+              {/* Pinpoint Send Button: Never scrollable away, always docked in modal footer */}
+              <button
+                type="button"
+                onClick={handleSendFromDrawer}
+                disabled={isSending || !cleanDrawerContent}
+                className="btn-primary"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 24px",
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  borderRadius: 8,
+                }}
+              >
+                {isSending ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Sending…</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={15} />
+                    <span>
+                      {drawerMode === "new"
+                        ? "Send Email"
+                        : replyMode === "candidate"
+                        ? "Log Candidate Response"
+                        : "Send Email Reply"}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Status Alert */}
+          {drawerStatus && (
+            <div
+              style={{
+                padding: "10px 16px",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: drawerStatus.type === "success" ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                color: drawerStatus.type === "success" ? "#065F46" : "#991B1B",
+                border: `1px solid ${drawerStatus.type === "success" ? "#A7F3D0" : "#FECACA"}`,
+              }}
+            >
+              {drawerStatus.type === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+              <span>{drawerStatus.text}</span>
+            </div>
+          )}
+
+          {/* Mode Switcher (Email Reply vs Offline Note) */}
+          {drawerMode !== "new" && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "#F3F4F6",
+                padding: 4,
+                borderRadius: 10,
+                width: "fit-content",
+                gap: 4,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setReplyMode("recruiter")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 14px",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  border: "none",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  background: replyMode === "recruiter" ? "#FFFFFF" : "transparent",
+                  color: replyMode === "recruiter" ? "var(--primary)" : "var(--text-3)",
+                  boxShadow: replyMode === "recruiter" ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <Mail size={14} />
+                <span>Email Reply (Outbound)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplyMode("candidate")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 14px",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  border: "none",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  background: replyMode === "candidate" ? "#FFFFFF" : "transparent",
+                  color: replyMode === "candidate" ? "#4338CA" : "var(--text-3)",
+                  boxShadow: replyMode === "candidate" ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <MessageSquare size={14} />
+                <span>Log Offline Note (Received)</span>
+              </button>
+            </div>
+          )}
+
+          {/* From / To Meta Strip */}
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "#F9FAFB",
+              borderRadius: 8,
+              border: "1px solid var(--card-border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: 12.5,
+              color: "var(--text-3)",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <div>
+              <span style={{ fontWeight: 600, color: "var(--text-4)", marginRight: 6 }}>To:</span>
+              <strong style={{ color: "var(--text-1)" }}>{candidateName}</strong> &lt;{selectedThread?.candidateEmail || candidateEmail}&gt;
+            </div>
+            <div>
+              <span style={{ fontWeight: 600, color: "var(--text-4)", marginRight: 6 }}>From:</span>
+              <span style={{ color: "var(--primary)", fontWeight: 600 }}>notifications@recruter.easyhr.pro</span>
+            </div>
+          </div>
+
+          {/* Subject Field */}
+          {drawerMode === "new" ? (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)", display: "block", marginBottom: 6 }}>
+                Subject
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={drawerSubject}
+                onChange={(e) => setDrawerSubject(e.target.value)}
+                placeholder="e.g. Next steps regarding your interview..."
+                style={{ width: "100%", fontWeight: 600, fontSize: 13.5 }}
+                required
+              />
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color: "var(--text-4)", fontWeight: 500 }}>Thread:</span>
+              <span>{selectedThread?.subject}</span>
+            </div>
+          )}
+
+          {/* Macros & Templates Ribbon */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setShowMacros(!showMacros)}
+              style={{
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 7,
+                border: "1px solid var(--card-border, #E2E8F0)",
+                background: showMacros ? "var(--primary-tint, #F3E8FF)" : "#FFFFFF",
+                color: showMacros ? "var(--primary)" : "var(--text-3)",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Sparkles size={13} style={{ color: "var(--primary)" }} />
+              <span>Templates & Macros ({macros.length})</span>
+              <ChevronDown
+                size={13}
+                style={{
+                  transform: showMacros ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.15s ease",
+                }}
+              />
+            </button>
+
+            {/* Quick Macro Pills */}
+            {macros.slice(0, 3).map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  borderRadius: 6,
+                  background: "#F9FAFB",
+                  border: "1px solid var(--card-border, #E2E8F0)",
+                  overflow: "hidden",
+                  fontSize: 11.5,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleApplyMacro(m)}
+                  style={{
+                    padding: "3px 8px",
+                    fontWeight: 600,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text-1)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                  title={`Insert /${m.shortcut}: ${m.title}`}
+                >
+                  <span style={{ fontWeight: 800, fontFamily: "monospace", color: "var(--primary)", fontSize: 10 }}>
+                    /{m.shortcut}
+                  </span>
+                  <span>{m.title}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMacro(m)}
+                  title="Preview macro"
+                  style={{
+                    padding: "3px 6px",
+                    background: "transparent",
+                    border: "none",
+                    borderLeft: "1px solid var(--card-border, #E2E8F0)",
+                    cursor: "pointer",
+                    color: "var(--text-4)",
+                  }}
+                >
+                  <Eye size={11} />
+                </button>
+              </div>
+            ))}
+
+            {/* Browse All Macros Popover Button */}
+            <div style={{ position: "relative" }} ref={pickerRef}>
+              <button
+                type="button"
+                onClick={() => setShowMacroPicker(!showMacroPicker)}
+                className="btn-neutral"
+                style={{
+                  padding: "4px 9px",
+                  fontSize: 11.5,
+                  borderRadius: 6,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                All ({macros.length})
+              </button>
+
+              {showMacroPicker && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: 0,
+                    width: 320,
+                    background: "#fff",
+                    border: "1px solid var(--card-border)",
+                    borderRadius: 10,
+                    boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
+                    zIndex: 400,
+                    padding: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
                   <div
                     style={{
-                      display: "inline-flex",
+                      display: "flex",
                       alignItems: "center",
                       gap: 6,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: replyMode === "recruiter" ? "var(--primary)" : "#4338CA",
-                      background: replyMode === "recruiter" ? "var(--primary-tint, #F3E8FF)" : "#EEF2FF",
-                      padding: "4px 10px",
+                      padding: "6px 10px",
+                      background: "var(--page-bg, #F9FAFB)",
                       borderRadius: 6,
+                      border: "1px solid var(--card-border)",
                     }}
                   >
-                    {replyMode === "recruiter" ? (
-                      <>
-                        <Mail size={13} />
-                        <span>Email Reply</span>
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare size={13} />
-                        <span>Log Offline Note</span>
-                      </>
-                    )}
+                    <Search size={13} style={{ color: "var(--text-4)" }} />
+                    <input
+                      type="text"
+                      placeholder="Search macros..."
+                      value={macroSearch}
+                      onChange={(e) => setMacroSearch(e.target.value)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        outline: "none",
+                        fontSize: 12,
+                        width: "100%",
+                      }}
+                      autoFocus
+                    />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setReplyMode(replyMode === "recruiter" ? "candidate" : "recruiter")}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-4)",
-                      cursor: "pointer",
-                      padding: "2px 4px",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--primary)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-4)")}
-                  >
-                    {replyMode === "recruiter" ? "Switch to offline note" : "Switch back to email reply"}
-                  </button>
-                </div>
-
-                {/* Macro Toggle & Pills */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowMacros(!showMacros)}
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: "1px solid var(--card-border, #E2E8F0)",
-                      background: showMacros ? "var(--primary-tint, #F3E8FF)" : "#FFFFFF",
-                      color: showMacros ? "var(--primary)" : "var(--text-3, #64748B)",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <Sparkles size={12} style={{ color: "var(--primary)" }} />
-                    <span>Macros ({macros.length})</span>
-                    <ChevronDown
-                      size={12}
-                      style={{
-                        transform: showMacros ? "rotate(180deg)" : "rotate(0deg)",
-                        transition: "transform 0.15s ease",
-                      }}
-                    />
-                  </button>
-
-                  {/* Macro Quick Pills Row (Shown only when toggled open) */}
-                  {showMacros && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-
-                  {macros.slice(0, 3).map((m) => (
-                    <div
-                      key={m.id}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        borderRadius: 6,
-                        background: "#F9FAFB",
-                        border: "1px solid var(--card-border, #E2E8F0)",
-                        overflow: "hidden",
-                        fontSize: 11.5,
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleApplyMacro(m)}
-                        style={{
-                          padding: "3px 8px",
-                          fontWeight: 600,
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "var(--text-1)",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                        title={`Insert /${m.shortcut}: ${m.title}`}
-                      >
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            fontFamily: "monospace",
-                            color: "var(--primary)",
-                            fontSize: 10,
-                          }}
-                        >
-                          /{m.shortcut}
-                        </span>
-                        <span>{m.title}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewMacro(m)}
-                        title="Preview macro"
-                        style={{
-                          padding: "3px 6px",
-                          background: "transparent",
-                          border: "none",
-                          borderLeft: "1px solid var(--card-border, #E2E8F0)",
-                          cursor: "pointer",
-                          color: "var(--text-4)",
-                        }}
-                      >
-                        <Eye size={11} />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Browse all button */}
-                  <div style={{ position: "relative" }} ref={pickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowMacroPicker(!showMacroPicker)}
-                      className="btn-neutral"
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: 11,
-                        borderRadius: 6,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      All ({macros.length})
-                    </button>
-
-                    {/* Popover macro selector */}
-                    {showMacroPicker && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: "calc(100% + 8px)",
-                          right: 0,
-                          width: 320,
-                          background: "#fff",
-                          border: "1px solid var(--card-border)",
-                          borderRadius: 10,
-                          boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
-                          zIndex: 300,
-                          padding: 10,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                        }}
-                      >
+                  <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                    {filteredMacros.length === 0 ? (
+                      <div style={{ padding: "12px 8px", textAlign: "center", fontSize: 11.5, color: "var(--text-4)" }}>
+                        No macros found
+                      </div>
+                    ) : (
+                      filteredMacros.map((m) => (
                         <div
+                          key={m.id}
                           style={{
                             display: "flex",
+                            justifyContent: "space-between",
                             alignItems: "center",
-                            gap: 6,
-                            padding: "6px 10px",
-                            background: "var(--page-bg, #F9FAFB)",
+                            padding: "6px 8px",
                             borderRadius: 6,
-                            border: "1px solid var(--card-border)",
+                            cursor: "pointer",
+                            fontSize: 12,
                           }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#F3F4F6")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                         >
-                          <Search size={13} style={{ color: "var(--text-4)" }} />
-                          <input
-                            type="text"
-                            placeholder="Search macros..."
-                            value={macroSearch}
-                            onChange={(e) => setMacroSearch(e.target.value)}
-                            style={{
-                              border: "none",
-                              background: "transparent",
-                              outline: "none",
-                              fontSize: 12,
-                              width: "100%",
-                            }}
-                            autoFocus
-                          />
+                          <div
+                            onClick={() => handleApplyMacro(m)}
+                            style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}
+                          >
+                            <span style={{ fontWeight: 800, fontFamily: "monospace", color: "var(--primary)", fontSize: 10.5 }}>
+                              /{m.shortcut}
+                            </span>
+                            <span style={{ fontWeight: 600, color: "var(--text-1)" }}>{m.title}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewMacro(m)}
+                            title="Preview"
+                            style={{ background: "none", border: "none", color: "var(--text-4)", cursor: "pointer", padding: 2 }}
+                          >
+                            <Eye size={12} />
+                          </button>
                         </div>
-
-                        <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
-                          {filteredMacros.length === 0 ? (
-                            <div style={{ padding: "12px 8px", textAlign: "center", fontSize: 11.5, color: "var(--text-4)" }}>
-                              No macros found
-                            </div>
-                          ) : (
-                            filteredMacros.map((m) => (
-                              <div
-                                key={m.id}
-                                onClick={() => handleApplyMacro(m)}
-                                style={{
-                                  padding: "6px 8px",
-                                  borderRadius: 6,
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  gap: 6,
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-tint)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                  <span
-                                    style={{
-                                      fontSize: 10,
-                                      fontWeight: 800,
-                                      color: "var(--primary)",
-                                      fontFamily: "monospace",
-                                    }}
-                                  >
-                                    /{m.shortcut}
-                                  </span>
-                                  <span
-                                    style={{
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                      color: "var(--text-1)",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                    }}
-                                  >
-                                    {m.title}
-                                  </span>
-                                </div>
-                                <span style={{ fontSize: 11, color: "var(--primary)", fontWeight: 700 }}>Apply</span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                      ))
                     )}
                   </div>
                 </div>
@@ -949,110 +1186,34 @@ export function ThreadView({
             </div>
           </div>
 
-              {/* WYSIWYG Mail Composer (Zendesk-Style, Full formatting, Resizable, Large Height) */}
-              <div
-                style={{
-                  position: "relative",
-                  borderRadius: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                }}
-              >
-                <RichTextEditor
-                  value={replyHtml}
-                  onChange={(val) => setReplyHtml(val)}
-                  placeholder={
-                    replyMode === "candidate"
-                      ? `Log response received from candidate ${candidateName} (rich formatting and macros supported)...`
-                      : `Type a response to ${candidateName}... (Type / for templates or use formatting toolbar, ⌘+Enter to send)`
-                  }
-                  minHeight={220}
-                  resizable={true}
-                  showFooter={true}
-                  onSubmit={handleSendChatReply}
-                  macros={macros}
-                  onSelectMacro={handleApplyMacro}
-                  onViewMacro={(m) => setPreviewMacro(m as MacroItem)}
-                />
-
-                {/* Bottom Action Ribbon */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "10px 14px",
-                    background: "#FFFFFF",
-                    borderRadius: 10,
-                    border: "1px solid var(--card-border, #E2E8F0)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "var(--text-4)" }}>
-                    <span>
-                      {replyMode === "recruiter" ? (
-                        <>Delivers from: <strong style={{ color: "var(--primary)" }}>notifications@recruter.easyhr.pro</strong> to <strong>{selectedThread.candidateEmail}</strong></>
-                      ) : (
-                        <>Logs as candidate response from: <strong>{candidateName}</strong></>
-                      )}
-                    </span>
-                    <span style={{ opacity: 0.6 }}>&bull; Press ⌘+Enter to send</span>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {replyHtml.replace(/<[^>]*>/g, "").trim() && (
-                      <button
-                        type="button"
-                        onClick={() => setReplyHtml("<p></p>")}
-                        className="btn-neutral btn-sm"
-                        style={{ padding: "5px 12px", fontSize: 12 }}
-                      >
-                        Clear
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleSendChatReply}
-                      disabled={isSendingReply || !replyHtml.replace(/<[^>]*>/g, "").trim()}
-                      className="btn-primary"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 7,
-                        padding: "7px 20px",
-                        fontWeight: 700,
-                        borderRadius: 8,
-                        fontSize: 13,
-                      }}
-                    >
-                      {isSendingReply ? (
-                        <>
-                          <Loader2 size={14} className="animate-spin" />
-                          <span>Sending…</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={14} />
-                          <span>{replyMode === "candidate" ? "Log Candidate Response" : "Send Reply"}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+          {/* Full WYSIWYG Rich Text Editor */}
+          <div>
+            <RichTextEditor
+              value={drawerHtml}
+              onChange={(val) => setDrawerHtml(val)}
+              placeholder={
+                replyMode === "candidate"
+                  ? `Type or paste the response received from ${candidateName}...`
+                  : `Draft your message to ${candidateName}... (Type / for templates or format with toolbar, ⌘+Enter to send)`
+              }
+              minHeight={260}
+              resizable={true}
+              showFooter={true}
+              onSubmit={handleSendFromDrawer}
+              macros={macros}
+              onSelectMacro={handleApplyMacro}
+              onViewMacro={(m) => setPreviewMacro(m as MacroItem)}
+            />
+          </div>
+        </div>
+      </Modal>
 
       {/* Macro Preview Modal */}
       {previewMacro && (
         <Modal
           isOpen={true}
           onClose={() => setPreviewMacro(null)}
-          title={`Macro: ${previewMacro.title}`}
+          title={`Macro Preview: ${previewMacro.title}`}
           subtitle={`Shortcut: /${previewMacro.shortcut} • Category: ${previewMacro.category || "Hiring"}`}
           width={580}
           footer={
@@ -1073,7 +1234,7 @@ export function ThreadView({
                 className="btn-primary"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               >
-                <CheckCircle2 size={14} /> Insert into Reply
+                <CheckCircle2 size={14} /> Insert into Editor
               </button>
             </div>
           }
