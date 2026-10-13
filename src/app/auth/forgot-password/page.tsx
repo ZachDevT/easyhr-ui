@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Mail, AlertCircle, CheckCircle2, KeyRound, Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthField, AuthShell, authStyles as s } from "@/components/auth/AuthShell";
-import { OtpInput } from "@/components/auth/OtpInput";
 import { useClerk, useAuth } from "@clerk/nextjs";
 
 export default function ForgotPassword() {
@@ -149,8 +148,41 @@ export default function ForgotPassword() {
             </span>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-            <OtpInput value={code} onChange={setCode} autoFocus disabled={isSubmitting} />
+          <div className={s.code} style={{ marginBottom: 16 }}>
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <input
+                key={i}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                autoFocus={i === 0}
+                value={code[i] || ""}
+                disabled={isSubmitting}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  const a = code.split("");
+                  a[i] = val;
+                  setCode(a.join(""));
+                  if (val && e.target.nextElementSibling) {
+                    (e.target.nextElementSibling as HTMLElement).focus();
+                  }
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                  if (p) {
+                    setCode(p);
+                    const ins = e.currentTarget.parentElement?.querySelectorAll("input");
+                    if (ins) (ins[Math.min(p.length, 5)] as HTMLElement).focus();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Backspace" && !code[i] && e.currentTarget.previousElementSibling) {
+                    (e.currentTarget.previousElementSibling as HTMLElement).focus();
+                  }
+                }}
+              />
+            ))}
           </div>
 
           <AuthField label="New password">
