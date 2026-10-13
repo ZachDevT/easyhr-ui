@@ -264,7 +264,7 @@ export default function CandidateProfilePage() {
                         border: "1px solid var(--border)",
                       }}
                     >
-                      <RichTextRenderer content={candidate.coverLetter} />
+                      <RichTextRenderer html={candidate.coverLetter} />
                     </div>
                   ) : (
                     <div className="text-sm text-4 p-16" style={{ background: "#F9FAFB", borderRadius: 8 }}>
@@ -534,14 +534,18 @@ export default function CandidateProfilePage() {
                 <div
                   style={{
                     background: "#F9FAFB",
-                    padding: 24,
+                    padding: 28,
                     borderRadius: 12,
                     fontSize: 15,
                     lineHeight: 1.7,
-                    whiteSpace: "pre-line",
+                    border: "1px solid var(--border)",
                   }}
                 >
-                  {candidate.coverLetter || "No cover letter provided."}
+                  {candidate.coverLetter ? (
+                    <RichTextRenderer html={candidate.coverLetter} />
+                  ) : (
+                    <span className="text-4">No cover letter provided.</span>
+                  )}
                 </div>
               </CardBody>
             </Card>
