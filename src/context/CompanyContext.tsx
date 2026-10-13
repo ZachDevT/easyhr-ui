@@ -160,6 +160,36 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             window.location.href = getWorkspaceUrl(targetSub, "/dashboard");
             return;
           }
+        } else {
+          // User has no active organization workspace at all in the database
+          setCompany(null);
+          setUserProfile(null);
+          try {
+            localStorage.removeItem(CACHE_KEYS.company);
+            localStorage.removeItem(CACHE_KEYS.user);
+          } catch {}
+          if (typeof window !== "undefined") {
+            const path = window.location.pathname;
+            if (!path.startsWith("/company/register") && !path.startsWith("/auth") && !path.startsWith("/careers")) {
+              window.location.href = "/company/register";
+              return;
+            }
+          }
+        }
+      } else if (res.status === 404) {
+        // User record does not exist in backend
+        setCompany(null);
+        setUserProfile(null);
+        try {
+          localStorage.removeItem(CACHE_KEYS.company);
+          localStorage.removeItem(CACHE_KEYS.user);
+        } catch {}
+        if (typeof window !== "undefined") {
+          const path = window.location.pathname;
+          if (!path.startsWith("/company/register") && !path.startsWith("/auth") && !path.startsWith("/careers")) {
+            window.location.href = "/company/register";
+            return;
+          }
         }
       }
 

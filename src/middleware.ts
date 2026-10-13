@@ -147,8 +147,11 @@ export default clerkMiddleware(async (auth, req) => {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
-    // If accessing sign-in / sign-up while authenticated, send to dashboard
+    // If accessing sign-in / sign-up while authenticated
     if (isAuthRoute(req)) {
+      if (pathname.startsWith('/auth/sign-up')) {
+        return NextResponse.redirect(new URL('/company/register', req.url));
+      }
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
   }

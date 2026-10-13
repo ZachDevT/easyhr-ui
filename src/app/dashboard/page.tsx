@@ -1,6 +1,7 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
 import { useCompany } from '@/context/CompanyContext';
@@ -10,8 +11,15 @@ import { Modal } from '@/components/ui/Modal';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 
 export default function Dashboard() {
+  const router = useRouter();
   const { currentUser } = useRole();
   const { company, userProfile, isLoading } = useCompany();
+
+  useEffect(() => {
+    if (!isLoading && !company && !userProfile) {
+      router.replace('/company/register');
+    }
+  }, [isLoading, company, userProfile, router]);
   const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
   const initials = `${currentUser.firstName?.[0] || 'H'}${currentUser.lastName?.[0] || 'A'}`;
 
@@ -50,7 +58,7 @@ export default function Dashboard() {
     }
   }
 
-  if (isLoading && !userProfile) {
+  if (isLoading || (!company && !userProfile)) {
     return <DashboardSkeleton />;
   }
 

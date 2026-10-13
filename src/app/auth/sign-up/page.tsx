@@ -19,9 +19,9 @@ function SignUpContent() {
 
   useEffect(() => {
     if (authLoaded && isSignedIn) {
-      router.replace(redirectUrl || '/dashboard');
+      router.replace(postAuthDestination);
     }
-  }, [authLoaded, isSignedIn, redirectUrl, router]);
+  }, [authLoaded, isSignedIn, postAuthDestination, router]);
 
   const [firstName, setFirstName]                     = useState('');
   const [lastName, setLastName]                       = useState('');
