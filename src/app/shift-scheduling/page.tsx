@@ -24,6 +24,8 @@ import { toast } from "@/components/ui/Toast";
 import { useAuth } from "@clerk/nextjs";
 import { API_BASE_URL } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
+import Link from "next/link";
+import { useRole } from "@/context/RoleContext";
 
 interface ShiftScheduleItem {
   id: string;
@@ -46,6 +48,8 @@ const WEEK_DAYS = ["MON", "TUE", "WED", "THU", "FRI"];
 
 export default function ShiftSchedulingPage() {
   const { getToken } = useAuth();
+  const { role, currentUser } = useRole();
+  const [activeTab, setActiveTab] = useState(role === "Employee" ? "My Shifts" : "Team Schedule");
   const [schedules, setSchedules] = useState<ShiftScheduleItem[]>([]);
   const [employees, setEmployees] = useState<OrgEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,6 +155,9 @@ export default function ShiftSchedulingPage() {
         title="Shift Scheduling"
         subtitle="Plan coverage, assign working patterns, and maintain payroll-accurate rosters."
         icon={<CalendarRange size={28} />}
+        tabs={["Team Schedule", "My Shifts"]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         actions={
           <div className="row gap-8">
             <button
@@ -172,43 +179,143 @@ export default function ShiftSchedulingPage() {
       />
 
       <main style={{ padding: "0 24px 32px" }}>
-        <StatRibbon
-          stats={[
-            {
-              label: "Team members rostered",
-              value: activeEmployees.length,
-              icon: <Users size={20} />,
-              color: "var(--primary)",
-            },
-            {
-              label: "Schedule templates",
-              value: schedules.length,
-              icon: <Clock3 size={20} />,
-              color: "var(--warning)",
-            },
-            {
-              label: "Weekly coverage",
-              value: "100%",
-              trend: "Full staffing",
-              trendType: "positive",
-              icon: <CalendarDays size={20} />,
-              color: "var(--success)",
-            },
-          ]}
-        />
-
-        <Card style={{ marginTop: 20, overflow: "hidden" }}>
-          <CardBody>
-            <SectionHeading
-              title="Active Weekly Roster"
-              description="Monday through Friday operational coverage across organization team"
-              action={
-                <div className="row gap-8 align-center">
-                  <strong className="text-sm text-1">Current Work Week</strong>
-                  {isPublished && <StatusPill tone="success">Published</StatusPill>}
-                </div>
-              }
+        {activeTab === "My Shifts" ? (
+          <div className="col gap-20 mt-20">
+            <StatRibbon
+              stats={[
+                {
+                  label: "Weekly Target",
+                  value: "40 hrs",
+                  icon: <Clock3 size={20} />,
+                  color: "var(--primary)",
+                },
+                {
+                  label: "Rostered Days",
+                  value: "5 days",
+                  icon: <CalendarDays size={20} />,
+                  color: "var(--success)",
+                },
+                {
+                  label: "Working Pattern",
+                  value: "Standard Day (09:00 - 17:00)",
+                  icon: <CalendarRange size={20} />,
+                  color: "var(--warning)",
+                },
+              ]}
             />
+
+            <Card style={{ overflow: "hidden" }}>
+              <CardBody>
+                <div className="row-between mb-20">
+                  <div>
+                    <h3 className="text-base fw-700 text-1 m-0">My Active Shift Schedule</h3>
+                    <p className="text-xs text-4 m-0 mt-4">
+                      Weekly working hours, break allocations, and shift statuses
+                    </p>
+                  </div>
+                  <div className="row gap-8">
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "4px 10px",
+                        borderRadius: 12,
+                        background: "#ecfdf5",
+                        color: "#059669",
+                      }}
+                    >
+                      Active Roster
+                    </span>
+                    <Link
+                      href="/time"
+                      className="btn-primary btn-sm"
+                      style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      <Clock3 size={13} /> Clock In Now
+                    </Link>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+                  {[
+                    { day: "Monday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Completed" },
+                    { day: "Tuesday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Active Today" },
+                    { day: "Wednesday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Upcoming" },
+                    { day: "Thursday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Upcoming" },
+                    { day: "Friday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Upcoming" },
+                  ].map((shift) => (
+                    <div
+                      key={shift.day}
+                      style={{
+                        padding: 16,
+                        borderRadius: 12,
+                        border: "1px solid var(--border)",
+                        background: shift.status === "Active Today" ? "var(--primary-tint, #f5f3ff)" : "var(--card-bg, #ffffff)",
+                      }}
+                    >
+                      <div className="row-between mb-8">
+                        <span className="text-sm fw-700 text-1">{shift.day}</span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: 10,
+                            background: shift.status === "Active Today" ? "rgba(124, 58, 237, 0.15)" : "#f1f5f9",
+                            color: shift.status === "Active Today" ? "var(--primary)" : "#64748b",
+                          }}
+                        >
+                          {shift.status}
+                        </span>
+                      </div>
+                      <div className="text-base fw-800 text-1 mb-4">{shift.time}</div>
+                      <div className="text-xs text-4 mb-2">{shift.hours} scheduled</div>
+                      <div className="text-xs text-5" style={{ fontSize: 11 }}>{shift.breakTime}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        ) : (
+          <>
+            <StatRibbon
+              stats={[
+                {
+                  label: "Team members rostered",
+                  value: activeEmployees.length,
+                  icon: <Users size={20} />,
+                  color: "var(--primary)",
+                },
+                {
+                  label: "Schedule templates",
+                  value: schedules.length,
+                  icon: <Clock3 size={20} />,
+                  color: "var(--warning)",
+                },
+                {
+                  label: "Weekly coverage",
+                  value: "100%",
+                  trend: "Full staffing",
+                  trendType: "positive",
+                  icon: <CalendarDays size={20} />,
+                  color: "var(--success)",
+                },
+              ]}
+            />
+
+            <Card style={{ marginTop: 20, overflow: "hidden" }}>
+              <CardBody>
+                <SectionHeading
+                  title="Active Weekly Roster"
+                  description="Monday through Friday operational coverage across organization team"
+                  action={
+                    <div className="row gap-8 align-center">
+                      <strong className="text-sm text-1">Current Work Week</strong>
+                      {isPublished && <StatusPill tone="success">Published</StatusPill>}
+                    </div>
+                  }
+                />
 
             {isLoading ? (
               <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
@@ -303,7 +410,9 @@ export default function ShiftSchedulingPage() {
             )}
           </CardBody>
         </Card>
-      </main>
+      </>
+    )}
+  </main>
 
       {/* Add Schedule Template Modal */}
       <Modal

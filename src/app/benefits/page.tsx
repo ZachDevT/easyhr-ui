@@ -18,8 +18,10 @@ import {
   Calendar,
   Layers,
 } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { API_BASE_URL } from "@/lib/api";
+import { useRole } from "@/context/RoleContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -76,6 +78,7 @@ const CATEGORY_ICONS: Record<string, { icon: React.ReactNode; bg: string; color:
 
 export default function BenefitsPage() {
   const { getToken } = useAuth();
+  const { role, currentUser } = useRole();
   const [activeTab, setActiveTab] = useState("Benefits");
 
   // Live state
@@ -106,6 +109,10 @@ export default function BenefitsPage() {
   });
 
   const fetchData = useCallback(async () => {
+    if (role === "Employee") {
+      setIsLoading(false);
+      return;
+    }
     try {
       const token = await getToken();
       if (!token) return;
@@ -268,6 +275,58 @@ export default function BenefitsPage() {
   const totalEnrolled = enrollments.length;
   const totalMonthlyCost = plans.reduce((acc, p) => acc + (p.employerCostMinor / 100) * (p.enrolledCount || 0), 0);
   const avgCostPerEmp = totalEnrolled > 0 ? Math.round(totalMonthlyCost / totalEnrolled) : 0;
+
+  if (role === "Employee") {
+    return (
+      <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
+        <PageHeader
+          title="Benefits Portal"
+          subtitle="Health, wellness, and retirement plans"
+          icon={<Gift size={28} className="text-white" />}
+        />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 48, textAlign: "center" }}>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              background: "var(--accent-subtle, #f1f5f9)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--primary)",
+              marginBottom: 20,
+            }}
+          >
+            <Shield size={32} />
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px 0", color: "var(--text-1)" }}>
+            Benefits Administration Restricted
+          </h2>
+          <p style={{ maxWidth: 480, color: "var(--text-4)", fontSize: 14, margin: "0 0 24px 0", lineHeight: 1.6 }}>
+            Plan configuration and company-wide enrollment administration are reserved for HR Administrators.
+            To view your individual enrolled benefits and total compensation, access your personal profile.
+          </p>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Link
+              href="/dashboard"
+              className="btn-neutral"
+              style={{ textDecoration: "none", padding: "10px 20px" }}
+            >
+              Return to Dashboard
+            </Link>
+            <Link
+              href={`/people/${currentUser?.id || ""}`}
+              className="btn-primary"
+              style={{ textDecoration: "none", padding: "10px 20px" }}
+            >
+              My Profile & Benefits
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>

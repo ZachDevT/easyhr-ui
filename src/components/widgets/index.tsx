@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Clock,
   CalendarDays,
@@ -295,7 +296,7 @@ export function CompulsoryMyTimeWidget() {
           <div
             ref={dropdownRef}
             className="row gap-8 mt-20"
-            style={{ position: 'relative', zIndex: 60 }}
+            style={{ position: 'relative', zIndex: 100 }}
           >
             <button
               className="btn-primary w-full"
@@ -337,12 +338,13 @@ export function CompulsoryMyTimeWidget() {
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   right: 0,
-                  width: 270,
+                  minWidth: 290,
+                  maxWidth: '100%',
                   background: 'var(--card-bg, #ffffff)',
                   border: '1px solid var(--card-border)',
                   borderRadius: 12,
-                  boxShadow: '0 12px 30px -4px rgba(0,0,0,0.18), 0 4px 12px -2px rgba(0,0,0,0.08)',
-                  zIndex: 100,
+                  boxShadow: '0 16px 36px -4px rgba(0,0,0,0.2), 0 4px 12px -2px rgba(0,0,0,0.08)',
+                  zIndex: 1050,
                   textAlign: 'left',
                   overflow: 'hidden',
                 }}
@@ -416,16 +418,16 @@ export function CompulsoryMyTimeWidget() {
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 4,
-                              fontSize: 11,
-                              fontWeight: 700,
+                              justifyContent: 'center',
+                              width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              background: 'rgba(124, 58, 237, 0.12)',
                               color: 'var(--primary)',
-                              background: 'rgba(124, 58, 237, 0.1)',
-                              padding: '2px 8px',
-                              borderRadius: 6,
+                              flexShrink: 0,
                             }}
                           >
-                            <Check size={12} strokeWidth={3} /> Selected
+                            <Check size={12} strokeWidth={3} />
                           </span>
                         )}
                       </button>
@@ -494,7 +496,9 @@ export function CompulsoryMyTimeWidget() {
             <p className="text-xs text-5 mb-4">Pay Period</p>
             <p className="text-sm text-1">{timeSummary.payPeriod}</p>
           </div>
-          <button className="btn-neutral btn-sm">My Timesheet</button>
+          <Link href="/time" className="btn-neutral btn-sm" style={{ textDecoration: 'none' }}>
+            My Timesheet
+          </Link>
         </div>
       </CardBody>
 
@@ -1081,6 +1085,8 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
   const [filterType, setFilterType] = useState<'all' | 'birthday' | 'anniversary'>('all');
   const [allModalOpen, setAllModalOpen] = useState(false);
 
+  const todayCelebrators = useMemo(() => celebrations.filter((c) => c.daysUntil === 0), [celebrations]);
+
   // Send Wish state
   const [wishCelebrator, setWishCelebrator] = useState<CelebrationItem | null>(null);
   const [wishMessage, setWishMessage] = useState('');
@@ -1281,6 +1287,62 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
         </div>
 
         <CardBody style={{ padding: filteredCelebrations.length === 0 ? '28px 20px' : 0, textAlign: filteredCelebrations.length === 0 ? 'center' : 'left' }}>
+          {todayCelebrators.length > 0 && (
+            <div
+              style={{
+                margin: '14px 16px',
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(219, 39, 119, 0.08) 100%)',
+                border: '1px solid rgba(124, 58, 237, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: 'var(--primary)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
+                    {todayCelebrators.length === 1
+                      ? `${todayCelebrators[0].name}'s ${todayCelebrators[0].milestone} Today!`
+                      : `${todayCelebrators.length} celebrations today!`}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-4)' }}>
+                    Send your warm congratulations!
+                  </div>
+                </div>
+              </div>
+              {todayCelebrators.length === 1 && (
+                <button
+                  className="btn-primary btn-sm"
+                  style={{ fontSize: 11, padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  onClick={() => {
+                    setWishCelebrator(todayCelebrators[0]);
+                    setWishMessage(getPresetWishes(todayCelebrators[0].type)[0]);
+                  }}
+                >
+                  <Heart size={12} /> Send Wish
+                </button>
+              )}
+            </div>
+          )}
+
           {filteredCelebrations.length === 0 ? (
             <div>
               <div className="icon-chip" style={{ width: 38, height: 38, margin: '0 auto 10px auto', background: 'var(--primary-tint, #f5f3ff)', color: 'var(--primary, #7c3aed)' }}>
@@ -1336,33 +1398,52 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {b.daysUntil === 0 ? (
-                    <Badge variant="primary" style={{ fontSize: 11, padding: '2px 8px' }}>
-                      Today!
-                    </Badge>
+                    <>
+                      <Badge variant="primary" style={{ fontSize: 11, padding: '2px 8px' }}>
+                        Today!
+                      </Badge>
+                      <button
+                        className="btn-primary btn-sm"
+                        style={{
+                          fontSize: 11,
+                          padding: '4px 10px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        onClick={() => {
+                          setWishCelebrator(b);
+                          setWishMessage(getPresetWishes(b.type)[0]);
+                        }}
+                      >
+                        <Heart size={12} /> Wish
+                      </button>
+                    </>
                   ) : b.daysUntil === 1 ? (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)' }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--primary)',
+                        background: 'var(--primary-tint, #f5f3ff)',
+                        padding: '3px 8px',
+                        borderRadius: 8,
+                      }}
+                    >
                       Tomorrow
                     </span>
                   ) : (
-                    <span className="text-xs text-5">in {b.daysUntil}d</span>
+                    <span
+                      className="text-xs text-5"
+                      style={{
+                        background: 'var(--bg-page)',
+                        padding: '3px 8px',
+                        borderRadius: 8,
+                      }}
+                    >
+                      in {b.daysUntil}d
+                    </span>
                   )}
-
-                  <button
-                    className="btn-neutral btn-sm"
-                    style={{
-                      fontSize: 11,
-                      padding: '4px 10px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                    onClick={() => {
-                      setWishCelebrator(b);
-                      setWishMessage(getPresetWishes(b.type)[0]);
-                    }}
-                  >
-                    <Heart size={12} /> Wish
-                  </button>
                 </div>
               </div>
             ))
@@ -1602,16 +1683,30 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
                     {b.celebrationDate}
                   </span>
-                  <button
-                    className="btn-neutral btn-sm"
-                    style={{ fontSize: 11, padding: '3px 8px' }}
-                    onClick={() => {
-                      setWishCelebrator(b);
-                      setWishMessage(getPresetWishes(b.type)[0]);
-                    }}
-                  >
-                    <Heart size={11} /> Wish
-                  </button>
+                  {b.daysUntil === 0 ? (
+                    <button
+                      className="btn-primary btn-sm"
+                      style={{ fontSize: 11, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      onClick={() => {
+                        setWishCelebrator(b);
+                        setWishMessage(getPresetWishes(b.type)[0]);
+                      }}
+                    >
+                      <Heart size={11} /> Wish
+                    </button>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--text-4)',
+                        background: 'var(--bg-page)',
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                      }}
+                    >
+                      {b.daysUntil === 1 ? 'Tomorrow' : `in ${b.daysUntil}d`}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
