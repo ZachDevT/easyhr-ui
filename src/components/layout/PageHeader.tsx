@@ -45,7 +45,7 @@ export function PageHeader({
     color: 'white', 
     borderRadius: 12, 
     position: 'relative',
-    margin: variant === 'page' ? '24px 24px 24px 24px' : '0' 
+    margin: variant === 'page' ? '0 0 20px 0' : '0' 
   };
 
   return (

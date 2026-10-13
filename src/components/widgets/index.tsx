@@ -23,6 +23,7 @@ import { Badge } from '../ui/Badge';
 import { Card, CardHeader, CardBody } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { toast } from '../ui/Toast';
 import { Textarea } from '../ui/Textarea';
 import { employees } from '../../data/employees';
 import { timeSummary, weekEntries } from '../../data/timeData';
@@ -56,7 +57,13 @@ export function CompulsoryMyTimeWidget() {
     const next = !isClocked;
     setIsClocked(next);
     timeSummary.isClocked = next;
-    setClockedAt(next ? new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date()) : null);
+    const formatted = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date());
+    setClockedAt(next ? formatted : null);
+    if (next) {
+      toast.success("Clocked in", `Started working on ${activeProject} at ${formatted}.`);
+    } else {
+      toast.success("Clocked out", "Session saved to your daily timesheet.");
+    }
   };
 
   return (
@@ -170,7 +177,7 @@ export function CompulsoryMyTimeWidget() {
         footer={
           <>
             <button className="btn-neutral" onClick={() => setClockModal(false)}>Cancel</button>
-            <button className="btn-primary" onClick={() => setClockModal(false)}>Save</button>
+            <button className="btn-primary" onClick={() => { setClockModal(false); toast.success("Time entry saved", "Added to your weekly timesheet."); }}>Save</button>
           </>
         }
       >
@@ -240,7 +247,7 @@ export function CompulsoryTimeOffWidget() {
         footer={
           <>
             <button className="btn-neutral" onClick={() => setModal(false)}>Cancel</button>
-            <button className="btn-primary" onClick={() => setModal(false)}>Submit Request</button>
+            <button className="btn-primary" onClick={() => { setModal(false); toast.success("Time-off requested", "Request sent to your manager for review."); }}>Submit Request</button>
           </>
         }
       >

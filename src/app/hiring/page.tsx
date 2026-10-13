@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,8 @@ import {
   ChevronRight,
   CheckCircle2,
   Loader2,
+  Calendar,
+  Eye,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -33,6 +36,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useHR, Candidate } from "@/context/HRContext";
 import { HiringSkeleton } from "@/components/ui/Skeleton";
+import { RichTextEditor, RichTextRenderer, formatEmploymentType, formatPostedDate } from "@/components/ui/RichTextEditor";
+import { toast } from "@/components/ui/Toast";
 
 interface JobPosting {
   id: string;
@@ -44,7 +49,7 @@ interface JobPosting {
   departmentId?: string;
   departmentName: string;
   applicantCount: number;
-  createdAt: string;
+  createdAt?: string;
 }
 
 interface DepartmentOption {
@@ -88,10 +93,10 @@ export default function HiringPage() {
       if (!token) return;
 
       const [jobsRes, deptsRes] = await Promise.all([
-        fetch("http://localhost:8080/api/v1/jobs", {
+        fetch(`${API_BASE_URL}/api/v1/jobs`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch("http://localhost:8080/api/v1/departments", {
+        fetch(`${API_BASE_URL}/api/v1/departments`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -123,7 +128,7 @@ export default function HiringPage() {
       const token = await getToken();
       if (!token) return;
 
-      const res = await fetch("http://localhost:8080/api/v1/jobs", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/jobs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -140,6 +145,7 @@ export default function HiringPage() {
       });
 
       if (res.ok) {
+        toast.success("Job posting created", `"${newJob.title.trim()}" is now published.`);
         setViewState("list");
         setBuilderStep(1);
         setNewJob({
@@ -150,9 +156,13 @@ export default function HiringPage() {
           description: "",
         });
         fetchJobs();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        toast.error("Failed to create job posting", errJson.detail || errJson.title || "Could not publish job.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create job posting", err);
+      toast.error("Network error", err.message || "Failed to create job posting.");
     } finally {
       setIsSubmittingJob(false);
     }
@@ -163,7 +173,7 @@ export default function HiringPage() {
       const token = await getToken();
       if (!token) return;
 
-      await fetch(`http://localhost:8080/api/v1/jobs/${jobId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -171,9 +181,15 @@ export default function HiringPage() {
         },
         body: JSON.stringify({ status }),
       });
-      fetchJobs();
+      if (res.ok) {
+        toast.success("Job status updated", `Status changed to ${status.charAt(0).toUpperCase() + status.slice(1)}.`);
+        fetchJobs();
+      } else {
+        toast.error("Failed to update status", "Could not update job status.");
+      }
     } catch (err) {
       console.error("Failed to update job status", err);
+      toast.error("Network error", "Unable to update job status.");
     }
   };
 
@@ -313,13 +329,11 @@ export default function HiringPage() {
 
                   <div className="col gap-12">
                     <label className="text-sm fw-700 text-1">Job Description</label>
-                    <textarea
-                      className="input"
-                      rows={6}
-                      placeholder="Describe the responsibilities, qualifications, and role expectations..."
+                    <RichTextEditor
                       value={newJob.description}
-                      onChange={(e) => setNewJob({ ...newJob, description: e.target.value })}
-                      style={{ padding: 16, fontFamily: "inherit", fontSize: 15 }}
+                      onChange={(val: string) => setNewJob({ ...newJob, description: val })}
+                      placeholder="Describe the responsibilities, qualifications, and role expectations..."
+                      minHeight={240}
                     />
                   </div>
 
@@ -334,36 +348,84 @@ export default function HiringPage() {
                       disabled={!newJob.title.trim()}
                       style={{ padding: "14px 36px" }}
                     >
-                      Next: Review & Publish <ArrowRight size={16} style={{ marginLeft: 8 }} />
+                      Next: Preview & Publish <ArrowRight size={16} style={{ marginLeft: 8 }} />
                     </button>
                   </div>
                 </div>
               )}
 
               {builderStep === 2 && (
-                <div className="col gap-40 text-center py-40">
-                  <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--success-tint)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
-                    <CheckCircle2 size={40} />
+                <div className="col gap-32 py-16">
+                  <div className="row-between align-center pb-20" style={{ borderBottom: "1px solid var(--border)" }}>
+                    <div>
+                      <h2 className="text-2xl fw-800 text-1 m-0">Live WYSIWYG Careers Preview</h2>
+                      <p className="text-sm text-5 mt-4">
+                        Review how your job posting will look to candidates on the public careers portal before publishing.
+                      </p>
+                    </div>
+                    <div className="row gap-12">
+                      <button className="btn-neutral" onClick={() => setBuilderStep(1)} style={{ padding: "10px 20px" }}>
+                        Back to Edit
+                      </button>
+                      <button
+                        className="btn-primary row gap-8 align-center"
+                        onClick={handleCreateJob}
+                        disabled={isSubmittingJob}
+                        style={{ padding: "10px 28px" }}
+                      >
+                        {isSubmittingJob ? <Loader2 size={16} className="animate-spin" /> : null}
+                        <span>Publish to Careers Page</span>
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-3xl fw-800 text-1 mb-12">Ready to Publish!</h2>
-                    <p className="text-lg text-5 max-w-md mx-auto">
-                      Your job posting for "{newJob.title}" is ready to be published to your live careers board.
-                    </p>
-                  </div>
-                  <div className="row gap-16 justify-center mt-16">
-                    <button className="btn-neutral" onClick={() => setBuilderStep(1)} style={{ padding: "14px 28px" }}>
-                      Back to Edit
-                    </button>
-                    <button
-                      className="btn-primary row gap-8 align-center"
-                      onClick={handleCreateJob}
-                      disabled={isSubmittingJob}
-                      style={{ padding: "14px 36px" }}
-                    >
-                      {isSubmittingJob ? <Loader2 size={16} className="animate-spin" /> : null}
-                      <span>Publish Job to Careers Page</span>
-                    </button>
+
+                  {/* Careers Job Card Preview */}
+                  <div 
+                    style={{ 
+                      background: "white", 
+                      border: "1px solid #E5E7EB", 
+                      borderRadius: 18, 
+                      padding: "32px 36px",
+                      boxShadow: "0 10px 30px rgba(0,0,0,0.04)"
+                    }}
+                  >
+                    <div className="row gap-12 mb-16 align-center flex-wrap">
+                      <Badge variant="primary">
+                        {departments.find((d) => d.id === newJob.departmentId)?.name || "General"}
+                      </Badge>
+                      <Badge variant="neutral">{newJob.location || "Remote"}</Badge>
+                      <Badge variant="neutral">{formatEmploymentType(newJob.employmentType)}</Badge>
+                      <Badge variant="neutral" style={{ background: "#F3F4F6", color: "var(--text-3)", fontWeight: 600 }}>
+                        <Calendar size={13} style={{ marginRight: 6 }} /> Posted today
+                      </Badge>
+                    </div>
+
+                    <h1 className="text-3xl fw-800 text-1 m-0 mb-14">{newJob.title}</h1>
+
+                    <div className="row gap-20 text-sm text-5 fw-500 mb-28 flex-wrap" style={{ paddingBottom: 20, borderBottom: "1px solid #F3F4F6" }}>
+                      <span className="row gap-6 align-center">
+                        <Briefcase size={16} /> {departments.find((d) => d.id === newJob.departmentId)?.name || "General"}
+                      </span>
+                      <span>&bull;</span>
+                      <span className="row gap-6 align-center">
+                        <MapPin size={16} /> {newJob.location}
+                      </span>
+                      <span>&bull;</span>
+                      <span className="row gap-6 align-center">
+                        <Clock size={16} /> {formatEmploymentType(newJob.employmentType)}
+                      </span>
+                      <span>&bull;</span>
+                      <span className="row gap-6 align-center">
+                        <Calendar size={16} /> Posted today
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg fw-800 text-1 mb-12">Job Description &amp; Details</h4>
+                      <div style={{ background: "#FAFBFD", padding: 24, borderRadius: 12, border: "1px solid #F3F4F6" }}>
+                        <RichTextRenderer content={newJob.description} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -382,11 +444,10 @@ export default function HiringPage() {
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0, background: "var(--bg-page)", overflowY: "auto" }}>
       {/* Top Header */}
-      <div style={{ padding: "24px 32px 0 32px", flexShrink: 0 }}>
+      <div style={{ flexShrink: 0 }}>
         <PageHeader
           title="Applicant Tracking System"
           subtitle="Manage your hiring pipeline, candidate tracking, and custom job postings."
-          variant="card"
           tabs={["Pipeline", "Job Postings", "Reports"]}
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -619,12 +680,18 @@ export default function HiringPage() {
                             </div>
                           </div>
 
-                          <div className="row gap-16 text-sm text-5 fw-500 mb-20" style={{ paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
+                          <div className="row gap-16 text-sm text-5 fw-500 mb-20 flex-wrap" style={{ paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
                             <span className="row gap-6 align-center"><LayoutDashboard size={14} /> {job.departmentName || "General"}</span>
                             <span>•</span>
                             <span className="row gap-6 align-center"><MapPin size={14} /> {job.location}</span>
                             <span>•</span>
-                            <span className="row gap-6 align-center"><Clock size={14} /> {job.employmentType}</span>
+                            <span className="row gap-6 align-center"><Clock size={14} /> {formatEmploymentType(job.employmentType)}</span>
+                            {job.createdAt && (
+                              <>
+                                <span>•</span>
+                                <span className="row gap-6 align-center"><Calendar size={14} /> {formatPostedDate(job.createdAt)}</span>
+                              </>
+                            )}
                           </div>
 
                           <div className="row-between align-center">
@@ -635,12 +702,12 @@ export default function HiringPage() {
                                 value={job.status}
                                 onChange={(e) => handleUpdateJobStatus(job.id, e.target.value)}
                               >
-                                <option value="published">🟢 Published</option>
-                                <option value="draft">⚪ Draft</option>
-                                <option value="closed">🔴 Closed</option>
+                                <option value="published">Published</option>
+                                <option value="draft">Draft</option>
+                                <option value="closed">Closed</option>
                               </select>
                             </div>
-                            <Link href="/careers" target="_blank" className="text-primary text-sm fw-700 row gap-6" style={{ textDecoration: "none" }}>
+                            <Link href={`/careers/preview?jobId=${job.id}`} target="_blank" className="text-primary text-sm fw-700 row gap-6" style={{ textDecoration: "none" }}>
                               Preview Job <ArrowRight size={14} />
                             </Link>
                           </div>

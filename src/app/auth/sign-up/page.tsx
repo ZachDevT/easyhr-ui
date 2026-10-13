@@ -32,6 +32,10 @@ export default function SignUp() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signUp) return;
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
     setError('');
     setIsSubmitting(true);
     try {
@@ -215,7 +219,7 @@ export default function SignUp() {
         </AuthField>
         <AuthField label="Create password">
           <div style={{position:'relative',display:'flex',alignItems:'center'}}>
-            <input type={showPassword?'text':'password'} placeholder="At least 15 characters"
+            <input type={showPassword?'text':'password'} placeholder="At least 8 characters" minLength={8}
               value={password} onChange={(e)=>setPassword(e.target.value)} required
               style={{width:'100%',paddingRight:'44px'}}/>
             <button type="button" onClick={()=>setShowPassword(!showPassword)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Building2, ChevronRight, Mail, MapPin, Search, Users, UserPlus } from "lucide-react";
@@ -46,8 +47,8 @@ export default function PeopleDirectory() {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [empRes, deptRes] = await Promise.all([
-        fetch("http://localhost:8080/api/v1/employees?limit=100", { headers }),
-        fetch("http://localhost:8080/api/v1/departments", { headers }),
+        fetch(`${API_BASE_URL}/api/v1/employees?limit=100`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/departments`, { headers }),
       ]);
 
       if (empRes.ok) {

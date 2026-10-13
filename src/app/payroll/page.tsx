@@ -12,6 +12,7 @@ import { SearchableSelect, SelectOption } from '@/components/ui/SearchableSelect
 import { Modal } from '@/components/ui/Modal';
 import { ugandaPayrollRecords, payrollTotals, PayrollRecord } from '@/data/ugandaPayroll';
 import { formatCurrency } from '@/utils/payrollCalc';
+import { toast } from '@/components/ui/Toast';
 
 const TABS = ['Overview', 'Run Payroll', 'Paystubs', 'Settings'];
 const WIZARD_STEPS = ['Hours & Attendance', 'Earnings & Adjustments', 'Taxes & Deductions', 'Review & Finalize'];
@@ -38,6 +39,7 @@ export default function PayrollPage() {
       setPayrollRun(true);
       setActiveTab('Overview');
       setWizardStep(0);
+      toast.success("Payroll executed", "Current pay period batch processed successfully.");
     }, 2000);
   };
 
@@ -46,7 +48,7 @@ export default function PayrollPage() {
     setTimeout(() => {
       setIsSendingEmails(false);
       setIsEmailAllModalOpen(false);
-      alert('Payslips queued for delivery successfully!');
+      toast.success("Payslips dispatched", "Payslips queued for delivery to all employees.");
     }, 1500);
   };
 
@@ -500,7 +502,7 @@ export default function PayrollPage() {
                       <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => setSelectedRecord(r)}>
                         View
                       </button>
-                      <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => alert(`Emailing payslip to ${r.employeeName}`)}>
+                      <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => toast.info("Dispatching payslip", `Emailing payslip to ${r.employeeName}...`)}>
                         <Mail size={14}/>
                       </button>
                     </div>
@@ -620,7 +622,7 @@ export default function PayrollPage() {
       <Modal isOpen={!!adjustRecord} onClose={() => setAdjustRecord(null)} title="Adjust Employee Hours" width={500} footer={
         <div className="row-between w-100">
           <button className="btn-neutral" onClick={() => setAdjustRecord(null)}>Cancel</button>
-          <button className="btn-primary" onClick={() => { alert('Hours adjusted and proof attached!'); setAdjustRecord(null); }}>Save Adjustments</button>
+          <button className="btn-primary" onClick={() => { toast.success("Hours adjusted", "Proof attached and adjustments saved."); setAdjustRecord(null); }}>Save Adjustments</button>
         </div>
       }>
         {adjustRecord && (

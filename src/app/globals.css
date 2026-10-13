@@ -81,6 +81,7 @@ img { display: block; }
   display: flex;
   height: 100vh;
   overflow: hidden;
+  background: var(--page-bg, #F7F7F5);
 }
 
 .main-content {
@@ -94,7 +95,7 @@ img { display: block; }
 .page-body {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 16px 24px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1010,3 +1011,142 @@ tr:hover td { background: #FAFAF8; }
 .avatar-hover-container:hover .avatar-hover-overlay {
   opacity: 1 !important;
 }
+
+/* ============================================================
+   RICH TEXT & WYSIWYG EDITOR TYPOGRAPHY
+   ============================================================ */
+.rich-editor-surface {
+  outline: none;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-1);
+  font-family: inherit;
+  word-break: break-word;
+}
+
+.rich-editor-surface:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-placeholder);
+  pointer-events: none;
+  display: block;
+}
+
+/* Formatted elements inside editor & renderer */
+.rich-editor-surface h1,
+.rich-rendered-html h1,
+.prose h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: var(--text-1);
+  line-height: 1.3;
+}
+
+.rich-editor-surface h2,
+.rich-rendered-html h2,
+.prose h2 {
+  font-size: 18px;
+  font-weight: 800;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: var(--text-1);
+  line-height: 1.35;
+}
+
+.rich-editor-surface h3,
+.rich-rendered-html h3,
+.prose h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  color: var(--text-1);
+  line-height: 1.4;
+}
+
+.rich-editor-surface p,
+.rich-rendered-html p,
+.prose p {
+  margin-bottom: 10px;
+  line-height: 1.65;
+}
+
+.rich-editor-surface ul,
+.rich-rendered-html ul,
+.prose ul {
+  list-style-type: disc !important;
+  margin: 10px 0 10px 24px !important;
+  padding-left: 8px !important;
+}
+
+.rich-editor-surface ol,
+.rich-rendered-html ol,
+.prose ol {
+  list-style-type: decimal !important;
+  margin: 10px 0 10px 24px !important;
+  padding-left: 8px !important;
+}
+
+.rich-editor-surface li,
+.rich-rendered-html li,
+.prose li {
+  margin-bottom: 6px;
+  line-height: 1.6;
+  display: list-item !important;
+}
+
+.rich-editor-surface blockquote,
+.rich-rendered-html blockquote,
+.prose blockquote {
+  border-left: 3.5px solid var(--primary) !important;
+  padding: 8px 16px !important;
+  margin: 14px 0 !important;
+  background: var(--primary-tint);
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  color: var(--text-2);
+}
+
+.rich-editor-surface b,
+.rich-editor-surface strong,
+.rich-rendered-html b,
+.rich-rendered-html strong,
+.prose b,
+.prose strong {
+  font-weight: 700 !important;
+  color: var(--text-1);
+}
+
+.rich-editor-surface i,
+.rich-editor-surface em,
+.rich-rendered-html i,
+.rich-rendered-html em,
+.prose i,
+.prose em {
+  font-style: italic !important;
+}
+
+.rich-editor-surface u,
+.rich-rendered-html u,
+.prose u {
+  text-decoration: underline !important;
+}
+
+.rich-editor-surface s,
+.rich-editor-surface strike,
+.rich-rendered-html s,
+.rich-rendered-html strike,
+.prose s,
+.prose strike {
+  text-decoration: line-through !important;
+}
+
+.rich-editor-surface hr,
+.rich-rendered-html hr,
+.prose hr {
+  border: none !important;
+  border-top: 1px solid var(--card-border) !important;
+  margin: 18px 0 !important;
+}
+

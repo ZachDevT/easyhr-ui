@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import {
   CheckCircle2,
@@ -26,6 +27,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { OnboardingPortalSkeleton } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
 
 interface EmployeeMe {
   id: string;
@@ -104,7 +106,7 @@ export default function MyOnboardingPage() {
         const token = await getToken();
         if (!token) return;
 
-        const res = await fetch("http://localhost:8080/api/v1/employees/me", {
+        const res = await fetch(`${API_BASE_URL}/api/v1/employees/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -155,7 +157,7 @@ export default function MyOnboardingPage() {
       const token = await getToken();
       if (!token) return;
 
-      await fetch("http://localhost:8080/api/v1/employees/me/profile", {
+      await fetch(`${API_BASE_URL}/api/v1/employees/me/profile`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -192,7 +194,7 @@ export default function MyOnboardingPage() {
       const token = await getToken();
       if (!token) return;
 
-      await fetch("http://localhost:8080/api/v1/employees/me/profile", {
+      await fetch(`${API_BASE_URL}/api/v1/employees/me/profile`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -225,7 +227,7 @@ export default function MyOnboardingPage() {
       if (!token) return;
 
       // 1. Save handbook signoff timestamp
-      await fetch("http://localhost:8080/api/v1/employees/me/profile", {
+      await fetch(`${API_BASE_URL}/api/v1/employees/me/profile`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -238,7 +240,7 @@ export default function MyOnboardingPage() {
 
       // 2. Activate employee in the system
       if (employee?.id) {
-        await fetch(`http://localhost:8080/api/v1/employees/${employee.id}/activate`, {
+        await fetch(`${API_BASE_URL}/api/v1/employees/${employee.id}/activate`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -985,7 +987,7 @@ export default function MyOnboardingPage() {
                     </div>
                     <button
                       className="btn-secondary btn-sm row gap-6 align-center"
-                      onClick={() => alert("Handbook is up to date and verified.")}
+                      onClick={() => toast.success("Handbook verified", "Employee handbook is verified and up to date.")}
                     >
                       <ExternalLink size={14} /> View Document
                     </button>

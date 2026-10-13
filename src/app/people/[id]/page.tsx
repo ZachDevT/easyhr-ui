@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -22,6 +23,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
+import { toast } from "@/components/ui/Toast";
 
 interface EmployeeProfileData {
   id: string;
@@ -60,7 +62,7 @@ export default function EmployeeProfile() {
       const token = await getToken();
       if (!token || !params?.id) return;
 
-      const res = await fetch(`http://localhost:8080/api/v1/employees/${params.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/employees/${params.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -86,16 +88,20 @@ export default function EmployeeProfile() {
       const token = await getToken();
       if (!token) return;
 
-      const res = await fetch(`http://localhost:8080/api/v1/employees/${employee.id}/activate`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/employees/${employee.id}/activate`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
+        toast.success("Employee activated", `${employee.firstName} ${employee.lastName} is now active.`);
         setEmployee({ ...employee, status: "active" });
+      } else {
+        toast.error("Activation failed", "Server rejected activation.");
       }
     } catch (err) {
       console.error("Failed to activate employee", err);
+      toast.error("Network error", "Unable to activate employee.");
     } finally {
       setIsActivating(false);
     }

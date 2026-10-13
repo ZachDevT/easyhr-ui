@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Mail, Phone, MapPin, Building, Calendar, Clock, Monitor, User, ChevronDown, ChevronUp, FileText, ChevronRight, CheckCircle2, Target, Stethoscope, Heart, Briefcase, Plus, Search, Camera, Loader2, Sparkles } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
@@ -14,7 +14,7 @@ import { ProfileMeSkeleton } from '@/components/ui/Skeleton';
 
 const TABS = ['Personal', 'Job', 'Documents', 'Time Off', 'Performance', 'Benefits', 'Timesheet', 'Pay Info', 'Emergency'];
 
-export default function ProfilePage() {
+function ProfileContent() {
   const { currentUser } = useRole();
   const { userProfile, company, updateProfile, uploadAvatar, isLoading } = useCompany();
   const searchParams = useSearchParams();
@@ -138,7 +138,7 @@ export default function ProfilePage() {
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column' }}>
       
       {/* Hero Banner Area */}
-      <div style={{ margin: '24px 24px 0 24px' }}>
+      <div style={{ margin: '0 0 20px 0' }}>
         <PageHeader 
           variant="card"
           title={`${displayFirstName} ${displayLastName}`}
@@ -713,3 +713,12 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<ProfileMeSkeleton />}>
+      <ProfileContent />
+    </Suspense>
+  );
+}
+

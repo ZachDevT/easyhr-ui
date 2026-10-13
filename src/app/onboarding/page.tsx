@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -35,6 +36,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useHR } from "@/context/HRContext";
+import { toast } from "@/components/ui/Toast";
 
 interface Department {
   id: string;
@@ -62,7 +64,7 @@ export default function HrOnboardingPage() {
       try {
         const token = await getToken();
         if (!token) return;
-        const res = await fetch("http://localhost:8080/api/v1/departments", {
+        const res = await fetch(`${API_BASE_URL}/api/v1/departments`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -118,7 +120,7 @@ export default function HrOnboardingPage() {
       // Create actual employee in backend database
       if (token) {
         const empNumber = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
-        const res = await fetch("http://localhost:8080/api/v1/employees", {
+        const res = await fetch(`${API_BASE_URL}/api/v1/employees`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -143,10 +145,11 @@ export default function HrOnboardingPage() {
         if (res.ok) {
           const empJson = await res.json();
           createdEmpId = empJson.id;
+          toast.success("Employee profile created", `${firstName} ${lastName} has been added to the directory.`);
 
           // Dispatch onboarding invitation email to new hire's email
           try {
-            await fetch("http://localhost:8080/api/v1/onboarding/send-invitation", {
+            await fetch(`${API_BASE_URL}/api/v1/onboarding/send-invitation`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -161,6 +164,7 @@ export default function HrOnboardingPage() {
                 portalUrl: `${window.location.origin}/my-onboarding`,
               }),
             });
+            toast.success("Invitation sent", `Onboarding portal access sent to ${wizardCandidate.email}.`);
           } catch (emailErr) {
             console.error("Failed to trigger invitation email", emailErr);
           }
@@ -173,8 +177,9 @@ export default function HrOnboardingPage() {
         deptName,
         createdEmpId
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to launch onboarding", err);
+      toast.error("Onboarding failed", err.message || "Failed to launch onboarding.");
     } finally {
       setIsLaunching(false);
       setWizardCandidate(null);
@@ -189,11 +194,10 @@ export default function HrOnboardingPage() {
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
       {/* Top Header */}
-      <div style={{ padding: "24px 32px 0 32px", flexShrink: 0 }}>
+      <div style={{ flexShrink: 0 }}>
         <PageHeader
           title="Employee Onboarding"
           subtitle="Guide new hires through their transition into your organization."
-          variant="card"
           tabs={["New Hires", "Today's Agenda", "Documents & Setup"]}
           activeTab={activeTab}
           onTabChange={setActiveTab}

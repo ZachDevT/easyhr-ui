@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -35,6 +36,9 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Modal } from "@/components/ui/Modal";
 import { useHR, Candidate } from "@/context/HRContext";
+import { RichTextRenderer } from "@/components/ui/RichTextEditor";
+import { EmailComposer } from "@/components/shared/EmailComposer";
+import { ThreadView } from "@/components/shared/ThreadView";
 
 export default function CandidateProfilePage() {
   const params = useParams();
@@ -63,7 +67,7 @@ export default function CandidateProfilePage() {
         const token = await getToken();
         if (!token) return;
 
-        const res = await fetch("http://localhost:8080/api/v1/hiring/applicants", {
+        const res = await fetch(`${API_BASE_URL}/api/v1/hiring/applicants`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -137,69 +141,26 @@ export default function CandidateProfilePage() {
         flexDirection: "column",
       }}
     >
-      {/* Compose Email Modal */}
+      {/* Real Email Composer Modal */}
       <Modal
         isOpen={showComposeEmailModal}
         onClose={() => setShowComposeEmailModal(false)}
-        title="Compose Email"
+        title="Send Email to Candidate"
         subtitle={`To: ${candidate.name} <${candidate.email}>`}
-        width={1000}
+        width={850}
       >
-        <div style={{ display: "flex", flexDirection: "row", height: "100%" }}>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <div style={{ padding: "24px 32px" }}>
-              <div
-                className="row gap-16 align-center py-16"
-                style={{ borderBottom: "1px solid var(--border)" }}
-              >
-                <span className="text-sm fw-700 text-4" style={{ width: 60 }}>
-                  Subject:
-                </span>
-                <input
-                  type="text"
-                  className="input text-base fw-600 w-full"
-                  placeholder="Enter subject line..."
-                  defaultValue={`Update regarding your application for ${candidate.role} - ProjectEasyHR`}
-                  style={{ border: "none", padding: 0, background: "transparent" }}
-                />
-              </div>
-            </div>
-
-            <div style={{ flex: 1, padding: "0 32px", display: "flex", flexDirection: "column" }}>
-              <textarea
-                className="input flex-1 w-full text-base"
-                placeholder="Write your message here..."
-                style={{ border: "none", background: "transparent", resize: "none", padding: 0, lineHeight: 1.6 }}
-                defaultValue={`Hi ${candidate.name},\n\nThank you for applying for the ${candidate.role} role. We reviewed your CV and qualifications and would love to invite you to discuss the opportunity.\n\nPlease let us know what times work best for you next week.\n\nBest regards,\nHiring Team`}
-              />
-            </div>
-
-            <div
-              className="row-between align-center p-20"
-              style={{ borderTop: "1px solid var(--border)", background: "#F9FAFB" }}
-            >
-              <div className="row gap-8 text-4">
-                <button className="btn-neutral" style={{ padding: 8 }}>
-                  <Type size={18} />
-                </button>
-                <button className="btn-neutral" style={{ padding: 8 }}>
-                  <Paperclip size={18} />
-                </button>
-                <button className="btn-neutral" style={{ padding: 8 }}>
-                  <Smile size={18} />
-                </button>
-              </div>
-              <div className="row gap-16 align-center">
-                <button
-                  className="btn-primary row gap-8 px-24 py-12"
-                  style={{ borderRadius: 8, fontSize: 14, fontWeight: 700 }}
-                  onClick={() => setShowComposeEmailModal(false)}
-                >
-                  <Send size={16} /> Send Email
-                </button>
-              </div>
-            </div>
-          </div>
+        <div style={{ padding: "8px 0" }}>
+          <EmailComposer
+            applicantId={candidate.id}
+            candidateEmail={candidate.email}
+            candidateName={candidate.name}
+            candidateRole={candidate.role}
+            onSent={() => {
+              setShowComposeEmailModal(false);
+              setCandidateProfileTab("Email Threads");
+            }}
+            onCancel={() => setShowComposeEmailModal(false)}
+          />
         </div>
       </Modal>
 
@@ -259,7 +220,7 @@ export default function CandidateProfilePage() {
 
         {/* Navigation Tabs */}
         <div className="row gap-32 mt-28" style={{ borderBottom: "1px solid var(--border)", margin: "24px -48px -24px -48px", padding: "0 48px" }}>
-          {["Overview", "Resume & Cover Letter", "Candidate Details"].map((tab) => (
+          {["Overview", "Email Threads", "Resume & Cover Letter", "Candidate Details"].map((tab) => (
             <button
               key={tab}
               onClick={() => setCandidateProfileTab(tab)}
@@ -298,16 +259,12 @@ export default function CandidateProfilePage() {
                     <div
                       style={{
                         background: "#F9FAFB",
-                        padding: 20,
+                        padding: 24,
                         borderRadius: 12,
                         border: "1px solid var(--border)",
-                        fontSize: 14,
-                        lineHeight: 1.7,
-                        color: "var(--text-2)",
-                        whiteSpace: "pre-line",
                       }}
                     >
-                      {candidate.coverLetter}
+                      <RichTextRenderer content={candidate.coverLetter} />
                     </div>
                   ) : (
                     <div className="text-sm text-4 p-16" style={{ background: "#F9FAFB", borderRadius: 8 }}>
@@ -520,6 +477,18 @@ export default function CandidateProfilePage() {
                 </CardBody>
               </Card>
             </div>
+          </div>
+        )}
+
+        {/* Email Threads Tab */}
+        {candidateProfileTab === "Email Threads" && (
+          <div style={{ width: "100%" }}>
+            <ThreadView
+              applicantId={candidate.id}
+              candidateEmail={candidate.email}
+              candidateName={candidate.name}
+              candidateRole={candidate.role}
+            />
           </div>
         )}
 

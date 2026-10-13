@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { API_BASE_URL } from "@/lib/api";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -22,6 +23,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "@/components/ui/Toast";
+import { formatEmploymentType, formatPostedDate, RichTextRenderer, RichTextEditor } from "@/components/ui/RichTextEditor";
 
 interface CompanyPublic {
   id: string;
@@ -39,9 +42,10 @@ interface JobDetail {
   location: string;
   employmentType: string;
   departmentName?: string;
+  createdAt?: string;
 }
 
-export default function CareerJobPage() {
+function CareerJobContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
   const orgParam = searchParams.get("orgId") || searchParams.get("organizationId");
@@ -90,8 +94,8 @@ export default function CareerJobPage() {
 
         // 1. Fetch public company profile
         const compUrl = orgParam
-          ? `http://localhost:8080/api/v1/public/company?organizationId=${orgParam}`
-          : "http://localhost:8080/api/v1/public/company";
+          ? `${API_BASE_URL}/api/v1/public/company?organizationId=${orgParam}`
+          : `${API_BASE_URL}/api/v1/public/company`;
         const compRes = await fetch(compUrl);
         let currentOrgId = orgParam || "";
         if (compRes.ok) {
@@ -104,8 +108,8 @@ export default function CareerJobPage() {
 
         // 2. Fetch jobs
         const jobsUrl = currentOrgId
-          ? `http://localhost:8080/api/v1/public/jobs?organizationId=${currentOrgId}`
-          : "http://localhost:8080/api/v1/public/jobs";
+          ? `${API_BASE_URL}/api/v1/public/jobs?organizationId=${currentOrgId}`
+          : `${API_BASE_URL}/api/v1/public/jobs`;
         const res = await fetch(jobsUrl, { headers });
         if (res.ok) {
           const list: JobDetail[] = await res.json();
@@ -137,7 +141,7 @@ export default function CareerJobPage() {
       const formData = new FormData();
       formData.append("resume", file);
 
-      const res = await fetch("http://localhost:8080/api/v1/public/upload-resume", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/public/upload-resume`, {
         method: "POST",
         body: formData,
       });
@@ -197,7 +201,7 @@ export default function CareerJobPage() {
         resumeFilename: form.resumeFilename || null,
       };
 
-      const res = await fetch(`http://localhost:8080/api/v1/public/jobs/${job.id}/apply`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/public/jobs/${job.id}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -208,8 +212,10 @@ export default function CareerJobPage() {
         throw new Error(errJson.detail || errJson.message || "Failed to submit application");
       }
 
+      toast.success("Application submitted", "Your application has been received successfully.");
       setSubmitted(true);
     } catch (err: any) {
+      toast.error("Application failed", err.message || "An error occurred while submitting your application");
       setErrorMsg(err.message || "An error occurred while submitting your application");
     } finally {
       setIsSubmitting(false);
@@ -334,15 +340,20 @@ export default function CareerJobPage() {
           <CardBody style={{ padding: 0 }}>
             {/* Job Header */}
             <div style={{ padding: "44px 48px 30px 48px", borderBottom: "1px solid var(--border)" }}>
-              <div className="row gap-12 mb-16 align-center">
+              <div className="row gap-12 mb-16 align-center flex-wrap">
                 <Badge variant="primary" style={{ background: "var(--primary-tint)", color: brandColor, fontWeight: 700 }}>
                   {job.departmentName || "General"}
                 </Badge>
                 <Badge variant="neutral">{job.location || "Remote"}</Badge>
-                <Badge variant="neutral">{job.employmentType || "Full-time"}</Badge>
+                <Badge variant="neutral">{formatEmploymentType(job.employmentType)}</Badge>
+                {job.createdAt && (
+                  <Badge variant="neutral" style={{ background: "#F3F4F6", color: "var(--text-2)", fontWeight: 600 }}>
+                    <Calendar size={13} style={{ marginRight: 6 }} /> {formatPostedDate(job.createdAt)}
+                  </Badge>
+                )}
               </div>
               <h1 className="text-3xl fw-800 text-1 m-0 mb-14">{job.title}</h1>
-              <div className="row gap-20 text-sm text-5 fw-500">
+              <div className="row gap-20 text-sm text-5 fw-500 flex-wrap">
                 <span className="row gap-6 align-center">
                   <Building size={16} /> {company.name}
                 </span>
@@ -352,8 +363,16 @@ export default function CareerJobPage() {
                 </span>
                 <span>&bull;</span>
                 <span className="row gap-6 align-center">
-                  <Clock size={16} /> {job.employmentType}
+                  <Clock size={16} /> {formatEmploymentType(job.employmentType)}
                 </span>
+                {job.createdAt && (
+                  <>
+                    <span>&bull;</span>
+                    <span className="row gap-6 align-center">
+                      <Calendar size={16} /> {formatPostedDate(job.createdAt)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -399,8 +418,17 @@ export default function CareerJobPage() {
               {step === 1 ? (
                 <div>
                   <div className="prose" style={{ lineHeight: 1.7, color: "var(--text-2)", fontSize: 16 }}>
-                    <h3 className="text-xl fw-800 text-1 mb-16">About the Role</h3>
-                    <p style={{ whiteSpace: "pre-line", marginBottom: 32 }}>{job.description}</p>
+                    <div className="row-between align-center mb-16 pb-12" style={{ borderBottom: "1px solid #F3F4F6" }}>
+                      <h3 className="text-xl fw-800 text-1 m-0">About the Role</h3>
+                      {job.createdAt && (
+                        <span className="text-xs text-4 fw-600 row gap-6 align-center">
+                          <Calendar size={14} /> {formatPostedDate(job.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ marginBottom: 36 }}>
+                      <RichTextRenderer content={job.description} />
+                    </div>
 
                     <h3 className="text-xl fw-800 text-1 mb-16">Why Join {company.name}?</h3>
                     <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -485,8 +513,9 @@ export default function CareerJobPage() {
                           />
                         </div>
                         <div className="col gap-8">
-                          <label className="text-xs fw-700 text-1 uppercase tracking-wider">
-                            Phone Number
+                          <label className="text-xs fw-700 text-1 uppercase tracking-wider row-between">
+                            <span>Phone Number</span>
+                            <span className="text-5 fw-600 lowercase" style={{ fontSize: 11 }}>(optional)</span>
                           </label>
                           <input
                             type="tel"
@@ -506,8 +535,9 @@ export default function CareerJobPage() {
                       <h4 className="text-base fw-800 text-1 mb-16">2. Location & Expectations</h4>
                       <div className="grid-2 gap-20">
                         <div className="col gap-8">
-                          <label className="text-xs fw-700 text-1 uppercase tracking-wider">
-                            Current Location / City <span className="text-danger">*</span>
+                          <label className="text-xs fw-700 text-1 uppercase tracking-wider row-between">
+                            <span>Current Location / City <span className="text-danger">*</span></span>
+                            <span className="text-primary fw-600 lowercase" style={{ fontSize: 11 }}>required</span>
                           </label>
                           <input
                             type="text"
@@ -519,8 +549,9 @@ export default function CareerJobPage() {
                           />
                         </div>
                         <div className="col gap-8">
-                          <label className="text-xs fw-700 text-1 uppercase tracking-wider">
-                            Notice Period / Availability
+                          <label className="text-xs fw-700 text-1 uppercase tracking-wider row-between">
+                            <span>Notice Period / Availability</span>
+                            <span className="text-5 fw-600 lowercase" style={{ fontSize: 11 }}>(optional)</span>
                           </label>
                           <select
                             className="input"
@@ -539,8 +570,9 @@ export default function CareerJobPage() {
 
                       <div className="grid-2 gap-20 mt-16">
                         <div className="col gap-8">
-                          <label className="text-xs fw-700 text-1 uppercase tracking-wider">
-                            Expected Salary (Gross / Month)
+                          <label className="text-xs fw-700 text-1 uppercase tracking-wider row-between">
+                            <span>Expected Salary (Gross / Month)</span>
+                            <span className="text-5 fw-600 lowercase" style={{ fontSize: 11 }}>(optional)</span>
                           </label>
                           <div className="row gap-8 align-center">
                             <select
@@ -568,8 +600,9 @@ export default function CareerJobPage() {
                         </div>
 
                         <div className="col gap-8">
-                          <label className="text-xs fw-700 text-1 uppercase tracking-wider">
-                            LinkedIn Profile URL
+                          <label className="text-xs fw-700 text-1 uppercase tracking-wider row-between">
+                            <span>LinkedIn Profile URL</span>
+                            <span className="text-5 fw-600 lowercase" style={{ fontSize: 11 }}>(optional)</span>
                           </label>
                           <input
                             type="url"
@@ -685,24 +718,26 @@ export default function CareerJobPage() {
 
                     {/* Section 4: Cover Letter */}
                     <div>
-                      <h4 className="text-base fw-800 text-1 mb-8">4. Cover Letter</h4>
+                      <div className="row-between align-center mb-8">
+                        <h4 className="text-base fw-800 text-1 m-0">4. Cover Letter</h4>
+                        <span className="text-5 fw-600 lowercase text-xs">(optional)</span>
+                      </div>
                       <p className="text-xs text-5 mb-14">
                         Introduce yourself and explain why you are a great fit for {company.name}.
                       </p>
-                      <textarea
-                        rows={5}
-                        placeholder="Dear Hiring Team,&#10;&#10;I am excited to apply for this role because..."
-                        className="input"
-                        style={{ height: "auto", padding: "14px 16px", lineHeight: 1.6 }}
+                      <RichTextEditor
                         value={form.coverLetter}
-                        onChange={(e) => setForm({ ...form, coverLetter: e.target.value })}
+                        onChange={(val: string) => setForm({ ...form, coverLetter: val })}
+                        placeholder="Dear Hiring Team,&#10;&#10;I am excited to apply for this role because..."
+                        minHeight={200}
                       />
                     </div>
 
                     {/* Section 5: Online Profile / Portfolio */}
                     <div className="col gap-8">
-                      <label className="text-xs fw-700 text-1 uppercase tracking-wider">
-                        Personal Portfolio / GitHub Website
+                      <label className="text-xs fw-700 text-1 uppercase tracking-wider row-between">
+                        <span>Personal Portfolio / GitHub Website</span>
+                        <span className="text-5 fw-600 lowercase" style={{ fontSize: 11 }}>(optional)</span>
                       </label>
                       <input
                         type="url"
@@ -747,3 +782,12 @@ export default function CareerJobPage() {
     </div>
   );
 }
+
+export default function CareerJobPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-gray-500">Loading job details...</div>}>
+      <CareerJobContent />
+    </Suspense>
+  );
+}
+

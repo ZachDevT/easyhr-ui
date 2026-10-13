@@ -1,7 +1,9 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { toast } from "@/components/ui/Toast";
 
 export interface CompanyData {
   id: string;
@@ -129,7 +131,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         Authorization: `Bearer ${token}`,
       };
 
-      const res = await fetch("http://localhost:8080/api/v1/me", { headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/me`, { headers });
       if (res.ok) {
         const data = await res.json();
 
@@ -173,7 +175,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch locations
-      const locRes = await fetch("http://localhost:8080/api/v1/locations", { headers });
+      const locRes = await fetch(`${API_BASE_URL}/api/v1/locations`, { headers });
       if (locRes.ok) {
         const locData = await locRes.json();
         const locs = locData.data || [];
@@ -202,7 +204,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       const token = await getToken();
       if (!token) return false;
 
-      const res = await fetch("http://localhost:8080/api/v1/organization/details", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/organization/details`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -224,6 +226,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (res.ok) {
+        toast.success("Settings saved", "Company profile updated successfully.");
         await refresh();
         return true;
       }
@@ -238,7 +241,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       const token = await getToken();
       if (!token) return false;
 
-      const res = await fetch("http://localhost:8080/api/v1/users/me", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -248,6 +251,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (res.ok) {
+        toast.success("Profile updated", "Personal profile updated successfully.");
         await refresh();
         return true;
       }
@@ -264,7 +268,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       let res: Response;
       if (typeof fileOrDataUrl === "string") {
-        res = await fetch("http://localhost:8080/api/v1/branding/logo", {
+        res = await fetch(`${API_BASE_URL}/api/v1/branding/logo`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -275,7 +279,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       } else {
         const formData = new FormData();
         formData.append("logo", fileOrDataUrl);
-        res = await fetch("http://localhost:8080/api/v1/branding/logo", {
+        res = await fetch(`${API_BASE_URL}/api/v1/branding/logo`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -286,6 +290,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       if (res.ok) {
         const data = await res.json();
+        toast.success("Logo updated", "Brand logo updated successfully.");
         await refresh();
         return data.logoUrl;
       }
@@ -302,7 +307,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       let res: Response;
       if (typeof fileOrDataUrl === "string") {
-        res = await fetch("http://localhost:8080/api/v1/users/me/avatar", {
+        res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -313,7 +318,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       } else {
         const formData = new FormData();
         formData.append("avatar", fileOrDataUrl);
-        res = await fetch("http://localhost:8080/api/v1/users/me/avatar", {
+        res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -324,6 +329,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       if (res.ok) {
         const data = await res.json();
+        toast.success("Avatar updated", "Profile photo updated successfully.");
         await refresh();
         return data.avatarUrl;
       }
@@ -338,7 +344,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       const token = await getToken();
       if (!token) return false;
 
-      const res = await fetch("http://localhost:8080/api/v1/locations", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/locations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -348,6 +354,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (res.ok) {
+        toast.success("Location added", `"${location.name}" added to company locations.`);
         await refresh();
         return true;
       }

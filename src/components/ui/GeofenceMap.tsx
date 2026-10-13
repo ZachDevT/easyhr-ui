@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Circle, useMapEvents, useMap } from "r
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { LocateFixed, Search, MapPin } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 
 const icon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -99,7 +100,7 @@ export default function GeofenceMap({ lat, lng, radius, onChange }: GeofenceMapP
           setPosition(newPos);
           setFlyToPos(newPos);
         },
-        () => alert("Location access denied.")
+        () => toast.error("Location access denied", "Please allow GPS location access to set geofence position.")
       );
     }
   };

@@ -25,9 +25,63 @@ export function SectionHeading({ title, description, action }: { title: string; 
 }
 
 export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?: ReactNode; title: string; subtitle?: string; meta?: ReactNode; onClick?: () => void }) {
-  return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent', cursor: onClick ? 'pointer' : 'default', textAlign: 'left', fontFamily: 'inherit' }}>
-    {leading}<div style={{ minWidth: 0, flex: 1 }}><div className="text-sm fw-700 text-1" style={{ marginBottom: subtitle ? 4 : 0 }}>{title}</div>{subtitle && <div className="text-xs text-4" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}</div>{meta}{onClick && <ChevronRight size={16} color="var(--text-5)" />}
-  </button>;
+  if (onClick) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          padding: '14px 0',
+          borderBottom: '1px solid var(--border)',
+          background: 'transparent',
+          cursor: 'pointer',
+          textAlign: 'left',
+          fontFamily: 'inherit',
+        }}
+      >
+        {leading}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="text-sm fw-700 text-1" style={{ marginBottom: subtitle ? 4 : 0 }}>{title}</div>
+          {subtitle && <div className="text-xs text-4" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+        </div>
+        {meta}
+        <ChevronRight size={16} color="var(--text-5)" />
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '14px 0',
+        borderBottom: '1px solid var(--border)',
+        background: 'transparent',
+        textAlign: 'left',
+        fontFamily: 'inherit',
+      }}
+    >
+      {leading}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="text-sm fw-700 text-1" style={{ marginBottom: subtitle ? 4 : 0 }}>{title}</div>
+        {subtitle && <div className="text-xs text-4" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+      </div>
+      {meta}
+    </div>
+  );
 }
 
 export function SegmentedControl({ options, value, onChange }: { options: string[]; value: string; onChange: (value: string) => void }) {

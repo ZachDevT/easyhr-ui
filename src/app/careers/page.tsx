@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Briefcase, MapPin, Clock, ArrowRight, Building, Globe, ExternalLink } from "lucide-react";
+import { Briefcase, MapPin, Clock, ArrowRight, Building, Globe, ExternalLink, Calendar } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { formatEmploymentType, formatPostedDate } from "@/components/ui/RichTextEditor";
 
 interface CompanyPublic {
   id: string;
@@ -26,7 +28,7 @@ interface PublicJob {
   createdAt: string;
 }
 
-export default function CareersPage() {
+function CareersContent() {
   const searchParams = useSearchParams();
   const orgParam = searchParams.get("orgId") || searchParams.get("organizationId");
   const { getToken } = useAuth();
@@ -52,8 +54,8 @@ export default function CareersPage() {
 
         // 1. Fetch public company profile (logo, branding, industry)
         const compUrl = orgParam
-          ? `http://localhost:8080/api/v1/public/company?organizationId=${orgParam}`
-          : "http://localhost:8080/api/v1/public/company";
+          ? `${API_BASE_URL}/api/v1/public/company?organizationId=${orgParam}`
+          : `${API_BASE_URL}/api/v1/public/company`;
         const compRes = await fetch(compUrl);
         let currentOrgId = orgParam || "";
         if (compRes.ok) {
@@ -66,8 +68,8 @@ export default function CareersPage() {
 
         // 2. Fetch public job listings for this organization
         const jobsUrl = currentOrgId
-          ? `http://localhost:8080/api/v1/public/jobs?organizationId=${currentOrgId}`
-          : "http://localhost:8080/api/v1/public/jobs";
+          ? `${API_BASE_URL}/api/v1/public/jobs?organizationId=${currentOrgId}`
+          : `${API_BASE_URL}/api/v1/public/jobs`;
         const jobsRes = await fetch(jobsUrl, { headers });
         if (jobsRes.ok) {
           const list = await jobsRes.json();
@@ -377,8 +379,16 @@ export default function CareersPage() {
                           </span>
                           <span>&bull;</span>
                           <span className="row gap-6 align-center">
-                            <Clock size={15} /> {role.employmentType}
+                            <Clock size={15} /> {formatEmploymentType(role.employmentType)}
                           </span>
+                          {role.createdAt && (
+                            <>
+                              <span>&bull;</span>
+                              <span className="row gap-6 align-center">
+                                <Calendar size={15} /> {formatPostedDate(role.createdAt)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -435,3 +445,12 @@ export default function CareersPage() {
     </div>
   );
 }
+
+export default function CareersPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-gray-500">Loading careers...</div>}>
+      <CareersContent />
+    </Suspense>
+  );
+}
+

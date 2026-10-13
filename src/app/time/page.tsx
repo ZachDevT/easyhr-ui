@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useRole } from '@/context/RoleContext';
 import { CompulsoryMyTimeWidget } from '@/components/widgets';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { toast } from '@/components/ui/Toast';
 
 export default function TimeTrackingPage() {
   const { currentUser } = useRole();
@@ -225,7 +226,7 @@ export default function TimeTrackingPage() {
         footer={
           <>
             <button className="btn-neutral" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button className="btn-primary" onClick={() => setModalOpen(false)}>Save Entry</button>
+            <button className="btn-primary" onClick={() => { setModalOpen(false); toast.success("Time entry saved", "Added to your weekly timesheet."); }}>Save Entry</button>
           </>
         }
       >

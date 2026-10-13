@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Save, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
@@ -8,6 +9,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { toast } from "@/components/ui/Toast";
 
 export default function NewDepartmentPage() {
   const router = useRouter();
@@ -35,14 +37,14 @@ export default function NewDepartmentPage() {
         const headers = { Authorization: `Bearer ${token}` };
 
         // Load existing departments
-        const deptRes = await fetch("http://localhost:8080/api/v1/departments", { headers });
+        const deptRes = await fetch(`${API_BASE_URL}/api/v1/departments`, { headers });
         if (deptRes.ok) {
           const deptData = await deptRes.json();
           setExistingDepartments(deptData.data || []);
         }
 
         // Load employees
-        const empRes = await fetch("http://localhost:8080/api/v1/employees", { headers });
+        const empRes = await fetch(`${API_BASE_URL}/api/v1/employees`, { headers });
         if (empRes.ok) {
           const empData = await empRes.json();
           const list = (empData.data || []).map((e: any) => ({
@@ -86,7 +88,7 @@ export default function NewDepartmentPage() {
         headEmployeeId: headEmployeeId || null,
       };
 
-      const res = await fetch("http://localhost:8080/api/v1/departments", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/departments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -100,8 +102,10 @@ export default function NewDepartmentPage() {
         throw new Error(errJson.detail || errJson.message || "Failed to create department");
       }
 
+      toast.success("Department created", `"${name.trim()}" has been added to your organization.`);
       router.push("/departments");
     } catch (err: any) {
+      toast.error("Failed to create department", err.message || "An error occurred.");
       setErrorMsg(err.message || "An error occurred while creating the department");
       setIsSubmitting(false);
     }

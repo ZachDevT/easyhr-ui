@@ -446,5 +446,69 @@ export function OnboardingPortalSkeleton() {
   );
 }
 
+/**
+ * AttendanceSkeleton mimics /attendance
+ */
+export function AttendanceSkeleton() {
+  return (
+    <div style={{ animation: "fadeIn 0.2s ease" }}>
+      {/* Top action / punch bar skeleton */}
+      <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: "20px 24px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Skeleton width={48} height={48} radius="50%" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Skeleton width={180} height={20} />
+            <Skeleton width={120} height={14} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <Skeleton width={120} height={40} radius={8} />
+          <Skeleton width={120} height={40} radius={8} />
+        </div>
+      </div>
 
+      {/* Stats Ribbon skeleton */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", gap: 16, background: "white", border: "1px solid var(--border)", borderRadius: 100, padding: "8px 24px" }}>
+          <Skeleton width={90} height={18} />
+          <Skeleton width={90} height={18} />
+          <Skeleton width={90} height={18} />
+          <Skeleton width={90} height={18} />
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <Skeleton width={130} height={36} radius={20} />
+          <Skeleton width={200} height={36} radius={20} />
+        </div>
+      </div>
 
+      {/* Grid of employee attendance cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <Skeleton width={44} height={44} radius="50%" />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Skeleton width={130} height={16} />
+                  <Skeleton width={90} height={12} />
+                </div>
+              </div>
+              <Skeleton width={74} height={24} radius={12} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 0", borderTop: "1px solid #F3F4F6", borderBottom: "1px solid #F3F4F6" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <Skeleton width={70} height={12} />
+                <Skeleton width={90} height={12} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <Skeleton width={60} height={12} />
+                <Skeleton width={80} height={12} />
+              </div>
+            </div>
+            <Skeleton width="100%" height={32} radius={8} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,4 +1,6 @@
 "use client";
+
+import { API_BASE_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -179,7 +181,7 @@ export default function CompanyRegistration() {
           if (isMounted) setIsCheckingOrg(false);
           return;
         }
-        const res = await fetch("http://localhost:8080/api/v1/setup/status", {
+        const res = await fetch(`${API_BASE_URL}/api/v1/setup/status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -224,7 +226,7 @@ export default function CompanyRegistration() {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/v1/public/check-subdomain?subdomain=${encodeURIComponent(clean)}`);
+        const res = await fetch(`${API_BASE_URL}/api/v1/public/check-subdomain?subdomain=${encodeURIComponent(clean)}`);
         const data = await res.json();
         if (data.available) {
           setDomainStatus("available");
@@ -269,7 +271,7 @@ export default function CompanyRegistration() {
 
       // 1. Provision identity in the Go backend
       try {
-        await fetch("http://localhost:8080/api/v1/auth/provision", {
+        await fetch(`${API_BASE_URL}/api/v1/auth/provision`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -341,7 +343,7 @@ export default function CompanyRegistration() {
         },
       };
 
-      const res = await fetch("http://localhost:8080/api/v1/setup/organizations", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/setup/organizations`, {
         method: "POST",
         headers: {
           ...headers,
@@ -358,7 +360,7 @@ export default function CompanyRegistration() {
       // Automatically upload logo to Cloudflare R2 if one was selected
       if (form.logoDataUrl && form.logoDataUrl.startsWith("data:")) {
         try {
-          await fetch("http://localhost:8080/api/v1/branding/logo", {
+          await fetch(`${API_BASE_URL}/api/v1/branding/logo`, {
             method: "POST",
             headers,
             body: JSON.stringify({ logoDataUrl: form.logoDataUrl }),

@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Network,
@@ -30,6 +31,7 @@ import { CurrencySelect } from "@/components/ui/CurrencySelect";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { DepartmentsSkeleton } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
 
 interface Department {
   id: string;
@@ -104,7 +106,7 @@ export default function DepartmentsPage() {
       const token = await getToken();
       if (!token) return;
 
-      const res = await fetch("http://localhost:8080/api/v1/departments", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/departments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -132,8 +134,8 @@ export default function DepartmentsPage() {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [membersRes, rolesRes] = await Promise.all([
-        fetch(`http://localhost:8080/api/v1/departments/${deptId}/members`, { headers }),
-        fetch(`http://localhost:8080/api/v1/departments/${deptId}/positions`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/departments/${deptId}/members`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/departments/${deptId}/positions`, { headers }),
       ]);
 
       if (membersRes.ok) {
@@ -166,7 +168,7 @@ export default function DepartmentsPage() {
       const token = await getToken();
       if (!token) return;
 
-      const res = await fetch(`http://localhost:8080/api/v1/departments/${selectedDept.id}/positions`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/departments/${selectedDept.id}/positions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -184,6 +186,7 @@ export default function DepartmentsPage() {
       });
 
       if (res.ok) {
+        toast.success("Position created", `"${newRole.title.trim()}" added to ${selectedDept.name}.`);
         setShowRoleWizard(false);
         setRoleStep(1);
         setNewRole({
@@ -197,9 +200,12 @@ export default function DepartmentsPage() {
         });
         await loadDeptDetails(selectedDept.id);
         fetchDepartments();
+      } else {
+        toast.error("Failed to create position", "Could not add role to department.");
       }
     } catch (err) {
       console.error("Failed to create position", err);
+      toast.error("Network error", "Unable to create position.");
     } finally {
       setIsSubmittingRole(false);
     }

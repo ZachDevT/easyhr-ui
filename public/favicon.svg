@@ -1,0 +1,39 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="easyhr-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#9B2DFF" />
+      <stop offset="100%" stopColor="#FF3EA5" />
+    </linearGradient>
+    <radialGradient id="easyhr-shine" cx="25%" cy="18%" r="55%" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+      <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+    </radialGradient>
+    <clipPath id="easyhr-clip">
+      <rect x="10" y="0" width="30" height="40" />
+    </clipPath>
+  </defs>
+
+  <!-- Background rounded card -->
+  <rect width="40" height="40" rx="10" fill="url(#easyhr-bg)" />
+  <rect width="40" height="40" rx="10" fill="url(#easyhr-shine)" />
+
+  <!-- Subtle corner sparkles -->
+  <circle cx="31" cy="8" r="1" fill="white" opacity="0.28" />
+  <circle cx="35" cy="8" r="1" fill="white" opacity="0.2" />
+  <circle cx="31" cy="12" r="1" fill="white" opacity="0.2" />
+  <circle cx="35" cy="12" r="1" fill="white" opacity="0.14" />
+  <circle cx="31" cy="28" r="1" fill="white" opacity="0.2" />
+  <circle cx="35" cy="28" r="1" fill="white" opacity="0.14" />
+  <circle cx="31" cy="32" r="1" fill="white" opacity="0.28" />
+  <circle cx="35" cy="32" r="1" fill="white" opacity="0.2" />
+
+  <!-- E mark bars -->
+  <g clipPath="url(#easyhr-clip)">
+    <rect x="8" y="11" width="24" height="5" rx="2.5" fill="white" />
+    <rect x="8" y="19.5" width="18" height="4.5" rx="2.25" fill="white" />
+    <rect x="8" y="27" width="24" height="5" rx="2.5" fill="white" />
+  </g>
+
+  <!-- Spine guideline -->
+  <rect x="10" y="11" width="2" height="21" fill="white" opacity="0.35" />
+</svg>

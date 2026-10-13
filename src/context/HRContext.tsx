@@ -1,7 +1,9 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/api";
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "@/components/ui/Toast";
 
 export type Candidate = {
   id: string;
@@ -99,7 +101,7 @@ export function HRProvider({ children }: { children: ReactNode }) {
       const token = await getToken();
       if (!token) return;
 
-      const res = await fetch("http://localhost:8080/api/v1/hiring/applicants", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/hiring/applicants`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -150,7 +152,7 @@ export function HRProvider({ children }: { children: ReactNode }) {
       if (!token) return;
 
       const backendStatus = STAGE_TO_BACKEND[stage] || stage.toLowerCase();
-      await fetch(`http://localhost:8080/api/v1/hiring/applicants/${id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/hiring/applicants/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -158,8 +160,16 @@ export function HRProvider({ children }: { children: ReactNode }) {
         },
         body: JSON.stringify({ status: backendStatus }),
       });
+
+      if (res.ok) {
+        toast.success("Candidate stage updated", `Moved to ${stage}.`);
+      } else {
+        toast.error("Failed to update candidate", "Server rejected stage transition.");
+        fetchCandidates();
+      }
     } catch (err) {
       console.error("Failed to update candidate status", err);
+      toast.error("Network error", "Unable to update candidate stage.");
       fetchCandidates();
     }
   };
@@ -173,7 +183,7 @@ export function HRProvider({ children }: { children: ReactNode }) {
       const firstName = parts[0] || "New";
       const lastName = parts.slice(1).join(" ") || "Candidate";
 
-      await fetch(`http://localhost:8080/api/v1/public/jobs/${candidate.jobId}/apply`, {
+      await fetch(`${API_BASE_URL}/api/v1/public/jobs/${candidate.jobId}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -216,6 +226,8 @@ export function HRProvider({ children }: { children: ReactNode }) {
       }
       return updated;
     });
+
+    toast.success("Onboarding started", `Onboarding workflow started for ${candidate.name}.`);
   };
 
   const toggleOnboardingTask = (recordId: string, taskId: string) => {
@@ -259,12 +271,14 @@ export function HRProvider({ children }: { children: ReactNode }) {
       return updated;
     });
 
+    toast.success("Onboarding completed", `Onboarding finished for ${record.name}.`);
+
     // If employeeId is attached, activate in backend
     if (record.employeeId) {
       try {
         const token = await getToken();
         if (token) {
-          await fetch(`http://localhost:8080/api/v1/employees/${record.employeeId}/activate`, {
+          await fetch(`${API_BASE_URL}/api/v1/employees/${record.employeeId}/activate`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
           });
