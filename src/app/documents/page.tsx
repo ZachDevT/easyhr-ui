@@ -24,6 +24,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { toast } from "@/components/ui/Toast";
 import { useAuth } from "@clerk/nextjs";
+import { useRole } from "@/context/RoleContext";
 import { API_BASE_URL } from "@/lib/api";
 
 interface OrgDocument {
@@ -48,6 +49,7 @@ interface OrgEmployee {
 
 export default function DocumentsPage() {
   const { getToken } = useAuth();
+  const { isHRAdmin, isEmployee, currentUser } = useRole();
   const [documents, setDocuments] = useState<OrgDocument[]>([]);
   const [employees, setEmployees] = useState<OrgEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,38 +172,94 @@ export default function DocumentsPage() {
     }
   };
 
-  const filteredDocs = useMemo(() => {
-    if (!query.trim()) return documents;
-    const q = query.toLowerCase();
+  const visibleDocs = useMemo(() => {
+    if (isHRAdmin) return documents;
     return documents.filter(
+      (d) =>
+        d.employeeId === currentUser.id ||
+        (d.employeeName &&
+          currentUser.firstName &&
+          d.employeeName.toLowerCase().includes(currentUser.firstName.toLowerCase()))
+    );
+  }, [documents, isHRAdmin, currentUser]);
+
+  const filteredDocs = useMemo(() => {
+    if (!query.trim()) return visibleDocs;
+    const q = query.toLowerCase();
+    return visibleDocs.filter(
       (d) =>
         d.filename.toLowerCase().includes(q) ||
         (d.employeeName || "").toLowerCase().includes(q) ||
         d.category.toLowerCase().includes(q)
     );
-  }, [documents, query]);
+  }, [visibleDocs, query]);
 
-  const contractsCount = documents.filter((d) => d.category.toLowerCase().includes("contract")).length;
-  const identityCount = documents.filter((d) => d.category.toLowerCase().includes("identity")).length;
+  const contractsCount = visibleDocs.filter((d) => d.category.toLowerCase().includes("contract")).length;
+  const identityCount = visibleDocs.filter((d) => d.category.toLowerCase().includes("identity")).length;
 
   return (
     <>
       <PageHeader
-        title="Employee Documents"
-        subtitle="Secure records, contracts, identity verifications, and compliance files."
+        title={isHRAdmin ? "Employee Documents" : "My Documents & Files"}
+        subtitle={
+          isHRAdmin
+            ? "Secure records, contracts, identity verifications, and compliance files."
+            : "Review documents and files associated with your employment record."
+        }
         icon={<FolderOpen size={28} />}
         actions={
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="btn-primary"
-            style={{ background: "white", color: "var(--primary)" }}
-          >
-            <Plus size={16} /> Add Document
-          </button>
+          isHRAdmin ? (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="btn-primary"
+              style={{ background: "white", color: "var(--primary)" }}
+            >
+              <Plus size={16} /> Add Document
+            </button>
+          ) : (
+            <Link
+              href="/my-signatures"
+              className="btn-primary"
+              style={{ background: "white", color: "var(--primary)", textDecoration: "none" }}
+            >
+              My Signatures & Docs
+            </Link>
+          )
         }
       />
 
       <main style={{ padding: "0 24px 32px" }}>
+        {!isHRAdmin && (
+          <div
+            style={{
+              background: "white",
+              border: "1px solid var(--border)",
+              borderRadius: 14,
+              padding: "18px 24px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 20,
+              boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--text-1)", fontSize: 15 }}>
+                Documents Requested for Your Signature
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-4)", marginTop: 4 }}>
+                Company policies and employment contracts awaiting your electronic signature are located in your personal E-Signature hub.
+              </div>
+            </div>
+            <Link
+              href="/my-signatures"
+              className="btn-primary"
+              style={{ textDecoration: "none", whiteSpace: "nowrap", marginLeft: 20 }}
+            >
+              Go to My Signatures
+            </Link>
+          </div>
+        )}
         <StatRibbon
           stats={[
             {

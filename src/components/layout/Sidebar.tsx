@@ -121,8 +121,8 @@ export function Sidebar() {
             { label: "Overview", href: "/dashboard" },
             { label: "Organization Chart", href: "/org-chart" },
             { label: "People Directory", href: "/people" },
-            { label: "Company Documents", href: "/documents" },
-            { label: "Policies & Handbook", href: "/policies" },
+            { label: "My Signatures & Docs", href: "/my-signatures" },
+            { label: "Company Handbook", href: "/policies" },
           ],
         },
         {

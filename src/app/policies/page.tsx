@@ -25,6 +25,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { toast } from "@/components/ui/Toast";
+import { useRole } from "@/context/RoleContext";
 
 interface PolicyItem {
   id: string;
@@ -40,6 +41,7 @@ const CATEGORIES = ["General", "Operations", "Security", "Compliance", "Time Off
 
 export default function PoliciesPage() {
   const { getToken } = useAuth();
+  const { isHRAdmin } = useRole();
   const [activeTab, setActiveTab] = useState("Policy Library");
   const [policies, setPolicies] = useState<PolicyItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -127,22 +129,24 @@ export default function PoliciesPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         actions={
-          <button
-            className="btn-secondary"
-            onClick={() => setIsModalOpen(true)}
-            style={{
-              background: "white",
-              color: "var(--primary)",
-              border: "none",
-              padding: "12px 24px",
-              fontSize: 14,
-              fontWeight: 700,
-              borderRadius: 20,
-              cursor: "pointer",
-            }}
-          >
-            <UploadCloud size={16} style={{ marginRight: 8 }} /> Add Policy
-          </button>
+          isHRAdmin ? (
+            <button
+              className="btn-secondary"
+              onClick={() => setIsModalOpen(true)}
+              style={{
+                background: "white",
+                color: "var(--primary)",
+                border: "none",
+                padding: "12px 24px",
+                fontSize: 14,
+                fontWeight: 700,
+                borderRadius: 20,
+                cursor: "pointer",
+              }}
+            >
+              <UploadCloud size={16} style={{ marginRight: 8 }} /> Add Policy
+            </button>
+          ) : undefined
         }
       />
 
@@ -236,12 +240,16 @@ export default function PoliciesPage() {
                   <div>
                     <h3 className="text-lg fw-700 text-1 mb-4">No policies in repository</h3>
                     <p className="text-sm text-4 m-0">
-                      Upload your employee handbook, code of conduct, or IT security rules.
+                      {isHRAdmin
+                        ? "Upload your employee handbook, code of conduct, or IT security rules."
+                        : "Company policies and handbooks will appear here once published by HR."}
                     </p>
                   </div>
-                  <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-                    <Plus size={16} /> Add First Policy
-                  </button>
+                  {isHRAdmin && (
+                    <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                      <Plus size={16} /> Add First Policy
+                    </button>
+                  )}
                 </CardBody>
               </Card>
             ) : (
@@ -391,95 +399,97 @@ export default function PoliciesPage() {
       </div>
 
       {/* Create Policy Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Add Company Policy"
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-              Policy Title
-            </label>
-            <Input
-              placeholder="e.g. Employee Handbook 2026, Remote Work Policy"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-              Category
-            </label>
-            <Select
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "12px",
-              borderRadius: 8,
-              background: "var(--bg-page)",
-              cursor: "pointer",
-            }}
-            onClick={() => setNewRequiresSig(!newRequiresSig)}
-          >
-            <input
-              type="checkbox"
-              checked={newRequiresSig}
-              onChange={(e) => setNewRequiresSig(e.target.checked)}
-              style={{ cursor: "pointer" }}
-            />
+      {isHRAdmin && (
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Add Company Policy"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>
-                Require employee digital signature
-              </div>
-              <div style={{ fontSize: 11, color: "var(--text-4)" }}>
-                Requires new and existing employees to sign during onboarding and compliance reviews
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                Policy Title
+              </label>
+              <Input
+                placeholder="e.g. Employee Handbook 2026, Remote Work Policy"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                Category
+              </label>
+              <Select
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "12px",
+                borderRadius: 8,
+                background: "var(--bg-page)",
+                cursor: "pointer",
+              }}
+              onClick={() => setNewRequiresSig(!newRequiresSig)}
+            >
+              <input
+                type="checkbox"
+                checked={newRequiresSig}
+                onChange={(e) => setNewRequiresSig(e.target.checked)}
+                style={{ cursor: "pointer" }}
+              />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>
+                  Require employee digital signature
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-4)" }}>
+                  Requires new and existing employees to sign during onboarding and compliance reviews
+                </div>
               </div>
             </div>
-          </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 12,
-              marginTop: 12,
-              borderTop: "1px solid var(--border)",
-              paddingTop: 16,
-            }}
-          >
-            <button
-              className="btn-neutral"
-              onClick={() => setIsModalOpen(false)}
-              disabled={isSubmitting}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 12,
+                marginTop: 12,
+                borderTop: "1px solid var(--border)",
+                paddingTop: 16,
+              }}
             >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              onClick={handleCreatePolicy}
-              disabled={!newTitle.trim() || isSubmitting}
-            >
-              {isSubmitting && <Loader2 size={14} className="spin mr-4" />}
-              Publish Policy
-            </button>
+              <button
+                className="btn-neutral"
+                onClick={() => setIsModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleCreatePolicy}
+                disabled={!newTitle.trim() || isSubmitting}
+              >
+                {isSubmitting && <Loader2 size={14} className="spin mr-4" />}
+                Publish Policy
+              </button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 }
