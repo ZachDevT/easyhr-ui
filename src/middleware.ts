@@ -10,7 +10,8 @@ const isPublicRoute = createRouteMatcher([
   '/contact(.*)',
   '/auth/(.*)',
   '/sso-callback',
-  '/api/public/(.*)'
+  '/api/public/(.*)',
+  '/api/inbound(.*)'
 ]);
 
 const isAuthRoute = createRouteMatcher([
