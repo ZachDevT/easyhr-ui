@@ -15,6 +15,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Modal } from "@/components/ui/Modal";
 import { AttendanceSkeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
+import { useRole } from "@/context/RoleContext";
 
 export interface LiveAttendanceItem {
   employeeId: string;
@@ -35,11 +36,23 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 
 export default function AttendancePage() {
   const { getToken, isSignedIn } = useAuth();
+  const { isHRAdmin, isManager, currentUser } = useRole();
   const [activeTab, setActiveTab] = useState("Live Attendance");
   const [records, setRecords] = useState<LiveAttendanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPunching, setIsPunching] = useState(false);
   const [punchMessage, setPunchMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const myRecord = useMemo(() => {
+    const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim().toLowerCase();
+    return (
+      records.find(
+        (r) =>
+          r.employeeId === currentUser.id ||
+          (fullName && r.employeeName.toLowerCase().includes(fullName))
+      ) || (records.length > 0 && !isHRAdmin && !isManager ? records[0] : null)
+    );
+  }, [records, currentUser, isHRAdmin, isManager]);
 
   // Filters & Controls
   const [searchTerm, setSearchTerm] = useState("");
@@ -270,9 +283,13 @@ export default function AttendancePage() {
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
       <PageHeader 
-        title="Live Team Attendance"
-        subtitle="Real-time employee punches, timesheet monitoring, and manager overrides."
-        tabs={TABS}
+        title={isHRAdmin || isManager ? "Live Team Attendance" : "Punch Clock & Attendance"}
+        subtitle={
+          isHRAdmin || isManager
+            ? "Real-time employee punches, timesheet monitoring, and manager overrides."
+            : "Record daily punches, track working hours, and review personal attendance logs."
+        }
+        tabs={isHRAdmin || isManager ? TABS : undefined}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
@@ -400,7 +417,94 @@ export default function AttendancePage() {
               </div>
             )}
 
-            {activeTab === "Live Attendance" && (
+            {!isHRAdmin && !isManager ? (
+              <div className="col gap-24">
+                {/* Personal Daily Summary Cards */}
+                <div className="grid-3 gap-16">
+                  <Card style={{ borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                    <CardBody style={{ padding: "20px 24px" }}>
+                      <div className="text-xs uppercase fw-700 text-4 mb-8">Today's Status</div>
+                      <div className="row-between align-center">
+                        <div className="text-xl fw-800 text-1">
+                          {myRecord?.status === "clocked_in" ? "Clocked In" : myRecord?.status === "clocked_out" ? "Clocked Out" : "Not Clocked In"}
+                        </div>
+                        {myRecord && renderStatusBadge(myRecord.status)}
+                      </div>
+                      <p className="text-xs text-4 mt-6">
+                        {myRecord?.status === "clocked_in"
+                          ? "Currently working. Remember to clock out when ending your shift."
+                          : "Use the punch buttons above to record your shift."}
+                      </p>
+                    </CardBody>
+                  </Card>
+
+                  <Card style={{ borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                    <CardBody style={{ padding: "20px 24px" }}>
+                      <div className="text-xs uppercase fw-700 text-4 mb-8">Punches Today</div>
+                      <div className="col gap-6">
+                        <div className="row-between text-sm">
+                          <span className="text-4 row gap-6"><MonitorPlay size={14} className="text-success" /> First Clock In:</span>
+                          <span className="fw-700 text-1">{formatTime(myRecord?.clockInAt)}</span>
+                        </div>
+                        <div className="row-between text-sm">
+                          <span className="text-4 row gap-6"><MonitorStop size={14} className="text-4" /> Last Clock Out:</span>
+                          <span className="fw-700 text-1">{formatTime(myRecord?.clockOutAt)}</span>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
+
+                  <Card style={{ borderRadius: 16, border: "1px solid var(--border)", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                    <CardBody style={{ padding: "20px 24px" }}>
+                      <div className="text-xs uppercase fw-700 text-4 mb-8">Total Logged Today</div>
+                      <div className="text-2xl fw-800 text-primary">
+                        {getWorkedDuration(myRecord?.clockInAt, myRecord?.clockOutAt) || "--"}
+                      </div>
+                      <p className="text-xs text-4 mt-6">Active tracked working time for today.</p>
+                    </CardBody>
+                  </Card>
+                </div>
+
+                {/* Personal Attendance Record Table */}
+                <Card style={{ borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden" }}>
+                  <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <h3 className="m-0 text-base fw-700 text-1">My Daily Punch Record</h3>
+                      <p className="m-0 text-xs text-4 mt-2">Verified time logs for this payroll cycle</p>
+                    </div>
+                    <Badge variant="neutral">{new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</Badge>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                    <thead style={{ background: "#F9FAFB", borderBottom: "1px solid var(--border)" }}>
+                      <tr style={{ color: "var(--text-4)", fontSize: 12, textTransform: "uppercase" }}>
+                        <th style={{ padding: "14px 24px", fontWeight: 700 }}>Date</th>
+                        <th style={{ padding: "14px 20px", fontWeight: 700 }}>Clock In</th>
+                        <th style={{ padding: "14px 20px", fontWeight: 700 }}>Clock Out</th>
+                        <th style={{ padding: "14px 20px", fontWeight: 700 }}>Duration</th>
+                        <th style={{ padding: "14px 24px", fontWeight: 700, textAlign: "right" }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "16px 24px", fontSize: 13, fontWeight: 600 }}>
+                          {new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} (Today)
+                        </td>
+                        <td style={{ padding: "16px 20px", fontSize: 13, fontWeight: 600 }}>{formatTime(myRecord?.clockInAt)}</td>
+                        <td style={{ padding: "16px 20px", fontSize: 13, fontWeight: 600 }}>{formatTime(myRecord?.clockOutAt)}</td>
+                        <td style={{ padding: "16px 20px", fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
+                          {getWorkedDuration(myRecord?.clockInAt, myRecord?.clockOutAt) || "--"}
+                        </td>
+                        <td style={{ padding: "16px 24px", textAlign: "right" }}>
+                          {renderStatusBadge(myRecord?.status || "absent")}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </Card>
+              </div>
+            ) : (
+              <>
+                {activeTab === "Live Attendance" && (
               <div>
                 {/* Stats & Filters Bar */}
                 <div className="row-between mb-24" style={{ flexWrap: "wrap", gap: 16 }}>
@@ -617,6 +721,8 @@ export default function AttendancePage() {
                   </table>
                 </Card>
               </div>
+            )}
+              </>
             )}
           </>
         )}

@@ -3,6 +3,7 @@
 import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useRole } from "@/context/RoleContext";
 import { toast } from "@/components/ui/Toast";
 import {
   Palmtree,
@@ -269,6 +270,7 @@ function DataTable({
 
 export default function TimeOffPage() {
   const { getToken, isSignedIn } = useAuth();
+  const { isHRAdmin, isManager } = useRole();
 
   const [activeTab, setActiveTab] = useState<"my_leave" | "hr_management">("my_leave");
   const [currentEmployeeId, setCurrentEmployeeId] = useState("");
@@ -826,8 +828,12 @@ export default function TimeOffPage() {
       }}
     >
       <PageHeader
-        title="Leave & Time Off"
-        subtitle="Manage leave types, policies, monthly accruals, and employee time-off requests."
+        title={isHRAdmin || isManager ? "Leave & Time Off Management" : "My Time Off & Leaves"}
+        subtitle={
+          isHRAdmin || isManager
+            ? "Manage leave types, policies, monthly accruals, and employee time-off requests."
+            : "Request time off, track approvals, and check your available leave balances."
+        }
         icon={<Palmtree size={26} style={{ color: "var(--primary)" }} />}
         actions={
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -893,28 +899,29 @@ export default function TimeOffPage() {
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div
-          style={{
-            display: "flex",
-            borderBottom: "1.5px solid var(--card-border)",
-            gap: 0,
-            marginBottom: 28,
-          }}
-        >
-          {(
-            [
-              { key: "my_leave", label: "My Balances & Requests", icon: <CalendarHeart size={15} /> },
-              {
-                key: "hr_management",
-                label: "HR Management & Policies",
-                icon: <Sliders size={15} />,
-              },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+        {/* Tab Navigation (only if HR or Manager) */}
+        {(isHRAdmin || isManager) && (
+          <div
+            style={{
+              display: "flex",
+              borderBottom: "1.5px solid var(--card-border)",
+              gap: 0,
+              marginBottom: 28,
+            }}
+          >
+            {(
+              [
+                { key: "my_leave", label: "My Balances & Requests", icon: <CalendarHeart size={15} /> },
+                {
+                  key: "hr_management",
+                  label: "HR Management & Policies",
+                  icon: <Sliders size={15} />,
+                },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
               style={{
                 padding: "11px 20px",
                 fontSize: 13.5,
@@ -954,6 +961,7 @@ export default function TimeOffPage() {
             </button>
           ))}
         </div>
+      )}
 
         {/* Skeleton loader */}
         {isLoading && (

@@ -25,6 +25,11 @@ import {
   ShieldCheck,
   Loader2,
   ExternalLink,
+  Video,
+  Play,
+  Save,
+  Sliders,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -37,6 +42,21 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useHR } from "@/context/HRContext";
 import { toast } from "@/components/ui/Toast";
+import { getVideoEmbedUrl } from "@/lib/videoEmbed";
+
+export interface OnboardingSettings {
+  welcomeTitle: string;
+  welcomeMessage: string;
+  welcomeVideoUrl: string;
+  welcomeVideoRequired: boolean;
+  requireBioAndAvatar: boolean;
+  requireCultureFavorites: boolean;
+  requireDirectDeposit: boolean;
+  requireHandbook: boolean;
+  handbookTitle: string;
+  handbookUrl: string;
+  handbookContent: string;
+}
 
 interface Department {
   id: string;
@@ -58,6 +78,74 @@ export default function HrOnboardingPage() {
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [selectedDeptId, setSelectedDeptId] = useState("");
   const [isLaunching, setIsLaunching] = useState(false);
+
+  // Dynamic Onboarding Settings state
+  const [onboardingSettings, setOnboardingSettings] = useState<OnboardingSettings>({
+    welcomeTitle: "Welcome to the Team",
+    welcomeMessage: "We are excited to have you join our team. Let's get your profile set up.",
+    welcomeVideoUrl: "",
+    welcomeVideoRequired: false,
+    requireBioAndAvatar: true,
+    requireCultureFavorites: true,
+    requireDirectDeposit: true,
+    requireHandbook: true,
+    handbookTitle: "Employee Handbook & Code of Conduct",
+    handbookUrl: "",
+    handbookContent: "Welcome to our organization! As a member of our team, we uphold high standards of integrity, excellence, and mutual respect. Please review and acknowledge our policies.",
+  });
+  const [isSettingsLoading, setIsSettingsLoading] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      setIsSettingsLoading(true);
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/v1/onboarding/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setOnboardingSettings(json);
+      }
+    } catch (err) {
+      console.error("Failed to load onboarding settings", err);
+    } finally {
+      setIsSettingsLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const handleSaveSettings = async () => {
+    try {
+      setIsSavingSettings(true);
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/onboarding/settings`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(onboardingSettings),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Failed to update onboarding settings");
+      }
+
+      toast.success("Settings saved", "Onboarding flow configuration updated for all new hires.");
+    } catch (err: any) {
+      toast.error("Save failed", err.message || "Failed to update onboarding settings");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   useEffect(() => {
     async function loadDepts() {
@@ -198,7 +286,7 @@ export default function HrOnboardingPage() {
         <PageHeader
           title="Employee Onboarding"
           subtitle="Guide new hires through their transition into your organization."
-          tabs={["New Hires", "Today's Agenda", "Documents & Setup"]}
+          tabs={["New Hires", "Today's Agenda", "Setup & Customization"]}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           actions={
@@ -520,20 +608,274 @@ export default function HrOnboardingPage() {
           </div>
         )}
 
-        {/* ---------------- DOCUMENTS TAB ---------------- */}
-        {activeTab === "Documents & Setup" && (
-          <div className="col gap-24">
-            <h2 className="text-xl fw-800 text-1 m-0">Standard Compliance Packets</h2>
-            <div className="grid-3 gap-20">
-              {["Employment Agreement", "Direct Deposit Form", "Company Code of Conduct"].map((doc, idx) => (
-                <Card key={idx} style={{ borderRadius: 16 }}>
-                  <CardBody className="col gap-12">
-                    <FileText size={24} className="text-primary" />
-                    <h3 className="text-base fw-700 text-1 m-0">{doc}</h3>
-                    <p className="text-xs text-4 m-0">Automatically requested during new hire workflow.</p>
-                  </CardBody>
-                </Card>
-              ))}
+        {/* ---------------- SETUP & CUSTOMIZATION TAB ---------------- */}
+        {activeTab === "Setup & Customization" && (
+          <div className="col gap-24" style={{ maxWidth: 900, margin: "0 auto" }}>
+            <div className="row-between align-center">
+              <div>
+                <h2 className="text-xl fw-800 text-1 m-0">Onboarding Flow Customization</h2>
+                <p className="text-sm text-5 m-0 mt-4">
+                  Configure the dynamic steps, CEO welcome video, culture prompts, and compliance handbooks for all new hires.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-primary row gap-8 align-center"
+                onClick={handleSaveSettings}
+                disabled={isSavingSettings}
+                style={{
+                  background: "var(--gradient)",
+                  padding: "10px 24px",
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
+                }}
+              >
+                {isSavingSettings ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                <span>Save Configuration</span>
+              </button>
+            </div>
+
+            {/* 1. Welcome & Leadership Video */}
+            <Card style={{ borderRadius: 16 }}>
+              <CardBody className="col gap-20" style={{ padding: 28 }}>
+                <div className="row gap-12 align-center">
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(124, 58, 237, 0.1)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Video size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base fw-700 text-1 m-0">Welcome Greeting & Video</h3>
+                    <p className="text-xs text-4 m-0 mt-2">First impression for new employees when they open their portal.</p>
+                  </div>
+                </div>
+
+                <div className="grid-2 gap-16">
+                  <div className="col gap-6">
+                    <label className="text-xs fw-700 text-2 uppercase">Welcome Title</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={onboardingSettings.welcomeTitle}
+                      onChange={(e) => setOnboardingSettings({ ...onboardingSettings, welcomeTitle: e.target.value })}
+                      placeholder="Welcome to the Team"
+                    />
+                  </div>
+                  <div className="col gap-6">
+                    <label className="text-xs fw-700 text-2 uppercase">Welcome Video URL (Optional)</label>
+                    <input
+                      type="url"
+                      className="input"
+                      value={onboardingSettings.welcomeVideoUrl}
+                      onChange={(e) => setOnboardingSettings({ ...onboardingSettings, welcomeVideoUrl: e.target.value })}
+                      placeholder="https://www.youtube.com/watch?v=... or Loom / Vimeo link"
+                    />
+                  </div>
+                </div>
+
+                <div className="col gap-6">
+                  <label className="text-xs fw-700 text-2 uppercase">Welcome Message / CEO Note</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={onboardingSettings.welcomeMessage}
+                    onChange={(e) => setOnboardingSettings({ ...onboardingSettings, welcomeMessage: e.target.value })}
+                    placeholder="We are thrilled to welcome you to our organization..."
+                    style={{ resize: "vertical" }}
+                  />
+                </div>
+
+                <div className="row gap-12 align-center p-12 bg-neutral" style={{ borderRadius: 10, border: "1px solid var(--border)" }}>
+                  <input
+                    type="checkbox"
+                    id="welcomeVideoRequired"
+                    checked={onboardingSettings.welcomeVideoRequired}
+                    onChange={(e) => setOnboardingSettings({ ...onboardingSettings, welcomeVideoRequired: e.target.checked })}
+                    style={{ width: 16, height: 16, accentColor: "var(--primary)", cursor: "pointer" }}
+                  />
+                  <label htmlFor="welcomeVideoRequired" className="text-sm fw-600 text-1" style={{ cursor: "pointer" }}>
+                    Make watching or acknowledging the welcome video mandatory before proceeding to Step 2
+                  </label>
+                </div>
+
+                {/* Video Preview */}
+                {onboardingSettings.welcomeVideoUrl && (() => {
+                  const videoData = getVideoEmbedUrl(onboardingSettings.welcomeVideoUrl);
+                  return (
+                    <div className="col gap-8 pt-8">
+                      <span className="text-xs fw-700 text-4 uppercase">Live Video Preview</span>
+                      {videoData?.type === "iframe" && (
+                        <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", borderRadius: 12, border: "1px solid var(--border)" }}>
+                          <iframe
+                            src={videoData.embedUrl}
+                            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
+                      {videoData?.type === "video" && (
+                        <video
+                          src={videoData.embedUrl}
+                          controls
+                          style={{ width: "100%", maxHeight: 360, borderRadius: 12, border: "1px solid var(--border)", background: "#000" }}
+                        />
+                      )}
+                      {videoData?.type === "link" && (
+                        <a
+                          href={videoData.embedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-12 row gap-8 align-center text-sm fw-600 text-primary"
+                          style={{ background: "#F5F3FF", borderRadius: 8, textDecoration: "none" }}
+                        >
+                          <ExternalLink size={16} /> Open External Video Link ({videoData.embedUrl})
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardBody>
+            </Card>
+
+            {/* 2. Profile & Culture Requirements */}
+            <Card style={{ borderRadius: 16 }}>
+              <CardBody className="col gap-20" style={{ padding: 28 }}>
+                <div className="row gap-12 align-center">
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(16, 185, 129, 0.1)", color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Sliders size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base fw-700 text-1 m-0">Required Profile & Team Culture Steps</h3>
+                    <p className="text-xs text-4 m-0 mt-2">Toggle optional vs required components for your organization.</p>
+                  </div>
+                </div>
+
+                <div className="col gap-12">
+                  <label className="row-between align-center p-14 bg-neutral" style={{ borderRadius: 10, border: "1px solid var(--border)", cursor: "pointer" }}>
+                    <div className="col gap-2">
+                      <span className="text-sm fw-700 text-1">Require Avatar Photo & Bio</span>
+                      <span className="text-xs text-4">Employee must upload a profile picture and provide a short bio.</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={onboardingSettings.requireBioAndAvatar}
+                      onChange={(e) => setOnboardingSettings({ ...onboardingSettings, requireBioAndAvatar: e.target.checked })}
+                      style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
+                    />
+                  </label>
+
+                  <label className="row-between align-center p-14 bg-neutral" style={{ borderRadius: 10, border: "1px solid var(--border)", cursor: "pointer" }}>
+                    <div className="col gap-2">
+                      <span className="text-sm fw-700 text-1">Require Team Culture & Fun Facts</span>
+                      <span className="text-xs text-4">Includes T-shirt size, favorite food, movies/shows, music, coffee/tea, and superpower.</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={onboardingSettings.requireCultureFavorites}
+                      onChange={(e) => setOnboardingSettings({ ...onboardingSettings, requireCultureFavorites: e.target.checked })}
+                      style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
+                    />
+                  </label>
+
+                  <label className="row-between align-center p-14 bg-neutral" style={{ borderRadius: 10, border: "1px solid var(--border)", cursor: "pointer" }}>
+                    <div className="col gap-2">
+                      <span className="text-sm fw-700 text-1">Require Direct Deposit & Banking Information</span>
+                      <span className="text-xs text-4">Collect payment method, bank name, routing number, and account number.</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={onboardingSettings.requireDirectDeposit}
+                      onChange={(e) => setOnboardingSettings({ ...onboardingSettings, requireDirectDeposit: e.target.checked })}
+                      style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
+                    />
+                  </label>
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* 3. Employee Handbook & Digital Sign-off */}
+            <Card style={{ borderRadius: 16 }}>
+              <CardBody className="col gap-20" style={{ padding: 28 }}>
+                <div className="row-between align-center">
+                  <div className="row gap-12 align-center">
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(59, 130, 246, 0.1)", color: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base fw-700 text-1 m-0">Employee Handbook & Policies</h3>
+                      <p className="text-xs text-4 m-0 mt-2">Configure document requirements and legally binding acknowledgment.</p>
+                    </div>
+                  </div>
+                  <label className="row gap-8 align-center" style={{ cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={onboardingSettings.requireHandbook}
+                      onChange={(e) => setOnboardingSettings({ ...onboardingSettings, requireHandbook: e.target.checked })}
+                      style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
+                    />
+                    <span className="text-sm fw-700 text-1">Require Handbook Sign-off</span>
+                  </label>
+                </div>
+
+                {onboardingSettings.requireHandbook && (
+                  <div className="col gap-16 pt-8">
+                    <div className="grid-2 gap-16">
+                      <div className="col gap-6">
+                        <label className="text-xs fw-700 text-2 uppercase">Handbook Title</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={onboardingSettings.handbookTitle}
+                          onChange={(e) => setOnboardingSettings({ ...onboardingSettings, handbookTitle: e.target.value })}
+                          placeholder="Employee Handbook & Code of Conduct"
+                        />
+                      </div>
+                      <div className="col gap-6">
+                        <label className="text-xs fw-700 text-2 uppercase">External Handbook Document URL (Optional)</label>
+                        <input
+                          type="url"
+                          className="input"
+                          value={onboardingSettings.handbookUrl}
+                          onChange={(e) => setOnboardingSettings({ ...onboardingSettings, handbookUrl: e.target.value })}
+                          placeholder="https://notion.so/... or Google Drive / PDF link"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col gap-6">
+                      <label className="text-xs fw-700 text-2 uppercase">Policy Guidelines & Conduct Summary</label>
+                      <textarea
+                        className="input"
+                        rows={4}
+                        value={onboardingSettings.handbookContent}
+                        onChange={(e) => setOnboardingSettings({ ...onboardingSettings, handbookContent: e.target.value })}
+                        placeholder="Welcome to our organization! As a member of our team, we uphold high standards of integrity, excellence, and mutual respect..."
+                        style={{ resize: "vertical" }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+
+            <div className="row justify-end pb-32">
+              <button
+                type="button"
+                className="btn-primary row gap-8 align-center"
+                onClick={handleSaveSettings}
+                disabled={isSavingSettings}
+                style={{
+                  background: "var(--gradient)",
+                  padding: "12px 32px",
+                  borderRadius: 12,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
+                }}
+              >
+                {isSavingSettings ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                <span>Save All Onboarding Settings</span>
+              </button>
             </div>
           </div>
         )}

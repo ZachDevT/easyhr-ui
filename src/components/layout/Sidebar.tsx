@@ -131,7 +131,7 @@ export function Sidebar() {
           icon: <Palmtree size={17} strokeWidth={2.2} />,
           children: [
             { label: "Leave Requests", href: "/time-off" },
-            { label: "Live Attendance", href: "/attendance" },
+            { label: "Punch Clock & Attendance", href: "/attendance" },
             { label: "My Timesheet", href: "/time" },
           ],
         },
