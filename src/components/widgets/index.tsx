@@ -50,13 +50,13 @@ export function CompulsoryMyTimeWidget() {
   const [clockModal, setClockModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeProject, setActiveProject] = useState('Production');
-  const [isClocked, setIsClocked] = useState(timeSummary.isClocked);
+  const [isClocked, setIsClocked] = useState(false);
   const [clockedAt, setClockedAt] = useState<string | null>(null);
+  const [todayDuration, setTodayDuration] = useState('0h 00m');
 
   const toggleClock = () => {
     const next = !isClocked;
     setIsClocked(next);
-    timeSummary.isClocked = next;
     const formatted = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date());
     setClockedAt(next ? formatted : null);
     if (next) {
@@ -76,9 +76,9 @@ export function CompulsoryMyTimeWidget() {
             <p className="text-xs text-2">{isClocked ? `Working on ${activeProject}` : 'Not clocked in'}</p>
           </div>
           <p className="gradient-text mt-6 mb-4" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
-            {timeSummary.today}
+            {isClocked ? '0h 01m' : todayDuration}
           </p>
-          <p className="text-xs text-5">{isClocked ? `Started at ${clockedAt ?? '9:00 AM'} · ${activeProject}` : 'Last clocked out: Sep 25 at 5:00 PM'}</p>
+          <p className="text-xs text-5">{isClocked ? `Started at ${clockedAt ?? '9:00 AM'} · ${activeProject}` : 'No active shift today'}</p>
 
           <div className="row gap-8 mt-20" style={{ position: 'relative' }}>
             <button
@@ -211,12 +211,17 @@ export function CompulsoryMyTimeWidget() {
 export function CompulsoryTimeOffWidget() {
   const [modal, setModal] = useState(false);
 
+  const balances = [
+    { type: 'Vacation', hoursUsed: 0 },
+    { type: 'Sick Leave', hoursUsed: 0 },
+  ];
+
   return (
     <Card>
       <CardHeader title="Time Off" icon={<CalendarDays size={16} strokeWidth={2.5} />} />
       <CardBody>
         <div className="row gap-16 mb-20">
-          {timeOffBalances.slice(0, 2).map((b) => (
+          {balances.map((b) => (
             <div key={b.type} style={{ flex: 1, textAlign: 'center' }}>
               {b.type === 'Vacation' ? (
                 <Palmtree size={28} strokeWidth={1.5} style={{ color: 'var(--primary)', margin: '0 auto' }} />
@@ -276,23 +281,7 @@ export function CompulsoryTimeOffWidget() {
   );
 }
 
-const feedItems = [
-  {
-    icon: <UserCircle2 size={16} strokeWidth={2.5} />,
-    title: 'Take a few minutes to complete your Self Assessment.',
-    sub: 'Due Oct 1 (1 day left)',
-  },
-  {
-    icon: <FileSignature size={16} strokeWidth={2.5} />,
-    title: 'Direct Deposit Form is waiting for your signature.',
-    sub: '2 hours ago',
-  },
-  {
-    icon: <Megaphone size={16} strokeWidth={2.5} />,
-    title: 'All Hands Meeting scheduled for Friday, Sep 12 at 3 PM.',
-    sub: 'Yesterday',
-  },
-];
+const feedItems: Array<{ icon: React.ReactNode; title: string; sub: string }> = [];
 
 export function FeedWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
   return (
@@ -304,26 +293,34 @@ export function FeedWidget({ onRemove, preview }: { onRemove?: () => void; previ
         </div>
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
-      <CardBody style={{ padding: '0 20px' }}>
-        {feedItems.map((item, i) => (
-          <div key={i} className="feed-item" style={{ padding: '16px 0', borderBottom: i === feedItems.length - 1 ? 'none' : '1px solid var(--card-border)' }}>
-            <div className="icon-chip" style={{ width: 34, height: 34 }}>{item.icon}</div>
-            <div className="feed-content">
-              <p className="feed-title">{item.title}</p>
-              <p className="feed-sub">{item.sub}</p>
+      <CardBody style={{ padding: feedItems.length === 0 ? '28px 20px' : '0 20px', textAlign: feedItems.length === 0 ? 'center' : 'left' }}>
+        {feedItems.length === 0 ? (
+          <div>
+            <div className="icon-chip" style={{ width: 38, height: 38, margin: '0 auto 10px auto', background: 'var(--primary-tint, #f5f3ff)', color: 'var(--primary, #7c3aed)' }}>
+              <Megaphone size={18} />
             </div>
+            <p className="text-sm fw-600 mb-4">No recent company announcements</p>
+            <p className="text-xs text-5" style={{ maxWidth: 280, margin: '0 auto' }}>
+              Company notices, all-hands meetings, and handbook updates will appear here.
+            </p>
           </div>
-        ))}
+        ) : (
+          feedItems.map((item, i) => (
+            <div key={i} className="feed-item" style={{ padding: '16px 0', borderBottom: i === feedItems.length - 1 ? 'none' : '1px solid var(--card-border)' }}>
+              <div className="icon-chip" style={{ width: 34, height: 34 }}>{item.icon}</div>
+              <div className="feed-content">
+                <p className="feed-title">{item.title}</p>
+                <p className="feed-sub">{item.sub}</p>
+              </div>
+            </div>
+          ))
+        )}
       </CardBody>
     </Card>
   );
 }
 
-const birthdays = [
-  { name: 'Grace Otieno',  date: 'Sep 5',  daysUntil: 0,  avatar: 'https://randomuser.me/api/portraits/women/28.jpg' },
-  { name: 'Brian Ochieng', date: 'Sep 12', daysUntil: 7,  avatar: 'https://randomuser.me/api/portraits/men/52.jpg' },
-  { name: 'Fatuma Ali',    date: 'Sep 25', daysUntil: 20, avatar: 'https://randomuser.me/api/portraits/women/17.jpg' },
-];
+const birthdays: Array<{ name: string; date: string; daysUntil: number; avatar: string }> = [];
 
 export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
   return (
@@ -335,26 +332,38 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
         </div>
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
-      <CardBody style={{ padding: 0 }}>
-        {birthdays.map((b) => (
-          <div key={b.name} className="list-row" style={{ padding: '12px 20px' }}>
-            <Avatar src={b.avatar} name={b.name} size="sm" />
-            <div style={{ flex: 1 }}>
-              <p className="text-sm text-1">{b.name}</p>
-              <p className="text-xs text-5">{b.date}</p>
+      <CardBody style={{ padding: birthdays.length === 0 ? '28px 20px' : 0, textAlign: birthdays.length === 0 ? 'center' : 'left' }}>
+        {birthdays.length === 0 ? (
+          <div>
+            <div className="icon-chip" style={{ width: 38, height: 38, margin: '0 auto 10px auto', background: 'var(--primary-tint, #f5f3ff)', color: 'var(--primary, #7c3aed)' }}>
+              <Gift size={18} />
             </div>
-            {b.daysUntil === 0
-              ? <Badge variant="primary" style={{ fontSize: 11, padding: '2px 8px' }}>Today</Badge>
-              : <span className="text-xs text-5">in {b.daysUntil}d</span>
-            }
+            <p className="text-sm fw-600 mb-4">No upcoming birthdays</p>
+            <p className="text-xs text-5" style={{ maxWidth: 280, margin: '0 auto' }}>
+              Team member birthdays in the next 30 days will be celebrated here.
+            </p>
           </div>
-        ))}
+        ) : (
+          birthdays.map((b) => (
+            <div key={b.name} className="list-row" style={{ padding: '12px 20px' }}>
+              <Avatar src={b.avatar} name={b.name} size="sm" />
+              <div style={{ flex: 1 }}>
+                <p className="text-sm text-1">{b.name}</p>
+                <p className="text-xs text-5">{b.date}</p>
+              </div>
+              {b.daysUntil === 0
+                ? <Badge variant="primary" style={{ fontSize: 11, padding: '2px 8px' }}>Today</Badge>
+                : <span className="text-xs text-5">in {b.daysUntil}d</span>
+              }
+            </div>
+          ))
+        )}
       </CardBody>
     </Card>
   );
 }
 
-const newHires = employees.filter((e) => ['4','6','8'].includes(e.id));
+const newHires: Array<{ id: string; firstName: string; lastName: string; title: string; department: string; avatar?: string }> = [];
 
 export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
   return (
@@ -366,17 +375,29 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
         </div>
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
-      <CardBody style={{ padding: 0 }}>
-        {newHires.map((emp) => (
-          <div key={emp.id} className="list-row" style={{ padding: '12px 20px' }}>
-            <Avatar src={emp.avatar} name={`${emp.firstName} ${emp.lastName}`} size="sm" />
-            <div style={{ flex: 1 }}>
-              <p className="text-sm text-1">{emp.firstName} {emp.lastName}</p>
-              <p className="text-xs text-5">{emp.title} · {emp.department}</p>
+      <CardBody style={{ padding: newHires.length === 0 ? '28px 20px' : 0, textAlign: newHires.length === 0 ? 'center' : 'left' }}>
+        {newHires.length === 0 ? (
+          <div>
+            <div className="icon-chip" style={{ width: 38, height: 38, margin: '0 auto 10px auto', background: 'var(--primary-tint, #f5f3ff)', color: 'var(--primary, #7c3aed)' }}>
+              <UserPlus size={18} />
             </div>
-            <Badge variant="success" style={{ fontSize: 11, padding: '2px 8px' }}>New</Badge>
+            <p className="text-sm fw-600 mb-4">No recent new hires</p>
+            <p className="text-xs text-5" style={{ maxWidth: 280, margin: '0 auto' }}>
+              Recently onboarded team members will be welcomed here.
+            </p>
           </div>
-        ))}
+        ) : (
+          newHires.map((emp) => (
+            <div key={emp.id} className="list-row" style={{ padding: '12px 20px' }}>
+              <Avatar src={emp.avatar} name={`${emp.firstName} ${emp.lastName}`} size="sm" />
+              <div style={{ flex: 1 }}>
+                <p className="text-sm text-1">{emp.firstName} {emp.lastName}</p>
+                <p className="text-xs text-5">{emp.title} · {emp.department}</p>
+              </div>
+              <Badge variant="success" style={{ fontSize: 11, padding: '2px 8px' }}>New</Badge>
+            </div>
+          ))
+        )}
       </CardBody>
     </Card>
   );

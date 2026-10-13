@@ -133,10 +133,12 @@ export default clerkMiddleware(async (auth, req) => {
 
   // 4. Apex / Central Domain Routing (easyhr.pro or localhost:3000)
   if (userId) {
-    // If visiting root '/', redirect to their company workspace or dashboard
-    if (pathname === '/') {
-      const savedWorkspace = req.cookies.get("easyhr_current_workspace")?.value;
-      if (savedWorkspace && slugRegex.test(savedWorkspace) && !RESERVED_SUBDOMAINS.has(savedWorkspace)) {
+    const savedWorkspace = req.cookies.get("easyhr_current_workspace")?.value;
+    const hasValidWorkspace = Boolean(savedWorkspace && slugRegex.test(savedWorkspace) && !RESERVED_SUBDOMAINS.has(savedWorkspace));
+
+    // If visiting root '/' or '/dashboard' on apex, redirect to their company workspace subdomain
+    if (pathname === '/' || pathname === '/dashboard') {
+      if (hasValidWorkspace) {
         const isLocalhost = host.includes("localhost");
         const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
         const target = isLocalhost
@@ -144,7 +146,9 @@ export default clerkMiddleware(async (auth, req) => {
           : `https://${savedWorkspace}.easyhr.pro/dashboard`;
         return NextResponse.redirect(target);
       }
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+      if (pathname === '/') {
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      }
     }
 
     // If accessing sign-in / sign-up while authenticated

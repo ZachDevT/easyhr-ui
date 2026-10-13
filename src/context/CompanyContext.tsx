@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE_URL, getAuthHeaders, getWorkspaceSubdomain, getWorkspaceUrl } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders, getWorkspaceSubdomain, getWorkspaceUrl, extractSubdomain } from "@/lib/api";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { toast } from "@/components/ui/Toast";
@@ -235,13 +235,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           document.cookie = `easyhr_current_workspace=${encodeURIComponent(comp.subdomain)}; Path=/${domainAttr}; SameSite=Lax; max-age=2592000`;
 
           // If on apex domain easyhr.pro or plain localhost:3000, redirect to their workspace subdomain
-          const currentSub = getWorkspaceSubdomain();
-          if (!currentSub && (window.location.hostname === "easyhr.pro" || window.location.hostname === "localhost")) {
+          const hostSub = extractSubdomain(window.location.hostname);
+          if (!hostSub && comp.subdomain && (window.location.hostname === "easyhr.pro" || window.location.hostname === "www.easyhr.pro" || window.location.hostname === "localhost")) {
             const currentPath = window.location.pathname;
-            if (currentPath === "/dashboard" || currentPath.startsWith("/people") || currentPath.startsWith("/hiring")) {
-              window.location.href = getWorkspaceUrl(comp.subdomain, currentPath);
-              return;
-            }
+            window.location.href = getWorkspaceUrl(comp.subdomain, currentPath);
+            return;
           }
         }
 
