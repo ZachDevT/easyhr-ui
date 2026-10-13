@@ -98,6 +98,13 @@ export default function Dashboard() {
             Edit Profile
           </Link>
           <button 
+            className="btn-neutral"
+            onClick={() => setPickerOpen(true)}
+            style={{ padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            Widget Library
+          </button>
+          <button 
             className={isEditing ? "btn-primary" : "widget-manage-btn"} 
             onClick={() => setIsEditing(!isEditing)} 
             style={{ padding: '8px 16px' }}
