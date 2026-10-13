@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders, getWorkspaceSubdomain, getWorkspaceUrl } from "@/lib/api";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { toast } from "@/components/ui/Toast";
@@ -127,11 +127,29 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       const token = await getToken();
       if (!token) return;
 
-      const headers = {
-        Authorization: `Bearer ${token}`,
-      };
+      const headers = getAuthHeaders(token);
+      let res = await fetch(`${API_BASE_URL}/api/v1/me`, { headers });
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/me`, { headers });
+      // If user attempted to access a workspace they do not belong to (HTTP 403 Forbidden)
+      if (res.status === 403) {
+        // Fallback: check their default active membership without the requested workspace selector
+        const fallbackRes = await fetch(`${API_BASE_URL}/api/v1/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          const targetSub = fallbackData.workspace?.subdomain;
+          if (targetSub && typeof window !== "undefined") {
+            toast.error(
+              "Switched Workspace",
+              `You are not a member of the requested workspace. Redirecting to your workspace (${targetSub})...`
+            );
+            window.location.href = getWorkspaceUrl(targetSub, "/dashboard");
+            return;
+          }
+        }
+      }
+
       if (res.ok) {
         const data = await res.json();
 
@@ -168,14 +186,30 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         setUserProfile(prof);
         applyBrandColor(comp.brandColor);
 
+        if (comp.subdomain && typeof window !== "undefined") {
+          const isLocalhost = window.location.hostname.includes("localhost");
+          const domainAttr = isLocalhost ? "" : "; Domain=.easyhr.pro";
+          document.cookie = `easyhr_current_workspace=${encodeURIComponent(comp.subdomain)}; Path=/${domainAttr}; SameSite=Lax; max-age=2592000`;
+
+          // If on apex domain easyhr.pro or plain localhost:3000, redirect to their workspace subdomain
+          const currentSub = getWorkspaceSubdomain();
+          if (!currentSub && (window.location.hostname === "easyhr.pro" || window.location.hostname === "localhost")) {
+            const currentPath = window.location.pathname;
+            if (currentPath === "/dashboard" || currentPath.startsWith("/people") || currentPath.startsWith("/hiring")) {
+              window.location.href = getWorkspaceUrl(comp.subdomain, currentPath);
+              return;
+            }
+          }
+        }
+
         try {
           localStorage.setItem(CACHE_KEYS.company, JSON.stringify(comp));
           localStorage.setItem(CACHE_KEYS.user, JSON.stringify(prof));
         } catch {}
       }
 
-      // Fetch locations
-      const locRes = await fetch(`${API_BASE_URL}/api/v1/locations`, { headers });
+      // Fetch locations with workspace context
+      const locRes = await fetch(`${API_BASE_URL}/api/v1/locations`, { headers: getAuthHeaders(token) });
       if (locRes.ok) {
         const locData = await locRes.json();
         const locs = locData.data || [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "@/components/ui/Toast";
@@ -102,7 +102,7 @@ export function HRProvider({ children }: { children: ReactNode }) {
       if (!token) return;
 
       const res = await fetch(`${API_BASE_URL}/api/v1/hiring/applicants`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(token),
       });
 
       if (res.ok) {
@@ -154,15 +154,16 @@ export function HRProvider({ children }: { children: ReactNode }) {
       const backendStatus = STAGE_TO_BACKEND[stage] || stage.toLowerCase();
       const res = await fetch(`${API_BASE_URL}/api/v1/hiring/applicants/${id}/status`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify({ status: backendStatus }),
       });
 
       if (res.ok) {
-        toast.success("Candidate stage updated", `Moved to ${stage}.`);
+        if (stage.toLowerCase() === "hired") {
+          toast.success("Candidate Hired!", "Employee profile created in directory and self-onboarding invitation email sent to candidate.");
+        } else {
+          toast.success("Candidate stage updated", `Moved to ${stage}.`);
+        }
       } else {
         toast.error("Failed to update candidate", "Server rejected stage transition.");
         fetchCandidates();

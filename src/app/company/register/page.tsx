@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getWorkspaceUrl } from "@/lib/api";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -357,6 +357,8 @@ export default function CompanyRegistration() {
         throw new Error(data.detail || data.message || `Setup failed (${res.status})`);
       }
 
+      const setupResult = await res.json().catch(() => ({}));
+
       // Automatically upload logo to Cloudflare R2 if one was selected
       if (form.logoDataUrl && form.logoDataUrl.startsWith("data:")) {
         try {
@@ -370,7 +372,19 @@ export default function CompanyRegistration() {
         }
       }
 
-      router.push("/dashboard");
+      const assignedSubdomain = setupResult.subdomain || cleanSubdomain;
+      if (typeof document !== "undefined") {
+        const isLocalhost = window.location.hostname.includes("localhost");
+        const domainAttr = isLocalhost ? "" : "; Domain=.easyhr.pro";
+        document.cookie = `easyhr_current_workspace=${encodeURIComponent(assignedSubdomain)}; Path=/${domainAttr}; SameSite=Lax; max-age=2592000`;
+      }
+
+      // Redirect immediately to their dedicated tenant workspace
+      const destination = setupResult.workspaceUrl
+        ? `${setupResult.workspaceUrl}/dashboard`
+        : getWorkspaceUrl(assignedSubdomain, "/dashboard");
+
+      window.location.href = destination;
     } catch (err: any) {
       console.error("Workspace setup failed:", err);
       setError(err.message || "Failed to create organization. Please try again.");
@@ -876,12 +890,13 @@ export default function CompanyRegistration() {
                           : undefined,
                     }}
                   >
-                    <span>easyhr.app/</span>
+                    <span style={{ padding: "0 10px", color: "var(--text-3)", fontWeight: 600, background: "#f8f6f3", borderRight: "1px solid #e5e0da", display: "flex", alignItems: "center" }}>https://</span>
                     <input
                       value={form.domain}
                       onChange={(e) => set("domain", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                       placeholder="acacia-labs"
                     />
+                    <span style={{ padding: "0 10px", color: "var(--text-3)", fontWeight: 600, background: "#f8f6f3", borderLeft: "1px solid #e5e0da", display: "flex", alignItems: "center" }}>.easyhr.pro</span>
                     <div style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "#fff" }}>
                       {domainStatus === "checking" && (
                         <Loader2 size={16} className="animate-spin" color="#a238ff" />
@@ -996,7 +1011,7 @@ export default function CompanyRegistration() {
                 <Review
                   icon={<Palette />}
                   label="Workspace"
-                  value={`easyhr.app/${form.domain || "acacia-labs"}`}
+                  value={`https://${form.domain || "acacia-labs"}.easyhr.pro`}
                   detail={
                     form.logoDataUrl
                       ? "Custom logo uploaded · Branded"

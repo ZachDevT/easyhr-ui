@@ -367,7 +367,7 @@ export default function CompanySettingsPage() {
 
                   <div style={{ marginTop: 24, padding: "12px 16px", background: "#F9FAFB", borderRadius: 10, width: "100%", textAlign: "left", fontSize: 12 }}>
                     <span style={{ color: "#6B7280", display: "block" }}>Workspace Subdomain:</span>
-                    <b style={{ color: "#111827", fontSize: 13 }}>{company?.subdomain}.easyhr.app</b>
+                    <b style={{ color: "#111827", fontSize: 13 }}>https://{company?.subdomain || "acacia"}.easyhr.pro</b>
                   </div>
                 </div>
               </CardBody>
@@ -662,7 +662,7 @@ export default function CompanySettingsPage() {
                     }}
                   >
                     <span style={{ fontWeight: 600, color: "#111827" }}>
-                      easyhr.app/{company?.subdomain || "acacia"}
+                      https://{company?.subdomain || "acacia"}.easyhr.pro
                     </span>
                     <Globe2 size={16} color="var(--primary)" />
                   </div>

@@ -208,13 +208,57 @@ export default function CandidateProfilePage() {
             >
               <Mail size={16} /> Send Email
             </button>
-            <button
-              className="btn-primary row gap-8 fw-600"
-              onClick={() => updateCandidateStage(candidate.id, "Interviewing")}
-              style={{ padding: "10px 20px", borderRadius: 8 }}
+            <select
+              value={candidate.stage}
+              onChange={async (e) => {
+                const nextStage = e.target.value;
+                await updateCandidateStage(candidate.id, nextStage);
+                setCandidate((prev: any) => prev ? { ...prev, stage: nextStage } : prev);
+              }}
+              style={{
+                padding: "9px 14px",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "var(--bg-card)",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                color: "var(--text-1)",
+              }}
             >
-              Advance Stage &rarr;
-            </button>
+              <option value="Applied">Applied</option>
+              <option value="Screening">Screening</option>
+              <option value="Interviewing">Interviewing</option>
+              <option value="Offer">Offer</option>
+              <option value="Hired">Hired &amp; Onboard</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            {candidate.stage.toLowerCase() !== "hired" ? (
+              <button
+                className="btn-primary row gap-8 fw-600"
+                onClick={async () => {
+                  await updateCandidateStage(candidate.id, "Hired");
+                  setCandidate((prev: any) => prev ? { ...prev, stage: "Hired" } : prev);
+                }}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  background: "linear-gradient(135deg, #16A34A 0%, #15803D 100%)",
+                  color: "white",
+                  border: "none",
+                }}
+              >
+                <CheckCircle2 size={16} /> Hire Candidate
+              </button>
+            ) : (
+              <Link
+                href="/people"
+                className="btn-secondary row gap-8 fw-600"
+                style={{ padding: "10px 18px", borderRadius: 8, color: "#16A34A", borderColor: "#86EFAC" }}
+              >
+                <CheckCircle2 size={16} /> View in Directory
+              </Link>
+            )}
           </div>
         </div>
 
@@ -244,7 +288,49 @@ export default function CandidateProfilePage() {
       {/* Main Content Body */}
       <div style={{ padding: "36px 48px", maxWidth: 1280, width: "100%", margin: "0 auto" }}>
         {candidateProfileTab === "Overview" && (
-          <div className="grid-2 gap-32" style={{ gridTemplateColumns: "1.4fr 1fr", alignItems: "flex-start" }}>
+          <div>
+            {candidate.stage.toLowerCase() === "hired" && (
+              <div
+                style={{
+                  marginBottom: 28,
+                  padding: "18px 24px",
+                  background: "#ECFDF5",
+                  border: "1px solid #A7F3D0",
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.08)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <CheckCircle2 size={26} color="#059669" style={{ flexShrink: 0 }} />
+                  <div>
+                    <b style={{ color: "#065F46", fontSize: 15, display: "block", marginBottom: 2 }}>
+                      Candidate Hired &amp; Converted to Active Employee
+                    </b>
+                    <span style={{ color: "#047857", fontSize: 13, lineHeight: 1.5 }}>
+                      An employee record with status <code>onboarding</code> has been created in your company directory. A personalized welcome email with direct workspace login and self-onboarding tasks was automatically sent to <strong>{candidate.email}</strong>.
+                    </span>
+                  </div>
+                </div>
+                <Link
+                  href="/people"
+                  className="btn-secondary btn-sm"
+                  style={{
+                    background: "#ffffff",
+                    color: "#065F46",
+                    borderColor: "#6EE7B7",
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    marginLeft: 16,
+                  }}
+                >
+                  Open People Directory &rarr;
+                </Link>
+              </div>
+            )}
+            <div className="grid-2 gap-32" style={{ gridTemplateColumns: "1.4fr 1fr", alignItems: "flex-start" }}>
             {/* Left Column */}
             <div className="col gap-24">
               {/* Cover Letter Card */}
@@ -477,6 +563,7 @@ export default function CandidateProfilePage() {
                 </CardBody>
               </Card>
             </div>
+          </div>
           </div>
         )}
 
