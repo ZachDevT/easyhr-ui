@@ -33,6 +33,10 @@ import { useAuth } from "@clerk/nextjs";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
+import { Modal } from "@/components/ui/Modal";
+import { Select } from "@/components/ui/Select";
+import { Input } from "@/components/ui/Input";
+import { CurrencySelect } from "@/components/ui/CurrencySelect";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useHR, Candidate } from "@/context/HRContext";
 import { HiringSkeleton } from "@/components/ui/Skeleton";
@@ -48,8 +52,24 @@ interface JobPosting {
   status: string;
   departmentId?: string;
   departmentName: string;
+  positionId?: string;
+  positionTitle?: string;
   applicantCount: number;
   createdAt?: string;
+}
+
+interface DepartmentRole {
+  id: string;
+  organizationId?: string;
+  departmentId?: string;
+  title: string;
+  level: string;
+  reportsTo: string;
+  payType: string;
+  currency: string;
+  minPay: number;
+  maxPay: number;
+  status: string;
 }
 
 interface DepartmentOption {
@@ -81,10 +101,25 @@ export default function HiringPage() {
   const [isSubmittingJob, setIsSubmittingJob] = useState(false);
   const [newJob, setNewJob] = useState({
     title: "",
+    positionId: "",
     departmentId: "",
     location: "Remote",
     employmentType: "full_time",
     description: "",
+  });
+
+  const [departmentRoles, setDepartmentRoles] = useState<DepartmentRole[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [isSubmittingRole, setIsSubmittingRole] = useState(false);
+  const [roleForm, setRoleForm] = useState({
+    title: "",
+    level: "Mid",
+    reportsTo: "Main (Department Head)",
+    payType: "Salaried",
+    currency: "CAD",
+    minPay: 80000,
+    maxPay: 120000,
   });
 
   const fetchJobs = useCallback(async () => {
@@ -116,9 +151,100 @@ export default function HiringPage() {
     }
   }, [getToken]);
 
+  const fetchDepartmentRoles = useCallback(async (deptId: string) => {
+    if (!deptId) {
+      setDepartmentRoles([]);
+      return;
+    }
+    setIsLoadingRoles(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/v1/departments/${deptId}/positions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setDepartmentRoles(json.data || []);
+      } else {
+        setDepartmentRoles([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch department roles", err);
+      setDepartmentRoles([]);
+    } finally {
+      setIsLoadingRoles(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  useEffect(() => {
+    if (newJob.departmentId) {
+      fetchDepartmentRoles(newJob.departmentId);
+    } else {
+      setDepartmentRoles([]);
+    }
+  }, [newJob.departmentId, fetchDepartmentRoles]);
+
+  const handleSaveRole = async () => {
+    if (!newJob.departmentId || !roleForm.title.trim()) {
+      toast.warning("Title required", "Please enter a title for the new role.");
+      return;
+    }
+    setIsSubmittingRole(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/departments/${newJob.departmentId}/positions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: roleForm.title.trim(),
+          level: roleForm.level,
+          reportsTo: roleForm.reportsTo,
+          payType: roleForm.payType,
+          currency: roleForm.currency,
+          minPay: Number(roleForm.minPay),
+          maxPay: Number(roleForm.maxPay),
+        }),
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        toast.success("Role created", `"${roleForm.title.trim()}" added to department.`);
+        setShowRoleModal(false);
+        setRoleForm({
+          title: "",
+          level: "Mid",
+          reportsTo: "Main (Department Head)",
+          payType: "Salaried",
+          currency: "CAD",
+          minPay: 80000,
+          maxPay: 120000,
+        });
+        await fetchDepartmentRoles(newJob.departmentId);
+        setNewJob((prev) => ({
+          ...prev,
+          positionId: created.id,
+          title: created.title,
+        }));
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        toast.error("Failed to create role", errJson.detail || errJson.title || "Could not add role.");
+      }
+    } catch (err: any) {
+      toast.error("Network error", err.message || "Failed to create role.");
+    } finally {
+      setIsSubmittingRole(false);
+    }
+  };
 
   const handleCreateJob = async () => {
     if (!newJob.title.trim()) return;
@@ -141,6 +267,7 @@ export default function HiringPage() {
           employmentType: newJob.employmentType,
           status: "published",
           departmentId: newJob.departmentId || null,
+          positionId: newJob.positionId || null,
         }),
       });
 
@@ -150,6 +277,7 @@ export default function HiringPage() {
         setBuilderStep(1);
         setNewJob({
           title: "",
+          positionId: "",
           departmentId: "",
           location: "Remote",
           employmentType: "full_time",
@@ -271,26 +399,23 @@ export default function HiringPage() {
           <Card>
             <CardBody style={{ padding: 40 }}>
               {builderStep === 1 && (
-                <div className="col gap-32">
-                  <h2 className="text-2xl fw-800 text-1 m-0">1. Job Details</h2>
-                  <div className="col gap-12">
-                    <label className="text-sm fw-700 text-1">Job Title *</label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. Senior Software Engineer"
-                      value={newJob.title}
-                      onChange={(e) => setNewJob({ ...newJob, title: e.target.value })}
-                    />
+                <div className="col gap-28">
+                  <div>
+                    <h2 className="text-2xl fw-800 text-1 m-0">1. Job Details &amp; Department Role</h2>
+                    <p className="text-sm text-5 mt-4">Every job opening represents an active role in a department.</p>
                   </div>
 
-                  <div className="grid-2 gap-32">
-                    <div className="col gap-12">
-                      <label className="text-sm fw-700 text-1">Department</label>
+                  {/* Department & Location */}
+                  <div className="grid-2 gap-24">
+                    <div className="col gap-10">
+                      <label className="text-sm fw-700 text-1">Department *</label>
                       <select
                         className="select"
                         value={newJob.departmentId}
-                        onChange={(e) => setNewJob({ ...newJob, departmentId: e.target.value })}
+                        onChange={(e) => {
+                          const deptId = e.target.value;
+                          setNewJob({ ...newJob, departmentId: deptId, positionId: "", title: "" });
+                        }}
                       >
                         <option value="">Select a department...</option>
                         {departments.map((d) => (
@@ -299,8 +424,8 @@ export default function HiringPage() {
                       </select>
                     </div>
 
-                    <div className="col gap-12">
-                      <label className="text-sm fw-700 text-1">Location & Work Model</label>
+                    <div className="col gap-10">
+                      <label className="text-sm fw-700 text-1">Location &amp; Work Model</label>
                       <select
                         className="select"
                         value={newJob.location}
@@ -313,7 +438,117 @@ export default function HiringPage() {
                     </div>
                   </div>
 
-                  <div className="col gap-12">
+                  {/* Role in Department */}
+                  {newJob.departmentId ? (
+                    <div className="col gap-14" style={{ background: "#F9FAFB", padding: 20, borderRadius: 14, border: "1px solid var(--border)" }}>
+                      <div className="row-between align-center">
+                        <div className="row gap-8 align-center">
+                          <Briefcase size={18} className="text-primary" />
+                          <span className="text-sm fw-700 text-1">Department Role *</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral row gap-6 align-center"
+                          onClick={() => setShowRoleModal(true)}
+                          style={{ fontSize: 13, padding: "6px 12px" }}
+                        >
+                          <Plus size={14} /> Add New Role
+                        </button>
+                      </div>
+
+                      {isLoadingRoles ? (
+                        <div className="row gap-8 align-center text-sm text-4 py-8">
+                          <Loader2 size={16} className="animate-spin text-primary" /> Loading department roles...
+                        </div>
+                      ) : departmentRoles.length === 0 ? (
+                        <div className="col gap-10 p-16" style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10 }}>
+                          <span className="text-sm fw-700 text-warning">
+                            No roles defined for this department yet.
+                          </span>
+                          <p className="text-xs text-4 m-0">
+                            Each job posting must be tied to an organizational role. Please add a role to this department before continuing.
+                          </p>
+                          <div>
+                            <button
+                              type="button"
+                              className="btn-primary row gap-6 align-center"
+                              onClick={() => setShowRoleModal(true)}
+                              style={{ fontSize: 13, padding: "8px 16px" }}
+                            >
+                              <Plus size={14} /> Add Role Now
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="col gap-10">
+                          <select
+                            className="select"
+                            value={newJob.positionId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "ADD_NEW") {
+                                setShowRoleModal(true);
+                              } else {
+                                const selected = departmentRoles.find((r) => r.id === val);
+                                setNewJob({
+                                  ...newJob,
+                                  positionId: val,
+                                  title: selected ? selected.title : "",
+                                });
+                              }
+                            }}
+                          >
+                            <option value="">Select a role from this department...</option>
+                            {departmentRoles.map((role) => (
+                              <option key={role.id} value={role.id}>
+                                {role.title} ({role.level}) &bull; Reports to: {role.reportsTo || "Main"}
+                              </option>
+                            ))}
+                            <option value="ADD_NEW">+ Add another role to this department...</option>
+                          </select>
+
+                          {newJob.positionId && (() => {
+                            const selected = departmentRoles.find((r) => r.id === newJob.positionId);
+                            if (!selected) return null;
+                            return (
+                              <div className="row gap-16 align-center p-12 text-xs flex-wrap" style={{ background: "white", borderRadius: 8, border: "1px solid var(--border)" }}>
+                                <Badge variant="primary">{selected.level} Level</Badge>
+                                <span className="text-4">
+                                  Reports to: <strong className="text-1">{selected.reportsTo || "Main"}</strong>
+                                </span>
+                                {selected.minPay > 0 && (
+                                  <span className="text-4">
+                                    Band: <strong className="text-1">{selected.minPay.toLocaleString()} - {selected.maxPay.toLocaleString()} {selected.currency} ({selected.payType})</strong>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-16 text-sm text-4" style={{ background: "#F9FAFB", borderRadius: 10, border: "1px dashed var(--border)", textAlign: "center" }}>
+                      Select a department above to view and assign its associated roles.
+                    </div>
+                  )}
+
+                  {/* Job Title */}
+                  <div className="col gap-10">
+                    <label className="text-sm fw-700 text-1">Job Post Title *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. Senior Software Engineer"
+                      value={newJob.title}
+                      onChange={(e) => setNewJob({ ...newJob, title: e.target.value })}
+                    />
+                    <span className="text-xs text-4">
+                      Pre-filled from the chosen role and can be tailored for external job boards.
+                    </span>
+                  </div>
+
+                  <div className="col gap-10">
                     <label className="text-sm fw-700 text-1">Employment Type</label>
                     <select
                       className="select"
@@ -327,7 +562,7 @@ export default function HiringPage() {
                     </select>
                   </div>
 
-                  <div className="col gap-12">
+                  <div className="col gap-10">
                     <label className="text-sm fw-700 text-1">Job Description</label>
                     <RichTextEditor
                       value={newJob.description}
@@ -345,10 +580,10 @@ export default function HiringPage() {
                     <button
                       className="btn-primary"
                       onClick={() => setBuilderStep(2)}
-                      disabled={!newJob.title.trim()}
+                      disabled={!newJob.title.trim() || !newJob.departmentId || !newJob.positionId}
                       style={{ padding: "14px 36px" }}
                     >
-                      Next: Preview & Publish <ArrowRight size={16} style={{ marginLeft: 8 }} />
+                      Next: Preview &amp; Publish <ArrowRight size={16} style={{ marginLeft: 8 }} />
                     </button>
                   </div>
                 </div>
@@ -432,6 +667,136 @@ export default function HiringPage() {
             </CardBody>
           </Card>
         </div>
+
+        {/* ADD ROLE TO DEPARTMENT MODAL */}
+        <Modal
+          isOpen={showRoleModal}
+          onClose={() => setShowRoleModal(false)}
+          title="Add Role to Department"
+          subtitle={`Department: ${departments.find((d) => d.id === newJob.departmentId)?.name || "Selected Department"}`}
+          footer={
+            <div className="row-between w-full align-center" style={{ width: "100%", display: "flex", justifyContent: "space-between" }}>
+              <button className="btn-neutral" onClick={() => setShowRoleModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn-primary row gap-8 align-center"
+                onClick={handleSaveRole}
+                disabled={isSubmittingRole || !roleForm.title.trim()}
+              >
+                {isSubmittingRole ? <Loader2 size={16} className="animate-spin" /> : null}
+                <span>Save &amp; Select Role</span>
+              </button>
+            </div>
+          }
+        >
+          <div className="col gap-20">
+            <div className="col gap-8">
+              <label className="text-sm fw-600 text-2">Role Title *</label>
+              <Input
+                type="text"
+                placeholder="e.g. Senior Backend Engineer"
+                value={roleForm.title}
+                onChange={(e) => setRoleForm({ ...roleForm, title: e.target.value })}
+              />
+            </div>
+
+            <div className="grid-2 gap-16">
+              <div className="col gap-8">
+                <label className="text-sm fw-600 text-2">Seniority Level</label>
+                <Select
+                  value={roleForm.level}
+                  onChange={(e) => setRoleForm({ ...roleForm, level: e.target.value })}
+                >
+                  <option value="Junior">Junior</option>
+                  <option value="Mid">Mid</option>
+                  <option value="Senior">Senior</option>
+                  <option value="Lead">Lead</option>
+                  <option value="Director">Director</option>
+                  <option value="Executive">Executive</option>
+                </Select>
+              </div>
+
+              <div className="col gap-8">
+                <label className="text-sm fw-600 text-2">Reports To</label>
+                <Select
+                  value={
+                    roleForm.reportsTo === "Main (Department Head)" ||
+                    roleForm.reportsTo === "None" ||
+                    departmentRoles.some((r) => r.title === roleForm.reportsTo)
+                      ? roleForm.reportsTo
+                      : "custom"
+                  }
+                  onChange={(e) => {
+                    if (e.target.value === "custom") {
+                      setRoleForm({ ...roleForm, reportsTo: "" });
+                    } else {
+                      setRoleForm({ ...roleForm, reportsTo: e.target.value });
+                    }
+                  }}
+                >
+                  <option value="Main (Department Head)">Main (Department Head)</option>
+                  <option value="None">None (Top-Level Role)</option>
+                  {departmentRoles.map((r) => (
+                    <option key={r.id} value={r.title}>
+                      Role: {r.title} ({r.level})
+                    </option>
+                  ))}
+                  <option value="custom">Custom Title...</option>
+                </Select>
+                {!["Main (Department Head)", "None"].includes(roleForm.reportsTo) &&
+                  !departmentRoles.some((r) => r.title === roleForm.reportsTo) && (
+                    <Input
+                      type="text"
+                      placeholder="Enter reporting manager or role"
+                      value={roleForm.reportsTo}
+                      onChange={(e) => setRoleForm({ ...roleForm, reportsTo: e.target.value })}
+                    />
+                  )}
+              </div>
+            </div>
+
+            <div className="grid-2 gap-16">
+              <div className="col gap-8">
+                <label className="text-sm fw-600 text-2">Pay Type</label>
+                <Select
+                  value={roleForm.payType}
+                  onChange={(e) => setRoleForm({ ...roleForm, payType: e.target.value })}
+                >
+                  <option value="Salaried">Salaried (Annual)</option>
+                  <option value="Hourly">Hourly</option>
+                </Select>
+              </div>
+
+              <div className="col gap-8">
+                <label className="text-sm fw-600 text-2">Currency</label>
+                <CurrencySelect
+                  value={roleForm.currency}
+                  onChange={(curr) => setRoleForm({ ...roleForm, currency: curr })}
+                />
+              </div>
+            </div>
+
+            <div className="grid-2 gap-16">
+              <div className="col gap-8">
+                <label className="text-sm fw-600 text-2">Min Pay</label>
+                <Input
+                  type="number"
+                  value={roleForm.minPay}
+                  onChange={(e) => setRoleForm({ ...roleForm, minPay: Number(e.target.value) })}
+                />
+              </div>
+              <div className="col gap-8">
+                <label className="text-sm fw-600 text-2">Max Pay</label>
+                <Input
+                  type="number"
+                  value={roleForm.maxPay}
+                  onChange={(e) => setRoleForm({ ...roleForm, maxPay: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+          </div>
+        </Modal>
       </div>
     );
   }

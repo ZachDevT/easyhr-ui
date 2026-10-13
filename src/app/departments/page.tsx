@@ -93,7 +93,7 @@ export default function DepartmentsPage() {
   const [newRole, setNewRole] = useState({
     title: "",
     level: "Mid",
-    reportsTo: "VP Engineering",
+    reportsTo: "Main (Department Head)",
     payType: "Salaried",
     currency: "CAD",
     minPay: 80000,
@@ -192,7 +192,7 @@ export default function DepartmentsPage() {
         setNewRole({
           title: "",
           level: "Mid",
-          reportsTo: "VP Engineering",
+          reportsTo: "Main (Department Head)",
           payType: "Salaried",
           currency: "CAD",
           minPay: 80000,
@@ -612,12 +612,39 @@ export default function DepartmentsPage() {
                 </div>
                 <div className="col gap-8">
                   <label className="text-sm fw-600 text-2">Reports To</label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. Engineering Manager"
-                    value={newRole.reportsTo}
-                    onChange={(e) => setNewRole({ ...newRole, reportsTo: e.target.value })}
-                  />
+                  <Select
+                    value={
+                      newRole.reportsTo === "Main (Department Head)" ||
+                      newRole.reportsTo === "None" ||
+                      roles.some((r) => r.title === newRole.reportsTo)
+                        ? newRole.reportsTo
+                        : "custom"
+                    }
+                    onChange={(e) => {
+                      if (e.target.value === "custom") {
+                        setNewRole({ ...newRole, reportsTo: "" });
+                      } else {
+                        setNewRole({ ...newRole, reportsTo: e.target.value });
+                      }
+                    }}
+                  >
+                    <option value="Main (Department Head)">Main (Department Head)</option>
+                    <option value="None">None (Top-Level Role)</option>
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.title}>
+                        Role: {r.title} ({r.level})
+                      </option>
+                    ))}
+                    <option value="custom">Custom Title...</option>
+                  </Select>
+                  {(!["Main (Department Head)", "None"].includes(newRole.reportsTo) && !roles.some((r) => r.title === newRole.reportsTo)) && (
+                    <Input
+                      type="text"
+                      placeholder="Enter custom reporting title"
+                      value={newRole.reportsTo}
+                      onChange={(e) => setNewRole({ ...newRole, reportsTo: e.target.value })}
+                    />
+                  )}
                 </div>
               </div>
             </div>

@@ -1,4 +1,373 @@
 "use client";
-import { useState } from 'react'; import { CalendarRange, ChevronLeft, ChevronRight, Clock3, Copy, Plus, Send, Users } from 'lucide-react'; import { PageHeader } from '@/components/layout/PageHeader'; import { Card, CardBody } from '@/components/ui/Card'; import { StatRibbon } from '@/components/ui/StatRibbon'; import { SectionHeading, StatusPill } from '@/components/ui/ModulePrimitives'; import { shifts } from '@/data/operations'; import { toast } from '@/components/ui/Toast';
-const days=[['MON','Sep 1'],['TUE','Sep 2'],['WED','Sep 3'],['THU','Sep 4'],['FRI','Sep 5']];
-export default function ShiftSchedulingPage(){const[published,setPublished]=useState(false);const[team,setTeam]=useState(shifts);return <><PageHeader title="Shift Scheduling" subtitle="Plan coverage, publish schedules, and catch conflicts before they become payroll issues." icon={<CalendarRange size={28}/>} actions={<><button onClick={()=>toast.info("Copied schedule", "Last week's shifts copied.")} className="btn-neutral" style={{background:'rgba(255,255,255,.14)',color:'white',borderColor:'rgba(255,255,255,.4)'}}><Copy size={15}/> Copy last week</button><button onClick={()=>{setPublished(true); toast.success("Schedule published", "Weekly team shift schedule has been published.");}} className="btn-primary" style={{background:'white',color:'var(--primary)'}}><Send size={15}/> {published?'Published':'Publish schedule'}</button></>}/><main style={{padding:'0 24px 32px'}}><StatRibbon stats={[{label:'Scheduled hours',value:'612h',icon:<Clock3 size={20}/>,color:'var(--primary)'},{label:'Team coverage',value:'96%',trend:'+3 pts',trendType:'positive',icon:<Users size={20}/>,color:'var(--success)'},{label:'Open shifts',value:2,description:'Friday afternoon',icon:<Plus size={20}/>,color:'var(--warning)'},{label:'Estimated overtime',value:'14h',description:'3 employees affected',icon:<CalendarRange size={20}/>,color:'var(--error)'}]}/><Card style={{marginTop:20,overflow:'hidden'}}><CardBody><SectionHeading title="Weekly schedule" description="Kampala HQ · Operations team" action={<div className="row gap-8 align-center"><button className="btn-neutral" style={{padding:8}}><ChevronLeft size={16}/></button><strong className="text-sm text-1">September 1–5, 2026</strong><button className="btn-neutral" style={{padding:8}}><ChevronRight size={16}/></button>{published&&<StatusPill tone="success">Published</StatusPill>}</div>}/><div style={{display:'grid',gridTemplateColumns:'220px repeat(5,minmax(130px,1fr))',border:'1px solid var(--border)',borderRadius:12,overflow:'hidden'}}><div style={{padding:14,background:'var(--bg-page)',borderRight:'1px solid var(--border)'}}><span className="text-xs fw-700 text-5">TEAM MEMBER</span></div>{days.map(d=><div key={d[0]} style={{padding:12,textAlign:'center',background:'var(--bg-page)',borderRight:'1px solid var(--border)'}}><div className="text-xs fw-800 text-4">{d[0]}</div><div className="text-sm fw-700 text-1">{d[1]}</div></div>)}{team.map((member,row)=><div key={member.person} style={{display:'contents'}}><div style={{padding:14,borderTop:'1px solid var(--border)',borderRight:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10}}><div style={{width:34,height:34,borderRadius:'50%',display:'grid',placeItems:'center',background:'var(--primary-tint)',color:'var(--primary)',fontSize:12,fontWeight:800}}>{member.initials}</div><span className="text-sm fw-700 text-1">{member.person}</span></div>{member.shifts.map((shift,col)=><button key={col} onClick={()=>setTeam(team.map((m,r)=>r===row?{...m,shifts:m.shifts.map((s,c)=>c===col?(s==='Off'?'08:00–17:00':'Off'):s)}:m))} style={{padding:12,border:0,borderTop:'1px solid var(--border)',borderRight:'1px solid var(--border)',background:'white',cursor:'pointer',fontFamily:'inherit'}}><span style={{display:'block',padding:'8px 6px',borderRadius:8,fontSize:12,fontWeight:700,color:shift==='Off'?'var(--text-5)':shift==='Remote'?'var(--primary)':'var(--text-2)',background:shift==='Off'?'var(--bg-page)':shift==='Remote'?'var(--primary-tint)':'rgba(22,163,74,.08)'}}>{shift}</span></button>)}</div>)}</div><div className="row-between" style={{marginTop:14}}><span className="text-xs text-4">Click any shift to toggle availability. Drag-and-drop support can connect to persisted scheduling data.</span><button className="btn-neutral"><Plus size={15}/> Add open shift</button></div></CardBody></Card></main></>}
+
+import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Copy,
+  Plus,
+  Send,
+  Users,
+  Loader2,
+  CalendarDays,
+} from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardBody } from "@/components/ui/Card";
+import { StatRibbon } from "@/components/ui/StatRibbon";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
+import { toast } from "@/components/ui/Toast";
+import { useAuth } from "@clerk/nextjs";
+import { API_BASE_URL } from "@/lib/api";
+import { Avatar } from "@/components/ui/Avatar";
+
+interface ShiftScheduleItem {
+  id: string;
+  name: string;
+  timezone: string;
+  description?: string;
+}
+
+interface OrgEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  jobTitle?: string;
+  department?: string;
+  avatar?: string;
+  status?: string;
+}
+
+const WEEK_DAYS = ["MON", "TUE", "WED", "THU", "FRI"];
+
+export default function ShiftSchedulingPage() {
+  const { getToken } = useAuth();
+  const [schedules, setSchedules] = useState<ShiftScheduleItem[]>([]);
+  const [employees, setEmployees] = useState<OrgEmployee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPublished, setIsPublished] = useState(false);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    timezone: "UTC",
+    description: "",
+  });
+
+  const loadData = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [schedRes, empRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/scheduling/schedules`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/employees`, { headers }),
+      ]);
+
+      if (schedRes.ok) {
+        const sJson = await schedRes.json();
+        setSchedules(Array.isArray(sJson) ? sJson : sJson.data || []);
+      }
+      if (empRes.ok) {
+        const eJson = await empRes.json();
+        setEmployees(Array.isArray(eJson) ? eJson : eJson.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load scheduling data", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleCreateSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      toast.error("Name required", "Please enter a schedule template name.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/scheduling/schedules`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          timezone: form.timezone || "UTC",
+          description: form.description.trim() || undefined,
+          entries: [
+            { dayOfWeek: 1, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
+            { dayOfWeek: 2, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
+            { dayOfWeek: 3, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
+            { dayOfWeek: 4, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
+            { dayOfWeek: 5, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
+          ],
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Schedule template created", "New working schedule saved.");
+        setIsModalOpen(false);
+        setForm({ name: "", timezone: "UTC", description: "" });
+        loadData();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        toast.error("Creation failed", errJson.detail || "Unable to save schedule.");
+      }
+    } catch (err: any) {
+      toast.error("Network error", err.message || "Failed to create schedule.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePublish = () => {
+    setIsPublished(true);
+    toast.success("Shift schedule published", "All team members notified of their weekly roster.");
+  };
+
+  const activeEmployees = employees.filter((e) => e.status !== "terminated");
+
+  return (
+    <>
+      <PageHeader
+        title="Shift Scheduling"
+        subtitle="Plan coverage, assign working patterns, and maintain payroll-accurate rosters."
+        icon={<CalendarRange size={28} />}
+        actions={
+          <div className="row gap-8">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn-neutral"
+              style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.4)" }}
+            >
+              <Plus size={15} /> Add Template
+            </button>
+            <button
+              onClick={handlePublish}
+              className="btn-primary"
+              style={{ background: "white", color: "var(--primary)" }}
+            >
+              <Send size={15} /> {isPublished ? "Published" : "Publish Schedule"}
+            </button>
+          </div>
+        }
+      />
+
+      <main style={{ padding: "0 24px 32px" }}>
+        <StatRibbon
+          stats={[
+            {
+              label: "Team members rostered",
+              value: activeEmployees.length,
+              icon: <Users size={20} />,
+              color: "var(--primary)",
+            },
+            {
+              label: "Schedule templates",
+              value: schedules.length,
+              icon: <Clock3 size={20} />,
+              color: "var(--warning)",
+            },
+            {
+              label: "Weekly coverage",
+              value: "100%",
+              trend: "Full staffing",
+              trendType: "positive",
+              icon: <CalendarDays size={20} />,
+              color: "var(--success)",
+            },
+          ]}
+        />
+
+        <Card style={{ marginTop: 20, overflow: "hidden" }}>
+          <CardBody>
+            <SectionHeading
+              title="Active Weekly Roster"
+              description="Monday through Friday operational coverage across organization team"
+              action={
+                <div className="row gap-8 align-center">
+                  <strong className="text-sm text-1">Current Work Week</strong>
+                  {isPublished && <StatusPill tone="success">Published</StatusPill>}
+                </div>
+              }
+            />
+
+            {isLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
+                <Loader2 className="animate-spin text-primary" size={32} />
+              </div>
+            ) : activeEmployees.length === 0 ? (
+              <div style={{ padding: 48, textAlign: "center" }}>
+                <Users size={36} className="text-4 mb-12" style={{ margin: "0 auto 12px" }} />
+                <h3 className="text-base fw-800 text-1">No employees in organization</h3>
+                <p className="text-xs text-4 mt-4">Add employees to your company directory to populate the shift schedule.</p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "240px repeat(5, minmax(130px, 1fr))",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ padding: 14, background: "var(--bg-page)", borderRight: "1px solid var(--border)" }}>
+                  <span className="text-xs fw-700 text-5">TEAM MEMBER</span>
+                </div>
+                {WEEK_DAYS.map((day) => (
+                  <div
+                    key={day}
+                    style={{
+                      padding: 12,
+                      textAlign: "center",
+                      background: "var(--bg-page)",
+                      borderRight: "1px solid var(--border)",
+                    }}
+                  >
+                    <div className="text-xs fw-800 text-4">{day}</div>
+                    <div className="text-sm fw-700 text-1">09:00–17:00</div>
+                  </div>
+                ))}
+
+                {activeEmployees.map((member) => {
+                  const fullName = `${member.firstName} ${member.lastName}`.trim();
+                  return (
+                    <div key={member.id} style={{ display: "contents" }}>
+                      <div
+                        style={{
+                          padding: 14,
+                          borderTop: "1px solid var(--border)",
+                          borderRight: "1px solid var(--border)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <Avatar src={member.avatar} name={fullName} size="sm" />
+                        <div>
+                          <div className="text-sm fw-700 text-1">{fullName}</div>
+                          <div className="text-xs text-4">{member.jobTitle || "Team Member"}</div>
+                        </div>
+                      </div>
+                      {WEEK_DAYS.map((day, idx) => (
+                        <div
+                          key={day + idx}
+                          style={{
+                            padding: 12,
+                            borderTop: "1px solid var(--border)",
+                            borderRight: "1px solid var(--border)",
+                            background: "white",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: "block",
+                              padding: "6px 12px",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "var(--primary)",
+                              background: "var(--primary-tint)",
+                            }}
+                          >
+                            Scheduled
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </main>
+
+      {/* Add Schedule Template Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="New Shift Template"
+        subtitle="Establish working hours and shift parameters"
+        width={500}
+        footer={
+          <>
+            <button className="btn-neutral" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              className="btn-primary"
+              onClick={handleCreateSchedule}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 size={15} className="animate-spin" /> : "Save Template"}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateSchedule} className="col gap-14">
+          <div>
+            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+              Template Name *
+            </label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Standard Daytime (09:00 - 17:00)"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+              Timezone
+            </label>
+            <Select
+              value={form.timezone}
+              onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+            >
+              <option value="UTC">UTC (Coordinated Universal Time)</option>
+              <option value="Africa/Kampala">Africa/Kampala (EAT, UTC+3)</option>
+              <option value="Africa/Nairobi">Africa/Nairobi (EAT, UTC+3)</option>
+              <option value="Africa/Lagos">Africa/Lagos (WAT, UTC+1)</option>
+              <option value="America/New_York">America/New_York (EST, UTC-5)</option>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+              Description (optional)
+            </label>
+            <Input
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="e.g. Default full-time business hours"
+            />
+          </div>
+        </form>
+      </Modal>
+    </>
+  );
+}

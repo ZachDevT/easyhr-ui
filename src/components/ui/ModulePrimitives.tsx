@@ -24,7 +24,7 @@ export function SectionHeading({ title, description, action }: { title: string; 
   return <div className="row-between align-center" style={{ marginBottom: 18 }}><div><h2 className="text-xl fw-800 text-1 m-0 mb-4">{title}</h2>{description && <p className="text-sm text-4 m-0">{description}</p>}</div>{action}</div>;
 }
 
-export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?: ReactNode; title: string; subtitle?: string; meta?: ReactNode; onClick?: () => void }) {
+export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?: ReactNode; title: ReactNode; subtitle?: ReactNode; meta?: ReactNode; onClick?: () => void }) {
   if (onClick) {
     return (
       <div

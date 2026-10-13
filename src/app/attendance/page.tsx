@@ -299,98 +299,6 @@ export default function AttendancePage() {
           <AttendanceSkeleton />
         ) : (
           <>
-            {/* Quick Self-Service Punch Bar */}
-            <div 
-              style={{ 
-                background: "linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)", 
-                borderRadius: 16, 
-                padding: "24px 32px", 
-                color: "white", 
-                marginBottom: 28,
-                boxShadow: "0 10px 25px -5px rgba(30, 27, 75, 0.2)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 20
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                <div 
-                  style={{ 
-                    width: 56, 
-                    height: 56, 
-                    borderRadius: 14, 
-                    background: "rgba(255, 255, 255, 0.12)", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    border: "1px solid rgba(255, 255, 255, 0.2)"
-                  }}
-                >
-                  <Clock size={28} className="text-white" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.08em", color: "#A5B4FC", fontWeight: 700 }}>
-                    My Daily Timecard &bull; {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-                  </div>
-                  <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 2, display: "flex", alignItems: "baseline", gap: 12 }}>
-                    <span>{currentTime || "--:--:--"}</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: "#C7D2FE" }}>Local Time</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <button
-                  onClick={() => handlePunch("clock_in")}
-                  disabled={isPunching}
-                  className="btn"
-                  style={{
-                    background: "#10B981",
-                    color: "white",
-                    fontWeight: 700,
-                    padding: "12px 24px",
-                    borderRadius: 10,
-                    border: "none",
-                    cursor: isPunching ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 14,
-                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
-                    transition: "all 0.2s ease"
-                  }}
-                >
-                  <LogIn size={18} />
-                  {isPunching ? "Punching..." : "Clock In"}
-                </button>
-
-                <button
-                  onClick={() => handlePunch("clock_out")}
-                  disabled={isPunching}
-                  className="btn"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.15)",
-                    color: "white",
-                    fontWeight: 700,
-                    padding: "12px 24px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.25)",
-                    cursor: isPunching ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 14,
-                    transition: "all 0.2s ease"
-                  }}
-                >
-                  <LogOut size={18} />
-                  {isPunching ? "Punching..." : "Clock Out"}
-                </button>
-              </div>
-            </div>
-
             {punchMessage && (
               <div 
                 style={{ 
@@ -433,8 +341,56 @@ export default function AttendancePage() {
                       <p className="text-xs text-4 mt-6">
                         {myRecord?.status === "clocked_in"
                           ? "Currently working. Remember to clock out when ending your shift."
-                          : "Use the punch buttons above to record your shift."}
+                          : "Record your working shift timestamps for today."}
                       </p>
+                      <div className="row gap-8 mt-14">
+                        <button
+                          onClick={() => handlePunch("clock_in")}
+                          disabled={isPunching || myRecord?.status === "clocked_in"}
+                          className="btn"
+                          style={{
+                            background: "#10B981",
+                            color: "white",
+                            fontWeight: 700,
+                            padding: "8px 16px",
+                            borderRadius: 8,
+                            border: "none",
+                            cursor: isPunching || myRecord?.status === "clocked_in" ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 13,
+                            opacity: myRecord?.status === "clocked_in" ? 0.5 : 1,
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          <LogIn size={14} />
+                          {isPunching ? "..." : "Clock In"}
+                        </button>
+                        <button
+                          onClick={() => handlePunch("clock_out")}
+                          disabled={isPunching || myRecord?.status !== "clocked_in"}
+                          className="btn"
+                          style={{
+                            background: "#6B7280",
+                            color: "white",
+                            fontWeight: 700,
+                            padding: "8px 16px",
+                            borderRadius: 8,
+                            border: "none",
+                            cursor: isPunching || myRecord?.status !== "clocked_in" ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 13,
+                            opacity: myRecord?.status !== "clocked_in" ? 0.5 : 1,
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          <LogOut size={14} />
+                          {isPunching ? "..." : "Clock Out"}
+                        </button>
+                      </div>
                     </CardBody>
                   </Card>
 
