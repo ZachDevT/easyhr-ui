@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Mail, AlertCircle, CheckCircle2, KeyRound, Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthField, AuthShell, authStyles as s } from "@/components/auth/AuthShell";
+import { OtpInput } from "@/components/auth/OtpInput";
 import { useClerk, useAuth } from "@clerk/nextjs";
 
 export default function ForgotPassword() {
@@ -120,7 +121,7 @@ export default function ForgotPassword() {
       <AuthShell
         eyebrow="Reset password"
         title="Create new password"
-        subtitle={`Enter the 6-digit code sent to ${emailAddress} and choose a new secure password.`}
+        subtitle={`We sent a 6-digit verification code to ${emailAddress} (not an email link). Enter the code below to set your new password.`}
         asideTitle="Secure access without slowing people down."
       >
         <div style={{ width: 50, height: 50, borderRadius: 13, background: "var(--primary-tint)", color: "var(--primary)", display: "grid", placeItems: "center", marginBottom: 22 }}>
@@ -142,17 +143,15 @@ export default function ForgotPassword() {
         )}
 
         <form onSubmit={handleResetPassword}>
-          <AuthField label="6-Digit Reset Code">
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="123456"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              required
-            />
-          </AuthField>
+          <div style={{ textAlign: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#4e4950" }}>
+              Enter 6-digit reset code
+            </span>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <OtpInput value={code} onChange={setCode} autoFocus disabled={isSubmitting} />
+          </div>
 
           <AuthField label="New password">
             <div style={{ position: "relative", display: "flex", alignItems: "center" }}>

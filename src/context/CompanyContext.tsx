@@ -32,6 +32,8 @@ export interface UserProfileData {
   phone: string;
   avatarUrl: string;
   role: string;
+  employeeStatus?: string;
+  employeeId?: string;
 }
 
 export interface LocationItem {
@@ -223,6 +225,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           phone: data.user?.phone || "",
           avatarUrl: data.user?.avatarUrl || clerkUser?.imageUrl || "",
           role: data.user?.role || "Company Administrator",
+          employeeStatus: data.user?.employeeStatus || "",
+          employeeId: data.user?.employeeId || "",
         };
 
         setCompany(comp);

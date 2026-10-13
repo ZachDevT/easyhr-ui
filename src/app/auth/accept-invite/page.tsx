@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AuthField, AuthShell, authStyles as s } from "@/components/auth/AuthShell";
+import { OtpInput } from "@/components/auth/OtpInput";
 import { useClerk, useAuth } from "@clerk/nextjs";
 import { API_BASE_URL, getWorkspaceSubdomain } from "@/lib/api";
 
@@ -191,19 +192,15 @@ function AcceptInviteContent() {
             </div>
           )}
 
-          <AuthField label="6-Digit Verification Code">
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="123456"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              required
-              autoFocus
-              style={{ letterSpacing: "4px", fontSize: "20px", textAlign: "center" }}
-            />
-          </AuthField>
+          <div style={{ textAlign: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#4e4950" }}>
+              Enter 6-digit verification code
+            </span>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <OtpInput value={code} onChange={setCode} autoFocus disabled={isSubmitting} />
+          </div>
 
           <button
             type="submit"

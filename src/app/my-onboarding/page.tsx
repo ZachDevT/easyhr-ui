@@ -19,9 +19,12 @@ import {
   UserCheck,
   Briefcase,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 import Link from "next/link";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser, useClerk } from "@clerk/nextjs";
+import { useCompany } from "@/context/CompanyContext";
+import { EasyHRMark } from "@/components/marketing/EasyHRLogo";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Input } from "@/components/ui/Input";
@@ -71,6 +74,8 @@ const STEPS = [
 export default function MyOnboardingPage() {
   const { getToken } = useAuth();
   const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+  const { company, refresh } = useCompany();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -251,6 +256,10 @@ export default function MyOnboardingPage() {
       if (employee) {
         setEmployee({ ...employee, status: "active" });
       }
+      try {
+        await refresh();
+      } catch {}
+      toast.success("Onboarding Completed", "Welcome aboard! Your employee profile is now active.");
     } catch (err) {
       console.error("Failed to complete onboarding", err);
     } finally {
@@ -271,57 +280,130 @@ export default function MyOnboardingPage() {
 
   return (
     <div
-      className="page-container"
       style={{
-        padding: 32,
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        minHeight: "100vh",
         background: "var(--bg-page)",
-        overflowY: "auto",
       }}
     >
-      {/* Dynamic Header Banner */}
-      <Card
+      {/* Dedicated Standalone Header Bar */}
+      <header
         style={{
-          marginBottom: 24,
-          background: "linear-gradient(135deg, var(--primary) 0%, #4338CA 100%)",
-          color: "white",
-          border: "none",
-          borderRadius: 16,
-          flexShrink: 0,
-          boxShadow: "0 10px 25px -5px rgba(79, 70, 229, 0.2)",
+          height: 64,
+          padding: "0 32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "white",
+          borderBottom: "1px solid var(--border)",
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
         }}
       >
-        <CardBody
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {company?.logoUrl ? (
+            <img
+              src={company.logoUrl}
+              alt={company.name || "Company"}
+              style={{ height: 32, maxWidth: 140, objectFit: "contain" }}
+            />
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 750, fontSize: 16 }}>
+              <EasyHRMark size={26} />
+              <span>{company?.name || "EasyHR"}</span>
+            </div>
+          )}
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              padding: "4px 10px",
+              borderRadius: 20,
+              background: "var(--primary-tint, #f5f3ff)",
+              color: "var(--primary, #7c3aed)",
+            }}
+          >
+            Employee Onboarding Portal
+          </span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Avatar name={employeeName} size="sm" src={employee?.avatar || clerkUser?.imageUrl} />
+            <div style={{ display: "flex", flexDirection: "column", textAlign: "right" }}>
+              <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-1)" }}>{employeeName}</span>
+              <span style={{ fontSize: 11, color: "var(--text-4)" }}>{employee?.workEmail || clerkUser?.primaryEmailAddress?.emailAddress}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => signOut({ redirectUrl: "/auth/sign-in" })}
+            className="btn-secondary btn-sm row gap-6 align-center"
+            style={{ fontSize: 12, padding: "6px 12px", cursor: "pointer" }}
+          >
+            <LogOut size={13} />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <div
+        className="page-container"
+        style={{
+          padding: 32,
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          overflowY: "auto",
+        }}
+      >
+        {/* Dynamic Header Banner */}
+        <Card
           style={{
-            padding: "24px 32px",
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
+            marginBottom: 24,
+            background: "linear-gradient(135deg, var(--primary) 0%, #4338CA 100%)",
+            color: "white",
+            border: "none",
+            borderRadius: 16,
+            flexShrink: 0,
+            boxShadow: "0 10px 25px -5px rgba(79, 70, 229, 0.2)",
           }}
         >
-          <div className="row gap-20 align-center">
-            <div
-              style={{
-                padding: 4,
-                background: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                border: "2px solid white",
-              }}
-            >
-              <Avatar
-                name={employeeName}
-                size="xl"
-                src={employee?.avatar || clerkUser?.imageUrl}
-              />
-            </div>
-            <div>
-              <div className="row gap-8 align-center mb-4">
-                <h1 className="text-2xl fw-800 m-0" style={{ color: "white" }}>
-                  Welcome aboard, {employee?.firstName || "there"}! 🎉
-                </h1>
+          <CardBody
+            style={{
+              padding: "24px 32px",
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div className="row gap-20 align-center">
+              <div
+                style={{
+                  padding: 4,
+                  background: "rgba(255,255,255,0.2)",
+                  borderRadius: "50%",
+                  border: "2px solid white",
+                }}
+              >
+                <Avatar
+                  name={employeeName}
+                  size="xl"
+                  src={employee?.avatar || clerkUser?.imageUrl}
+                />
+              </div>
+              <div>
+                <div className="row gap-8 align-center mb-4">
+                  <h1 className="text-2xl fw-800 m-0" style={{ color: "white" }}>
+                    Welcome aboard, {employee?.firstName || "there"}!
+                  </h1>
                 {isCompleted && (
                   <span
                     style={{
@@ -421,13 +503,21 @@ export default function MyOnboardingPage() {
                 </div>
               </div>
 
-              <div className="row gap-12">
+              <div className="row gap-12 align-center">
+                <Link
+                  href="/dashboard"
+                  className="btn-primary row gap-6 align-center"
+                  style={{ textDecoration: "none", padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700 }}
+                >
+                  <span>Enter Workspace & Dashboard</span>
+                  <ArrowRight size={15} />
+                </Link>
                 <Link
                   href="/attendance"
-                  className="btn-primary row gap-6 align-center"
+                  className="btn-secondary row gap-6 align-center"
                   style={{ textDecoration: "none", padding: "10px 18px", borderRadius: 8, fontSize: 13 }}
                 >
-                  Clock In & Attendance &rarr;
+                  Clock In & Attendance
                 </Link>
                 <Link
                   href="/time-off"
@@ -435,13 +525,6 @@ export default function MyOnboardingPage() {
                   style={{ textDecoration: "none", padding: "10px 18px", borderRadius: 8, fontSize: 13 }}
                 >
                   Request Time Off
-                </Link>
-                <Link
-                  href="/payroll"
-                  className="btn-secondary row gap-6 align-center"
-                  style={{ textDecoration: "none", padding: "10px 18px", borderRadius: 8, fontSize: 13 }}
-                >
-                  Pay Stubs
                 </Link>
               </div>
             </div>
@@ -1032,7 +1115,7 @@ export default function MyOnboardingPage() {
                           : undefined,
                       }}
                     >
-                      {isSaving ? "Completing..." : isCompleted ? "Active Employee (Completed)" : "Sign & Complete Onboarding 🎉"}
+                      {isSaving ? "Completing..." : isCompleted ? "Active Employee (Completed)" : "Sign & Complete Onboarding"}
                     </button>
                   </div>
                 </div>
@@ -1136,5 +1219,6 @@ export default function MyOnboardingPage() {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
