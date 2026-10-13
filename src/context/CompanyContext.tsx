@@ -253,10 +253,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       const res = await fetch(`${API_BASE_URL}/api/v1/organization/details`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify({
           displayName: input.name,
           legalName: input.legalName,
@@ -290,10 +287,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify(input),
       });
 
@@ -317,20 +311,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       if (typeof fileOrDataUrl === "string") {
         res = await fetch(`${API_BASE_URL}/api/v1/branding/logo`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(token),
           body: JSON.stringify({ logoDataUrl: fileOrDataUrl }),
         });
       } else {
         const formData = new FormData();
         formData.append("logo", fileOrDataUrl);
+        const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+        const sub = getWorkspaceSubdomain();
+        if (sub) headers["X-EasyHR-Workspace"] = sub;
+
         res = await fetch(`${API_BASE_URL}/api/v1/branding/logo`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
           body: formData,
         });
       }
@@ -356,20 +349,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       if (typeof fileOrDataUrl === "string") {
         res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(token),
           body: JSON.stringify({ avatarDataUrl: fileOrDataUrl }),
         });
       } else {
         const formData = new FormData();
         formData.append("avatar", fileOrDataUrl);
+        const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+        const sub = getWorkspaceSubdomain();
+        if (sub) headers["X-EasyHR-Workspace"] = sub;
+
         res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
           body: formData,
         });
       }
@@ -393,10 +385,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       const res = await fetch(`${API_BASE_URL}/api/v1/locations`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify(location),
       });
 

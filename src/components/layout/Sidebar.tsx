@@ -110,7 +110,84 @@ export function Sidebar() {
 
   // ─── Navigation Structure ─────────────────────────────────────────────────
   const navSections: { sectionTitle: string; items: NavParent[] }[] = useMemo(() => {
-    const mainItems: NavParent[] = [
+    // 1. Employee: Exactly two sidebar groups
+    if (role === "Employee") {
+      const employeeItems: NavParent[] = [
+        {
+          id: "workspace",
+          label: "Workspace",
+          icon: <LayoutGrid size={17} strokeWidth={2.2} />,
+          children: [
+            { label: "Overview", href: "/dashboard" },
+            { label: "Organization Chart", href: "/org-chart" },
+            { label: "People Directory", href: "/people" },
+            { label: "Company Documents", href: "/documents" },
+            { label: "Policies & Handbook", href: "/policies" },
+          ],
+        },
+        {
+          id: "timeoff",
+          label: "Time & Attendance",
+          icon: <Palmtree size={17} strokeWidth={2.2} />,
+          children: [
+            { label: "Leave Requests", href: "/time-off" },
+            { label: "Live Attendance", href: "/attendance" },
+            { label: "My Timesheet", href: "/time" },
+          ],
+        },
+      ];
+      return [{ sectionTitle: "MAIN", items: employeeItems }];
+    }
+
+    // 2. Manager: Team lead and approval workflows
+    if (isManager) {
+      const managerItems: NavParent[] = [
+        {
+          id: "dashboard",
+          label: "Dashboard",
+          icon: <LayoutGrid size={17} strokeWidth={2.2} />,
+          children: [
+            { label: "Overview", href: "/dashboard" },
+            { label: "Approvals Inbox", href: "/inbox" },
+          ],
+        },
+        {
+          id: "timeoff",
+          label: "Time & Attendance",
+          icon: <Palmtree size={17} strokeWidth={2.2} />,
+          children: [
+            { label: "Leave Management", href: "/time-off" },
+            { label: "Live Attendance", href: "/attendance" },
+            { label: "Shift Scheduling", href: "/shift-scheduling" },
+            { label: "Time Tracking", href: "/time" },
+          ],
+        },
+        {
+          id: "organization",
+          label: "People & Team",
+          icon: <Users size={17} strokeWidth={2.2} />,
+          children: [
+            { label: "My Team", href: "/my-team" },
+            { label: "Team Requests", href: "/team-requests" },
+            { label: "People Directory", href: "/people" },
+            { label: "Organization Chart", href: "/org-chart" },
+          ],
+        },
+        {
+          id: "records",
+          label: "Documents & Policies",
+          icon: <FolderOpen size={17} strokeWidth={2.2} />,
+          children: [
+            { label: "Company Documents", href: "/documents" },
+            { label: "Policies & Handbook", href: "/policies" },
+          ],
+        },
+      ];
+      return [{ sectionTitle: "MAIN", items: managerItems }];
+    }
+
+    // 3. HR Admin / Company Owner: Full suite
+    const adminItems: NavParent[] = [
       {
         id: "dashboard",
         label: "Dashboard",
@@ -150,8 +227,8 @@ export function Sidebar() {
         children: [
           { label: "People Directory", href: "/people" },
           { label: "Organization Chart", href: "/org-chart" },
-          ...(isHRAdmin ? [{ label: "Departments", href: "/departments" }] : []),
-          ...(isManager ? [{ label: "My Team", href: "/my-team" }] : []),
+          { label: "Departments", href: "/departments" },
+          { label: "My Team", href: "/my-team" },
         ],
       },
       {
@@ -174,26 +251,22 @@ export function Sidebar() {
           { label: "Policies & Handbook", href: "/policies" },
         ],
       },
-      ...(isHRAdmin
-        ? [
-            {
-              id: "admin",
-              label: "Administration",
-              icon: <Settings size={17} strokeWidth={2.2} />,
-              children: [
-                { label: "Automations & Workflows", href: "/workflows" },
-                { label: "Company Holidays", href: "/holidays" },
-                { label: "Company Settings", href: "/company-settings" },
-                { label: "Roles & Permissions", href: "/roles-permissions" },
-                { label: "Support Tickets", href: "/support" },
-              ],
-            },
-          ]
-        : []),
+      {
+        id: "admin",
+        label: "Administration",
+        icon: <Settings size={17} strokeWidth={2.2} />,
+        children: [
+          { label: "Automations & Workflows", href: "/workflows" },
+          { label: "Company Holidays", href: "/holidays" },
+          { label: "Company Settings", href: "/company-settings" },
+          { label: "Roles & Permissions", href: "/roles-permissions" },
+          { label: "Support Tickets", href: "/support" },
+        ],
+      },
     ];
 
-    return [{ sectionTitle: "MAIN", items: mainItems }];
-  }, [isHRAdmin, isManager]);
+    return [{ sectionTitle: "MAIN", items: adminItems }];
+  }, [role, isManager]);
 
   // Auto-expand parent if current route is within it
   useEffect(() => {
@@ -880,7 +953,7 @@ export function Sidebar() {
                       color: "#A1A1AA",
                     }}
                   >
-                    {role ? role.replace(" Admin", "") : "MEMBER"}
+                    {isHRAdmin ? "ADMIN" : isManager ? "MANAGER" : "EMPLOYEE"}
                   </span>
                 </div>
               )}
