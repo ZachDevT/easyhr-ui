@@ -17,6 +17,11 @@ import {
   UserRound,
   CheckCircle2,
   Loader2,
+  DollarSign,
+  Smartphone,
+  Wallet,
+  Sparkles,
+  Edit2,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -24,6 +29,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { toast } from "@/components/ui/Toast";
+import { EditEmployeeModal } from "@/components/people/EditEmployeeModal";
 
 interface EmployeeProfileData {
   id: string;
@@ -46,6 +52,25 @@ interface EmployeeProfileData {
   startDate?: string;
   avatar?: string;
   createdAt: string;
+
+  // Onboarding & Disbursement details
+  birthDate?: string;
+  bio?: string;
+  avatarUrl?: string;
+  shirtSize?: string;
+  favoriteFood?: string;
+  favoriteMovies?: string;
+  favoriteMusic?: string;
+  coffeeTea?: string;
+  funFact?: string;
+  paymentMethod?: string;
+  bankName?: string;
+  bankRoutingNumber?: string;
+  bankAccountNumber?: string;
+  mobileMoneyProvider?: string;
+  mobileMoneyPhone?: string;
+  walletEmail?: string;
+  handbookSignedAt?: string;
 }
 
 export default function EmployeeProfile() {
@@ -56,6 +81,34 @@ export default function EmployeeProfile() {
   const [employee, setEmployee] = useState<EmployeeProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isActivating, setIsActivating] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [managers, setManagers] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
+
+  useEffect(() => {
+    getToken().then((token) => {
+      if (!token) return;
+      Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/departments`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/v1/locations`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/v1/employees`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]).then(async ([deptRes, locRes, empRes]) => {
+        if (deptRes.ok) {
+          const d = await deptRes.json();
+          setDepartments(Array.isArray(d) ? d : d.data || []);
+        }
+        if (locRes.ok) {
+          const l = await locRes.json();
+          setLocations(Array.isArray(l) ? l : l.data || []);
+        }
+        if (empRes.ok) {
+          const emps = await empRes.json();
+          setManagers(Array.isArray(emps) ? emps : emps.data || []);
+        }
+      }).catch(() => {});
+    });
+  }, [getToken]);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -159,6 +212,21 @@ export default function EmployeeProfile() {
                 <span>Activate as Active Employee</span>
               </button>
             )}
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="btn-secondary row gap-6 align-center"
+              style={{
+                background: "white",
+                color: "var(--text-1)",
+                padding: "10px 18px",
+                borderRadius: 20,
+                border: "1px solid var(--border)",
+                fontWeight: 650,
+                cursor: "pointer",
+              }}
+            >
+              <Edit2 size={15} /> Edit Details
+            </button>
             <Link
               href="/people"
               className="btn-secondary row gap-6 align-center"
@@ -247,6 +315,79 @@ export default function EmployeeProfile() {
                 </div>
               </CardBody>
             </Card>
+
+            {/* Compensation & Disbursement */}
+            {(employee.paymentMethod || employee.mobileMoneyProvider || employee.bankName) && (
+              <Card>
+                <CardBody>
+                  <SectionHeading
+                    title="Disbursement & Payroll"
+                    description="Designated compensation payout account"
+                  />
+                  <div className="col gap-12">
+                    <DataRow
+                      leading={
+                        employee.paymentMethod === "Mobile Money" ? (
+                          <Smartphone size={18} color="var(--primary)" />
+                        ) : employee.paymentMethod === "PayPal / Digital Wallet" ? (
+                          <Wallet size={18} color="var(--primary)" />
+                        ) : (
+                          <DollarSign size={18} color="var(--primary)" />
+                        )
+                      }
+                      title={
+                        employee.paymentMethod === "Mobile Money"
+                          ? `${employee.mobileMoneyProvider || "Mobile Money"} (${employee.mobileMoneyPhone || "Phone registered"})`
+                          : employee.paymentMethod === "PayPal / Digital Wallet"
+                          ? `PayPal: ${employee.walletEmail || "Wallet on file"}`
+                          : employee.bankName
+                          ? `${employee.bankName}${employee.bankAccountNumber ? ` · ····${employee.bankAccountNumber.slice(-4)}` : ""}`
+                          : employee.paymentMethod || "Direct Deposit"
+                      }
+                      subtitle={employee.paymentMethod || "Disbursement Channel"}
+                      meta={<StatusPill tone="success">Active</StatusPill>}
+                    />
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Culture & Bio */}
+            {(employee.bio || employee.funFact || employee.favoriteFood || employee.favoriteMusic) && (
+              <Card>
+                <CardBody>
+                  <SectionHeading
+                    title="About & Culture"
+                    description="Fun facts, favorites, and profile bio"
+                  />
+                  {employee.bio && (
+                    <p style={{ fontSize: 13.5, color: "#3F3F46", lineHeight: 1.6, margin: "0 0 16px" }}>
+                      {employee.bio}
+                    </p>
+                  )}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+                    {employee.funFact && (
+                      <Detail label="Fun Fact" value={employee.funFact} />
+                    )}
+                    {employee.favoriteFood && (
+                      <Detail label="Favorite Food" value={employee.favoriteFood} />
+                    )}
+                    {employee.favoriteMusic && (
+                      <Detail label="Favorite Music" value={employee.favoriteMusic} />
+                    )}
+                    {employee.favoriteMovies && (
+                      <Detail label="Favorite Movies" value={employee.favoriteMovies} />
+                    )}
+                    {employee.coffeeTea && (
+                      <Detail label="Beverage" value={employee.coffeeTea} />
+                    )}
+                    {employee.shirtSize && (
+                      <Detail label="Shirt Size" value={employee.shirtSize} />
+                    )}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -277,6 +418,18 @@ export default function EmployeeProfile() {
           </div>
         </div>
       </main>
+
+      {employee && (
+        <EditEmployeeModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={() => fetchProfile()}
+          employee={employee}
+          departments={departments}
+          locations={locations}
+          managers={managers}
+        />
+      )}
     </>
   );
 }

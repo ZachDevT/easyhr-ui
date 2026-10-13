@@ -11,6 +11,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { PeopleDirectorySkeleton } from "@/components/ui/Skeleton";
 
+import { AddHireModal } from "@/components/people/AddHireModal";
+
 interface Employee {
   id: string;
   firstName: string;
@@ -35,9 +37,12 @@ export default function PeopleDirectory() {
   const { getToken } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<string[]>(["All"]);
+  const [rawDepartments, setRawDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [rawLocations, setRawLocations] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddHireOpen, setIsAddHireOpen] = useState(false);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -46,9 +51,10 @@ export default function PeopleDirectory() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [empRes, deptRes] = await Promise.all([
+      const [empRes, deptRes, locRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/employees?limit=100`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/departments`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/locations`, { headers }),
       ]);
 
       if (empRes.ok) {
@@ -59,8 +65,15 @@ export default function PeopleDirectory() {
 
       if (deptRes.ok) {
         const deptJson = await deptRes.json();
-        const deptNames: string[] = (deptJson.data || []).map((d: any) => String(d.name)).filter(Boolean);
+        const rawDepts = deptJson.data || [];
+        setRawDepartments(rawDepts);
+        const deptNames: string[] = rawDepts.map((d: any) => String(d.name)).filter(Boolean);
         setDepartments(["All", ...Array.from(new Set<string>(deptNames))]);
+      }
+
+      if (locRes.ok) {
+        const locJson = await locRes.json();
+        setRawLocations(locJson.data || []);
       }
     } catch (err) {
       console.error("Failed to load people directory", err);
@@ -87,24 +100,54 @@ export default function PeopleDirectory() {
         subtitle="Find and connect with everyone across your organization."
         icon={<Users size={28} />}
         actions={
-          <Link
-            href="/onboarding"
-            className="btn-primary row gap-8 align-center"
-            style={{
-              background: "white",
-              color: "var(--primary)",
-              border: "none",
-              padding: "10px 20px",
-              fontSize: 14,
-              fontWeight: 700,
-              borderRadius: 20,
-              textDecoration: "none",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-            }}
-          >
-            <UserPlus size={16} /> Onboard New Hire
-          </Link>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={() => setIsAddHireOpen(true)}
+              className="btn-primary row gap-8 align-center"
+              style={{
+                background: "white",
+                color: "var(--primary)",
+                border: "none",
+                padding: "10px 20px",
+                fontSize: 14,
+                fontWeight: 700,
+                borderRadius: 20,
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              }}
+            >
+              <UserPlus size={16} /> Add Hire Manually
+            </button>
+            <Link
+              href="/onboarding"
+              style={{
+                padding: "10px 18px",
+                borderRadius: 20,
+                fontSize: 14,
+                fontWeight: 600,
+                color: "white",
+                background: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              Onboarding Pipeline
+            </Link>
+          </div>
         }
+      />
+
+      <AddHireModal
+        isOpen={isAddHireOpen}
+        onClose={() => setIsAddHireOpen(false)}
+        onSuccess={fetchEmployees}
+        departments={rawDepartments}
+        locations={rawLocations}
+        managers={employees}
       />
 
       <main style={{ padding: "0 24px 32px" }}>

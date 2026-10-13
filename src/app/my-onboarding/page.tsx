@@ -23,6 +23,9 @@ import {
   Building,
   Briefcase,
   Calendar,
+  Smartphone,
+  Globe,
+  Wallet,
 } from "lucide-react";
 import { useAuth, useUser, useClerk } from "@clerk/nextjs";
 import { useCompany } from "@/context/CompanyContext";
@@ -70,6 +73,9 @@ interface EmployeeMe {
   bankName?: string;
   bankRoutingNumber?: string;
   bankAccountNumber?: string;
+  mobileMoneyProvider?: string;
+  mobileMoneyPhone?: string;
+  walletEmail?: string;
   handbookSignedAt?: string;
 }
 
@@ -139,11 +145,17 @@ export default function MyOnboardingPage() {
   const [coffeeTea, setCoffeeTea] = useState("Coffee");
   const [funFact, setFunFact] = useState("");
 
-  // Step: Direct Deposit & Emergency Contact
-  const [paymentMethod, setPaymentMethod] = useState("Direct Deposit");
+  // Step: Payroll & Disbursement & Emergency Contact
+  const [paymentMethod, setPaymentMethod] = useState("Mobile Money");
+  const [mobileMoneyProvider, setMobileMoneyProvider] = useState("MTN Mobile Money");
+  const [customProvider, setCustomProvider] = useState("");
+  const [mobileMoneyPhone, setMobileMoneyPhone] = useState("");
+  const [accountHolderName, setAccountHolderName] = useState("");
+  const [walletEmail, setWalletEmail] = useState("");
   const [bankName, setBankName] = useState("");
   const [routingNumber, setRoutingNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
+  const [swiftCode, setSwiftCode] = useState("");
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyRel, setEmergencyRel] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
@@ -205,6 +217,17 @@ export default function MyOnboardingPage() {
           if (data.funFact) setFunFact(data.funFact);
 
           if (data.paymentMethod) setPaymentMethod(data.paymentMethod);
+          if (data.mobileMoneyProvider) {
+            const standardProviders = ["MTN Mobile Money", "M-Pesa", "Airtel Money", "Orange Money", "Wave", "Telebirr", "Moov Africa"];
+            if (standardProviders.includes(data.mobileMoneyProvider)) {
+              setMobileMoneyProvider(data.mobileMoneyProvider);
+            } else {
+              setMobileMoneyProvider("Other");
+              setCustomProvider(data.mobileMoneyProvider);
+            }
+          }
+          if (data.mobileMoneyPhone) setMobileMoneyPhone(data.mobileMoneyPhone);
+          if (data.walletEmail) setWalletEmail(data.walletEmail);
           if (data.bankName) setBankName(data.bankName);
           if (data.bankRoutingNumber) setRoutingNumber(data.bankRoutingNumber);
           if (data.bankAccountNumber) setAccountNumber(data.bankAccountNumber);
@@ -303,9 +326,12 @@ export default function MyOnboardingPage() {
           emergencyContactRelationship: emergencyRel || undefined,
           emergencyContactPhone: emergencyPhone || undefined,
           paymentMethod: paymentMethod || undefined,
-          bankName: bankName || undefined,
-          bankRoutingNumber: routingNumber || undefined,
-          bankAccountNumber: accountNumber || undefined,
+          mobileMoneyProvider: paymentMethod === "Mobile Money" ? (mobileMoneyProvider === "Other" ? (customProvider.trim() || "Mobile Money") : mobileMoneyProvider) : undefined,
+          mobileMoneyPhone: paymentMethod === "Mobile Money" ? mobileMoneyPhone : undefined,
+          walletEmail: paymentMethod === "PayPal / Digital Wallet" ? walletEmail : undefined,
+          bankName: paymentMethod === "Mobile Money" ? (mobileMoneyProvider === "Other" ? (customProvider.trim() || "Mobile Money") : mobileMoneyProvider) : (paymentMethod === "PayPal / Digital Wallet" ? "PayPal" : bankName || undefined),
+          bankRoutingNumber: paymentMethod === "Wire Transfer / SWIFT" ? swiftCode || undefined : (routingNumber || undefined),
+          bankAccountNumber: paymentMethod === "Mobile Money" ? mobileMoneyPhone : (paymentMethod === "PayPal / Digital Wallet" ? walletEmail : accountNumber || undefined),
         }),
       });
 
@@ -361,9 +387,12 @@ export default function MyOnboardingPage() {
           emergencyContactRelationship: emergencyRel || undefined,
           emergencyContactPhone: emergencyPhone || undefined,
           paymentMethod: paymentMethod || undefined,
-          bankName: bankName || undefined,
-          bankRoutingNumber: routingNumber || undefined,
-          bankAccountNumber: accountNumber || undefined,
+          mobileMoneyProvider: paymentMethod === "Mobile Money" ? (mobileMoneyProvider === "Other" ? (customProvider.trim() || "Mobile Money") : mobileMoneyProvider) : undefined,
+          mobileMoneyPhone: paymentMethod === "Mobile Money" ? mobileMoneyPhone : undefined,
+          walletEmail: paymentMethod === "PayPal / Digital Wallet" ? walletEmail : undefined,
+          bankName: paymentMethod === "Mobile Money" ? (mobileMoneyProvider === "Other" ? (customProvider.trim() || "Mobile Money") : mobileMoneyProvider) : (paymentMethod === "PayPal / Digital Wallet" ? "PayPal" : bankName || undefined),
+          bankRoutingNumber: paymentMethod === "Wire Transfer / SWIFT" ? swiftCode || undefined : (routingNumber || undefined),
+          bankAccountNumber: paymentMethod === "Mobile Money" ? mobileMoneyPhone : (paymentMethod === "PayPal / Digital Wallet" ? walletEmail : accountNumber || undefined),
           handbookSignedAt: new Date().toISOString(),
         }),
       });
@@ -948,89 +977,332 @@ export default function MyOnboardingPage() {
               </div>
             )}
 
-            {/* STEP 4: Direct Deposit & Emergency Contact */}
+            {/* STEP 4: Payroll, Disbursement & Emergency Contact */}
             {currentStep.key === "payment" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
                 <div>
                   <h1 style={{ fontSize: 20, fontWeight: 750, margin: 0, color: "#18181B" }}>
-                    Payroll & Direct Deposit
+                    Payroll & Disbursement
                   </h1>
                   <p style={{ fontSize: 13, color: "#71717A", margin: "4px 0 0" }}>
-                    Configure how your compensation is disbursed and register emergency details.
+                    Configure how your compensation is disbursed and register verified emergency details.
                   </p>
                 </div>
 
-                {/* Payment Method Selector */}
+                {/* Disbursement Method Selector */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Disbursement Method</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {["Direct Deposit", "Paper Check", "Wire Transfer"].map((method) => {
-                      const isSel = paymentMethod === method;
+                  <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                    Disbursement Channel
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))", gap: 8 }}>
+                    {[
+                      { id: "Mobile Money", label: "Mobile Money", desc: "M-Pesa, MTN, Airtel, Wave", icon: <Smartphone size={16} /> },
+                      { id: "Direct Deposit", label: "Direct Deposit", desc: "Local Bank (ACH / EFT)", icon: <Building size={16} /> },
+                      { id: "PayPal / Digital Wallet", label: "PayPal / Wallet", desc: "PayPal, Wise, Wallet ID", icon: <Wallet size={16} /> },
+                      { id: "Wire Transfer / SWIFT", label: "Wire Transfer", desc: "International SWIFT", icon: <Globe size={16} /> },
+                      { id: "Paper Check", label: "Paper Check", desc: "Dispatched by courier", icon: <FileText size={16} /> },
+                    ].map((m) => {
+                      const isSel = paymentMethod === m.id;
                       return (
                         <button
-                          key={method}
+                          key={m.id}
                           type="button"
-                          onClick={() => setPaymentMethod(method)}
+                          onClick={() => setPaymentMethod(m.id)}
                           style={{
-                            padding: "8px 16px",
-                            borderRadius: 10,
+                            padding: "10px 12px",
+                            borderRadius: 12,
                             border: isSel ? "2px solid #7C3AED" : "1px solid #E4E4E7",
                             background: isSel ? "#F5F3FF" : "#FFFFFF",
                             color: isSel ? "#7C3AED" : "#18181B",
-                            fontWeight: isSel ? 700 : 500,
-                            fontSize: 13,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                            gap: 4,
                             cursor: "pointer",
+                            textAlign: "left",
+                            transition: "all 0.15s ease",
                           }}
                         >
-                          {method}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13 }}>
+                            {m.icon}
+                            <span>{m.label}</span>
+                          </div>
+                          <span style={{ fontSize: 11, color: isSel ? "#6D28D9" : "#71717A", lineHeight: 1.2 }}>
+                            {m.desc}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Bank Account Fields */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Bank / Institution Name</label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={bankName}
-                      onChange={(e) => setBankName(e.target.value)}
-                      placeholder="E.g. Chase, Bank of America, Wells Fargo..."
-                      style={{ fontSize: 13 }}
-                    />
+                {/* Sub-form based on method */}
+                {paymentMethod === "Mobile Money" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                      padding: 16,
+                      borderRadius: 14,
+                      background: "#FAFAFA",
+                      border: "1px solid #F4F4F5",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                        Select Network / Provider
+                      </label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {[
+                          "MTN Mobile Money",
+                          "M-Pesa",
+                          "Airtel Money",
+                          "Orange Money",
+                          "Wave",
+                          "Telebirr",
+                          "Moov Africa",
+                          "Other",
+                        ].map((provider) => {
+                          const isSel = mobileMoneyProvider === provider;
+                          return (
+                            <button
+                              key={provider}
+                              type="button"
+                              onClick={() => setMobileMoneyProvider(provider)}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: 20,
+                                fontSize: 12,
+                                fontWeight: isSel ? 700 : 500,
+                                border: isSel ? "1.5px solid #7C3AED" : "1px solid #E4E4E7",
+                                background: isSel ? "#7C3AED" : "#FFFFFF",
+                                color: isSel ? "#FFFFFF" : "#3F3F46",
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              {provider}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {mobileMoneyProvider === "Other" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                          Custom Network Name
+                        </label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={customProvider}
+                          onChange={(e) => setCustomProvider(e.target.value)}
+                          placeholder="E.g. Tigo Pesa, Vodafone Cash..."
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                          Mobile Money Registered Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          className="input"
+                          value={mobileMoneyPhone}
+                          onChange={(e) => setMobileMoneyPhone(e.target.value)}
+                          placeholder="+250 78X XXX XXX or +254 7XX..."
+                          style={{ fontSize: 13 }}
+                        />
+                        <span style={{ fontSize: 11, color: "#71717A" }}>
+                          Include country code (e.g. +254, +250, +233, +234, +225)
+                        </span>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                          Registered SIM / Account Name
+                        </label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={accountHolderName || `${employee?.firstName || ""} ${employee?.lastName || ""}`.trim()}
+                          onChange={(e) => setAccountHolderName(e.target.value)}
+                          placeholder="Full name as registered on SIM card"
+                          style={{ fontSize: 13 }}
+                        />
+                        <span style={{ fontSize: 11, color: "#71717A" }}>
+                          Must match official government ID on file
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                )}
+
+                {paymentMethod === "PayPal / Digital Wallet" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      padding: 16,
+                      borderRadius: 14,
+                      background: "#FAFAFA",
+                      border: "1px solid #F4F4F5",
+                    }}
+                  >
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Routing / Transit Number</label>
+                      <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
+                        PayPal or Digital Wallet Email
+                      </label>
+                      <input
+                        type="email"
+                        className="input"
+                        value={walletEmail}
+                        onChange={(e) => setWalletEmail(e.target.value)}
+                        placeholder="your-wallet-email@example.com"
+                        style={{ fontSize: 13 }}
+                      />
+                      <span style={{ fontSize: 11, color: "#71717A" }}>
+                        Disbursements will be routed to your verified digital wallet address.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === "Direct Deposit" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      padding: 16,
+                      borderRadius: 14,
+                      background: "#FAFAFA",
+                      border: "1px solid #F4F4F5",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Bank / Institution Name</label>
                       <input
                         type="text"
                         className="input"
-                        value={routingNumber}
-                        onChange={(e) => setRoutingNumber(e.target.value)}
-                        placeholder="9-digit routing"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        placeholder="E.g. Chase, Bank of America, Ecobank, Equity Bank..."
                         style={{ fontSize: 13 }}
                       />
                     </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Routing / Transit / Sort Code</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={routingNumber}
+                          onChange={(e) => setRoutingNumber(e.target.value)}
+                          placeholder="Routing or branch code"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Account Number</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          placeholder="Account number"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === "Wire Transfer / SWIFT" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      padding: 16,
+                      borderRadius: 14,
+                      background: "#FAFAFA",
+                      border: "1px solid #F4F4F5",
+                    }}
+                  >
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Account Number</label>
+                      <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Beneficiary Bank Name</label>
                       <input
                         type="text"
                         className="input"
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                        placeholder="Account number"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        placeholder="E.g. Standard Bank, BNP Paribas, Barclays..."
                         style={{ fontSize: 13 }}
                       />
                     </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>SWIFT / BIC Code</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={swiftCode}
+                          onChange={(e) => setSwiftCode(e.target.value)}
+                          placeholder="8 or 11 characters (e.g. SBICZAJJ)"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>IBAN / Account Number</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          placeholder="International bank account number"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {paymentMethod === "Paper Check" && (
+                  <div
+                    style={{
+                      padding: 16,
+                      borderRadius: 14,
+                      background: "#F8FAFC",
+                      border: "1px solid #E2E8F0",
+                      fontSize: 13,
+                      color: "#475569",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Paper checks will be issued on company payroll paydays and mailed directly to your registered residential address:
+                    <div style={{ marginTop: 8, fontWeight: 600, color: "#1E293B" }}>
+                      {[addressLine1, addressLine2, city, administrativeArea, postalCode].filter(Boolean).join(", ") || "No address entered yet (please complete Step 2)."}
+                    </div>
+                  </div>
+                )}
 
                 {/* Emergency Contact */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#52525B", textTransform: "uppercase" }}>Emergency Contact</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 6 }}>
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "#18181B" }}>
+                      Emergency Contact Details
+                    </h3>
+                    <p style={{ fontSize: 12, color: "#71717A", margin: "2px 0 0" }}>
+                      Designate a primary contact in case of workplace emergencies.
+                    </p>
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <input
                       type="text"
@@ -1045,7 +1317,7 @@ export default function MyOnboardingPage() {
                       className="input"
                       value={emergencyRel}
                       onChange={(e) => setEmergencyRel(e.target.value)}
-                      placeholder="Relationship (e.g. Spouse, Parent)"
+                      placeholder="Relationship (e.g. Spouse, Parent, Sibling)"
                       style={{ fontSize: 13 }}
                     />
                   </div>
@@ -1054,7 +1326,7 @@ export default function MyOnboardingPage() {
                     className="input"
                     value={emergencyPhone}
                     onChange={(e) => setEmergencyPhone(e.target.value)}
-                    placeholder="Emergency Phone Number"
+                    placeholder="Emergency Phone Number (e.g. +250 78...)"
                     style={{ fontSize: 13 }}
                   />
                 </div>
