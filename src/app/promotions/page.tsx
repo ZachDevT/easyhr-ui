@@ -46,6 +46,7 @@ interface OrgEmployee {
   lastName: string;
   jobTitle?: string;
   department?: string;
+  departmentId?: string;
   avatar?: string;
   manager?: string;
 }
@@ -60,9 +61,14 @@ export default function PromotionsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [departments, setDepartments] = useState<{id:string;name:string}[]>([]);
+  const [targetDepartmentId, setTargetDepartmentId] = useState("");
+  const [departmentPositions, setDepartmentPositions] = useState<{id:string;title:string;level:string}[]>([]);
+  const [positionsLoading, setPositionsLoading] = useState(false);
   const [form, setForm] = useState({
     employeeId: "",
     newJobTitle: "",
+    positionId: "",
     effectiveDate: new Date().toISOString().split("T")[0],
     newCompensation: "",
     rationale: "",
@@ -74,19 +80,18 @@ export default function PromotionsPage() {
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [promoRes, empsRes] = await Promise.all([
+      const [promoRes, empsRes, departmentsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/promotions`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/employees`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/departments`, { headers }),
       ]);
 
       if (promoRes.ok) {
         const pJson = await promoRes.json();
         setPromotions(Array.isArray(pJson) ? pJson : pJson.data || []);
       }
-      if (empsRes.ok) {
-        const eJson = await empsRes.json();
-        setEmployees(Array.isArray(eJson) ? eJson : eJson.data || []);
-      }
+      if (empsRes.ok) { const eJson = await empsRes.json(); setEmployees(Array.isArray(eJson) ? eJson : eJson.data || []); }
+      if (departmentsRes.ok) { const dJson = await departmentsRes.json(); setDepartments(dJson.data || dJson || []); }
     } catch (err) {
       console.error("Failed to load promotions", err);
     } finally {
@@ -97,6 +102,15 @@ export default function PromotionsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const employee = employees.find((item) => item.id === form.employeeId);
+    const departmentId = targetDepartmentId || employee?.departmentId;
+    if (!departmentId) { setDepartmentPositions([]); return; }
+    let cancelled = false;
+    (async () => { setPositionsLoading(true); try { const token = await getToken(); const response = await fetch(`${API_BASE_URL}/api/v1/departments/${departmentId}/positions`, {headers:{Authorization:`Bearer ${token}`}}); const payload = await response.json(); if(response.ok&&!cancelled)setDepartmentPositions((payload.data||payload||[]).filter((p:{status:string})=>p.status==='active')); } catch { if(!cancelled)setDepartmentPositions([]); } finally { if(!cancelled)setPositionsLoading(false); } })();
+    return () => { cancelled = true; };
+  }, [employees, form.employeeId, targetDepartmentId, getToken]);
 
   const employeeOptions = useMemo(() => {
     return employees.map((e) => ({
@@ -109,7 +123,7 @@ export default function PromotionsPage() {
 
   const handleCreatePromotion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.employeeId || !form.newJobTitle.trim() || !form.effectiveDate) {
+    if (!form.employeeId || !form.positionId || !form.effectiveDate) {
       toast.error("Required fields", "Please select an employee, title, and effective date.");
       return;
     }
@@ -129,6 +143,7 @@ export default function PromotionsPage() {
         },
         body: JSON.stringify({
           newJobTitle: form.newJobTitle.trim(),
+          positionId: form.positionId,
           effectiveDate: form.effectiveDate,
           newCompensationMinor: compMinor,
           rationale: form.rationale.trim() || undefined,
@@ -141,6 +156,7 @@ export default function PromotionsPage() {
         setForm({
           employeeId: "",
           newJobTitle: "",
+          positionId: "",
           effectiveDate: new Date().toISOString().split("T")[0],
           newCompensation: "",
           rationale: "",
@@ -331,23 +347,23 @@ export default function PromotionsPage() {
             </label>
             <SearchableSelect
               value={form.employeeId}
-              onChange={(val) => setForm({ ...form, employeeId: val })}
+              onChange={(val) => { const employee=employees.find((item)=>item.id===val); setForm({ ...form, employeeId: val, positionId: "", newJobTitle: "" }); setTargetDepartmentId(employee?.departmentId || ""); }}
               options={employeeOptions}
               placeholder="Select employee..."
               searchPlaceholder="Search by name or department..."
             />
           </div>
 
+          <div><label className="text-xs fw-700 text-2 mb-6" style={{display:"block"}}>Target department *</label><select className="input" value={targetDepartmentId} onChange={(e)=>{setTargetDepartmentId(e.target.value);setForm({...form,positionId:"",newJobTitle:""})}}><option value="">Choose a department</option>{departments.map((department)=><option key={department.id} value={department.id}>{department.name}</option>)}</select></div>
+
           <div>
             <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
-              New Job Title / Position *
+              New Position *
             </label>
-            <Input
-              value={form.newJobTitle}
-              onChange={(e) => setForm({ ...form, newJobTitle: e.target.value })}
-              placeholder="e.g. Senior Lead Developer or Regional Operations Manager"
-              required
-            />
+            <select className="input" required value={form.positionId} disabled={!form.employeeId || positionsLoading} onChange={(e)=>{const position=departmentPositions.find((item)=>item.id===e.target.value);setForm({...form,positionId:e.target.value,newJobTitle:position?.title||""})}}>
+              <option value="">{!form.employeeId?"Choose employee first":positionsLoading?"Loading department positions…":departmentPositions.length?"Choose a role in the employee’s department":"No active positions in this department"}</option>
+              {departmentPositions.map((position)=><option key={position.id} value={position.id}>{position.title} · {position.level}</option>)}
+            </select>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

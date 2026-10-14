@@ -92,7 +92,7 @@ export default function BenefitsPage() {
   const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
   const [planForm, setPlanForm] = useState({
     name: "",
-    category: "health",
+    category: "Health & Medical",
     description: "",
     employerCost: 0,
     employeeCost: 0,
@@ -202,7 +202,7 @@ export default function BenefitsPage() {
         setShowAddPlanModal(false);
         setPlanForm({
           name: "",
-          category: "health",
+          category: "Health & Medical",
           description: "",
           employerCost: 0,
           employeeCost: 0,
@@ -701,16 +701,7 @@ export default function BenefitsPage() {
           <div className="grid-2 gap-16">
             <div className="col gap-6">
               <label className="text-xs fw-700 text-2">Category</label>
-              <Select
-                value={planForm.category}
-                onChange={(e) => setPlanForm({ ...planForm, category: e.target.value })}
-              >
-                <option value="health">Health & Medical</option>
-                <option value="retirement">Retirement & Financial</option>
-                <option value="allowance">Meal & Wellness</option>
-                <option value="transit">Transit & Commute</option>
-                <option value="other">Other Allowance</option>
-              </Select>
+              <Input type="text" maxLength={80} placeholder="e.g. Health cover, lunch stipend, pension" value={planForm.category} onChange={(e) => setPlanForm({ ...planForm, category: e.target.value })} />
             </div>
             <div className="col gap-6">
               <label className="text-xs fw-700 text-2">Currency (ISO code)</label>

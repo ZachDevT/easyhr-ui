@@ -32,6 +32,7 @@ interface ShiftScheduleItem {
   name: string;
   timezone: string;
   description?: string;
+  entries?: { dayOfWeek: number; startTime: string; endTime: string; breakMinutes: number }[];
 }
 
 interface OrgEmployee {
@@ -42,9 +43,10 @@ interface OrgEmployee {
   department?: string;
   avatar?: string;
   status?: string;
+  positionId?: string;
 }
 
-const WEEK_DAYS = ["MON", "TUE", "WED", "THU", "FRI"];
+const WEEK_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 export default function ShiftSchedulingPage() {
   const { getToken } = useAuth();
@@ -52,17 +54,17 @@ export default function ShiftSchedulingPage() {
   const [activeTab, setActiveTab] = useState(role === "Employee" ? "My Shifts" : "Team Schedule");
   const [schedules, setSchedules] = useState<ShiftScheduleItem[]>([]);
   const [employees, setEmployees] = useState<OrgEmployee[]>([]);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState("");
+  const [assignments, setAssignments] = useState<{id:string;employeeId:string;scheduleId:string;employeeName:string;scheduleName:string;effectiveFrom:string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPublished, setIsPublished] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [assignmentForm, setAssignmentForm] = useState({ employeeId: "", scheduleId: "", effectiveFrom: new Date().toISOString().slice(0,10) });
   const [isSaving, setIsSaving] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    timezone: "UTC",
-    description: "",
-  });
+  const [form, setForm] = useState({ name: "", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", description: "", startTime: "09:00", endTime: "17:00", breakMinutes: "60", workDays: [1,2,3,4,5] as number[] });
 
   const loadData = useCallback(async () => {
     try {
@@ -70,18 +72,29 @@ export default function ShiftSchedulingPage() {
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [schedRes, empRes] = await Promise.all([
+      const [schedRes, empRes, assignmentsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/scheduling/schedules`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/employees`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/employees/me`, { headers }),
       ]);
 
       if (schedRes.ok) {
         const sJson = await schedRes.json();
         setSchedules(Array.isArray(sJson) ? sJson : sJson.data || []);
       }
+      if (assignmentsRes.ok) { const me = await assignmentsRes.json(); setCurrentEmployeeId(me.id || ""); }
       if (empRes.ok) {
         const eJson = await empRes.json();
-        setEmployees(Array.isArray(eJson) ? eJson : eJson.data || []);
+        const roster = Array.isArray(eJson) ? eJson : eJson.data || [];
+        setEmployees(roster);
+        const mine = await Promise.all(roster.map(async (employee: OrgEmployee) => {
+          const response = await fetch(`${API_BASE_URL}/api/v1/scheduling/assignments/${employee.id}`, { headers });
+          if (!response.ok) return [];
+          const data = await response.json();
+          const active = (Array.isArray(data) ? data : data.data || []).filter((assignment: {effectiveFrom:string;effectiveTo?:string|null}) => assignment.effectiveFrom <= new Date().toISOString().slice(0,10) && (!assignment.effectiveTo || assignment.effectiveTo >= new Date().toISOString().slice(0,10)));
+          return active.slice(0,1).map((assignment: {employeeId:string;scheduleId:string;effectiveFrom:string})=>({...assignment,employeeName:`${employee.firstName} ${employee.lastName}`}));
+        }));
+        setAssignments(mine.flat());
       }
     } catch (err) {
       console.error("Failed to load scheduling data", err);
@@ -116,20 +129,14 @@ export default function ShiftSchedulingPage() {
           name: form.name.trim(),
           timezone: form.timezone || "UTC",
           description: form.description.trim() || undefined,
-          entries: [
-            { dayOfWeek: 1, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
-            { dayOfWeek: 2, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
-            { dayOfWeek: 3, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
-            { dayOfWeek: 4, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
-            { dayOfWeek: 5, startTime: "09:00", endTime: "17:00", breakMinutes: 60 },
-          ],
+          entries: form.workDays.map((dayOfWeek) => ({ dayOfWeek, startTime: form.startTime, endTime: form.endTime, breakMinutes: Number(form.breakMinutes) || 0 })),
         }),
       });
 
       if (res.ok) {
         toast.success("Schedule template created", "New working schedule saved.");
         setIsModalOpen(false);
-        setForm({ name: "", timezone: "UTC", description: "" });
+        setForm({ name: "", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", description: "", startTime: "09:00", endTime: "17:00", breakMinutes: "60", workDays: [1,2,3,4,5] });
         loadData();
       } else {
         const errJson = await res.json().catch(() => ({}));
@@ -144,10 +151,35 @@ export default function ShiftSchedulingPage() {
 
   const handlePublish = () => {
     setIsPublished(true);
-    toast.success("Shift schedule published", "All team members notified of their weekly roster.");
+    toast.success("Shift roster published", "The saved roster is now visible to employees.");
+  };
+
+  const handleAssignSchedule = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!assignmentForm.employeeId || !assignmentForm.scheduleId) return;
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/scheduling/assignments/${assignmentForm.employeeId}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduleId: assignmentForm.scheduleId, effectiveFrom: assignmentForm.effectiveFrom }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || "Could not assign this shift.");
+      toast.success("Shift assigned", "The employee now has this working pattern.");
+      setShowAssignmentModal(false);
+      setAssignmentForm({ employeeId: "", scheduleId: "", effectiveFrom: new Date().toISOString().slice(0,10) });
+      await loadData();
+    } catch (error) { toast.error("Assignment failed", error instanceof Error ? error.message : "Try again."); }
   };
 
   const activeEmployees = employees.filter((e) => e.status !== "terminated");
+  const personalSchedule = schedules.find((schedule) => assignments.some((assignment) => assignment.employeeId === currentEmployeeId && assignment.scheduleId === schedule.id));
+  const personalEntries = personalSchedule?.entries || [];
+  const weeklyHours = (personalEntries.reduce((total, entry) => {
+    const [startHour, startMinute] = entry.startTime.split(":").map(Number);
+    const [endHour, endMinute] = entry.endTime.split(":").map(Number);
+    return total + Math.max(0, endHour * 60 + endMinute - startHour * 60 - startMinute - entry.breakMinutes);
+  }, 0) / 60).toFixed(0);
 
   return (
     <>
@@ -160,6 +192,14 @@ export default function ShiftSchedulingPage() {
         onTabChange={setActiveTab}
         actions={
           <div className="row gap-8">
+            <button
+              onClick={() => setShowAssignmentModal(true)}
+              className="btn-neutral"
+              style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.4)" }}
+              disabled={!schedules.length || !activeEmployees.length}
+            >
+              <Users size={15} /> Assign Shift
+            </button>
             <button
               onClick={() => setIsModalOpen(true)}
               className="btn-neutral"
@@ -185,19 +225,19 @@ export default function ShiftSchedulingPage() {
               stats={[
                 {
                   label: "Weekly Target",
-                  value: "40 hrs",
+                  value: `${weeklyHours} hrs`,
                   icon: <Clock3 size={20} />,
                   color: "var(--primary)",
                 },
                 {
                   label: "Rostered Days",
-                  value: "5 days",
+                  value: `${personalEntries.length} days`,
                   icon: <CalendarDays size={20} />,
                   color: "var(--success)",
                 },
                 {
                   label: "Working Pattern",
-                  value: "Standard Day (09:00 - 17:00)",
+                  value: personalSchedule?.name || "No shift assigned",
                   icon: <CalendarRange size={20} />,
                   color: "var(--warning)",
                 },
@@ -237,41 +277,8 @@ export default function ShiftSchedulingPage() {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-                  {[
-                    { day: "Monday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Completed" },
-                    { day: "Tuesday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Active Today" },
-                    { day: "Wednesday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Upcoming" },
-                    { day: "Thursday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Upcoming" },
-                    { day: "Friday", time: "09:00 – 17:00", hours: "8 hrs", breakTime: "60m Meal Break (Non-billable)", status: "Upcoming" },
-                  ].map((shift) => (
-                    <div
-                      key={shift.day}
-                      style={{
-                        padding: 16,
-                        borderRadius: 12,
-                        border: "1px solid var(--border)",
-                        background: shift.status === "Active Today" ? "var(--primary-tint, #f5f3ff)" : "var(--card-bg, #ffffff)",
-                      }}
-                    >
-                      <div className="row-between mb-8">
-                        <span className="text-sm fw-700 text-1">{shift.day}</span>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "2px 6px",
-                            borderRadius: 10,
-                            background: shift.status === "Active Today" ? "rgba(124, 58, 237, 0.15)" : "#f1f5f9",
-                            color: shift.status === "Active Today" ? "var(--primary)" : "#64748b",
-                          }}
-                        >
-                          {shift.status}
-                        </span>
-                      </div>
-                      <div className="text-base fw-800 text-1 mb-4">{shift.time}</div>
-                      <div className="text-xs text-4 mb-2">{shift.hours} scheduled</div>
-                      <div className="text-xs text-5" style={{ fontSize: 11 }}>{shift.breakTime}</div>
-                    </div>
+                  {(personalEntries || []).map((entry) => ({ day: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][entry.dayOfWeek], time: `${entry.startTime} – ${entry.endTime}`, breakTime: `${entry.breakMinutes}m break`, status: "Scheduled" })).map((shift) => (
+                    <div key={shift.day} style={{padding:16,borderRadius:12,border:"1px solid var(--border)",background:"var(--card-bg,#fff)"}}><div className="row-between mb-8"><span className="text-sm fw-700 text-1">{shift.day}</span><span className="text-xs text-4">{shift.status}</span></div><div className="text-base fw-800 text-1 mb-4">{shift.time}</div><div className="text-xs text-5">{shift.breakTime}</div></div>
                   ))}
                 </div>
               </CardBody>
@@ -331,7 +338,7 @@ export default function ShiftSchedulingPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "240px repeat(5, minmax(130px, 1fr))",
+                  gridTemplateColumns: `240px repeat(${WEEK_DAYS.length}, minmax(130px, 1fr))`,
                   border: "1px solid var(--border)",
                   borderRadius: 12,
                   overflow: "hidden",
@@ -340,7 +347,7 @@ export default function ShiftSchedulingPage() {
                 <div style={{ padding: 14, background: "var(--bg-page)", borderRight: "1px solid var(--border)" }}>
                   <span className="text-xs fw-700 text-5">TEAM MEMBER</span>
                 </div>
-                {WEEK_DAYS.map((day) => (
+                {WEEK_DAYS.map((day, index) => (
                   <div
                     key={day}
                     style={{
@@ -351,7 +358,7 @@ export default function ShiftSchedulingPage() {
                     }}
                   >
                     <div className="text-xs fw-800 text-4">{day}</div>
-                    <div className="text-sm fw-700 text-1">09:00–17:00</div>
+                    <div className="text-sm fw-700 text-1">{schedules.find((schedule) => schedule.entries?.some((entry) => entry.dayOfWeek === index))?.entries?.find((entry) => entry.dayOfWeek === index) ? `${schedules.find((schedule) => schedule.entries?.some((entry) => entry.dayOfWeek === index))?.entries?.find((entry) => entry.dayOfWeek === index)?.startTime}–${schedules.find((schedule) => schedule.entries?.some((entry) => entry.dayOfWeek === index))?.entries?.find((entry) => entry.dayOfWeek === index)?.endTime}` : "—"}</div>
                   </div>
                 ))}
 
@@ -388,19 +395,7 @@ export default function ShiftSchedulingPage() {
                             justifyContent: "center",
                           }}
                         >
-                          <span
-                            style={{
-                              display: "block",
-                              padding: "6px 12px",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "var(--primary)",
-                              background: "var(--primary-tint)",
-                            }}
-                          >
-                            Scheduled
-                          </span>
+                          {(() => { const assignment = assignments.find((item) => item.employeeId === member.id); const schedule = schedules.find((item) => item.id === assignment?.scheduleId); const entry = schedule?.entries?.find((item) => item.dayOfWeek === idx); return assignment && entry ? <span style={{display:"block",padding:"6px 10px",borderRadius:8,fontSize:11,fontWeight:700,color:"var(--primary)",background:"var(--primary-tint)"}}>{entry.startTime}–{entry.endTime}</span> : <span className="text-xs text-5">{assignment ? "Off" : "Unassigned"}</span>; })()}
                         </div>
                       ))}
                     </div>
@@ -475,6 +470,15 @@ export default function ShiftSchedulingPage() {
               placeholder="e.g. Default full-time business hours"
             />
           </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={showAssignmentModal} onClose={() => setShowAssignmentModal(false)} title="Assign a shift" subtitle="Choose an employee, saved schedule, and effective date">
+        <form className="col gap-14" onSubmit={handleAssignSchedule}>
+          <label className="col gap-6">Employee<select className="input" required value={assignmentForm.employeeId} onChange={e=>setAssignmentForm(v=>({...v,employeeId:e.target.value}))}><option value="">Choose employee</option>{activeEmployees.map(e=><option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}</select></label>
+          <label className="col gap-6">Shift template<select className="input" required value={assignmentForm.scheduleId} onChange={e=>setAssignmentForm(v=>({...v,scheduleId:e.target.value}))}><option value="">Choose schedule</option>{schedules.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <label className="col gap-6">Effective from<input className="input" type="date" required value={assignmentForm.effectiveFrom} onChange={e=>setAssignmentForm(v=>({...v,effectiveFrom:e.target.value}))}/></label>
+          <button className="btn-primary" type="submit">Assign shift</button>
         </form>
       </Modal>
     </>

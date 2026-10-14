@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { toast } from "@/components/ui/Toast";
 import { API_BASE_URL } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 import { SearchableSelect, SelectOption } from "@/components/ui/SearchableSelect";
-import { Loader2, UserPlus, Mail, Briefcase, Building, MapPin, UserCheck, Calendar, ShieldCheck, Check } from "lucide-react";
+import { Loader2, UserPlus, Mail, Briefcase, Building, MapPin, UserCheck, Calendar, ShieldCheck, Check, Plus } from "lucide-react";
 
 interface AddHireModalProps {
   isOpen: boolean;
@@ -33,6 +33,12 @@ export function AddHireModal({
   const [personalEmail, setPersonalEmail] = useState("");
   const [personalPhone, setPersonalPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [positionId, setPositionId] = useState("");
+  const [departmentPositions, setDepartmentPositions] = useState<{id:string;title:string;level:string;status:string}[]>([]);
+  const [positionsLoading, setPositionsLoading] = useState(false);
+  const [showCreatePosition, setShowCreatePosition] = useState(false);
+  const [newPositionTitle, setNewPositionTitle] = useState("");
+  const [creatingPosition, setCreatingPosition] = useState(false);
   const [departmentId, setDepartmentId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [managerId, setManagerId] = useState("");
@@ -40,6 +46,46 @@ export function AddHireModal({
   const [employmentType, setEmploymentType] = useState("full_time");
   const [sendInvitation, setSendInvitation] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setPositionId("");
+    setJobTitle("");
+    setDepartmentPositions([]);
+    if (!departmentId) return;
+    let cancelled = false;
+    (async () => {
+      setPositionsLoading(true);
+      try {
+        const token = await getToken();
+        const response = await fetch(`${API_BASE_URL}/api/v1/departments/${departmentId}/positions`, { headers: { Authorization: `Bearer ${token}` } });
+        const payload = await response.json();
+        if (response.ok && !cancelled) setDepartmentPositions((payload.data || payload || []).filter((p: {status:string}) => p.status === "active"));
+      } catch { if (!cancelled) setDepartmentPositions([]); }
+      finally { if (!cancelled) setPositionsLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [departmentId, getToken]);
+
+  const createDepartmentPosition = async () => {
+    if (!departmentId || !newPositionTitle.trim()) return;
+    setCreatingPosition(true);
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/v1/departments/${departmentId}/positions`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newPositionTitle.trim(), level: "Mid", payType: "Salaried" }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || "Could not create this position.");
+      setDepartmentPositions((previous) => [...previous, result]);
+      setPositionId(result.id);
+      setJobTitle(result.title);
+      setNewPositionTitle("");
+      setShowCreatePosition(false);
+      toast.success("Position created", "The new position is available for this hire.");
+    } catch (error) { toast.error("Could not create position", error instanceof Error ? error.message : "Try again."); }
+    finally { setCreatingPosition(false); }
+  };
 
   const managerOptions: SelectOption[] = useMemo(() => [
     { value: "", label: "No manager assigned", description: "Direct reporting or founder" },
@@ -76,6 +122,7 @@ export function AddHireModal({
     setPersonalEmail("");
     setPersonalPhone("");
     setJobTitle("");
+    setPositionId("");
     setDepartmentId("");
     setLocationId("");
     setManagerId("");
@@ -95,8 +142,8 @@ export function AddHireModal({
       toast.error("Validation error", "Work email address is required.");
       return;
     }
-    if (!jobTitle.trim()) {
-      toast.error("Validation error", "Job title is required.");
+    if (!positionId) {
+      toast.error("Select a position", "Choose a role from the selected department.");
       return;
     }
 
@@ -112,6 +159,7 @@ export function AddHireModal({
         personalEmail: personalEmail.trim().toLowerCase() || undefined,
         personalPhone: personalPhone.trim() || undefined,
         jobTitle: jobTitle.trim(),
+        positionId,
         departmentId: departmentId || undefined,
         locationId: locationId || undefined,
         managerId: managerId || undefined,
@@ -244,19 +292,19 @@ export function AddHireModal({
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
-              Job Title <span style={{ color: "#EF4444" }}>*</span>
+              Position <span style={{ color: "#EF4444" }}>*</span>
             </label>
-            <input
-              type="text"
-              className="input"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              placeholder="E.g. Senior Software Engineer"
-              required
-              style={{ fontSize: 13 }}
-            />
+            <select className="input" value={positionId} disabled={!departmentId || positionsLoading} onChange={(e) => { setPositionId(e.target.value); setJobTitle(departmentPositions.find((p) => p.id === e.target.value)?.title || ""); }}>
+              <option value="">{!departmentId ? "Select a department first" : positionsLoading ? "Loading department positions…" : "Choose a department position"}</option>
+              {departmentPositions.map((p) => <option key={p.id} value={p.id}>{p.title} · {p.level}</option>)}
+            </select>
           </div>
         </div>
+
+        {departmentId && !positionsLoading && departmentPositions.length === 0 && <div style={{padding:14,borderRadius:10,background:"#faf5ff",border:"1px solid #e9d5ff"}}>
+          <strong style={{fontSize:13}}>No roles set up for this department yet.</strong>
+          {!showCreatePosition ? <button type="button" className="btn-neutral btn-sm" style={{marginLeft:10}} onClick={() => setShowCreatePosition(true)}><Plus size={14}/> Create a role</button> : <div style={{display:"flex",gap:8,marginTop:10}}><input className="input" value={newPositionTitle} onChange={(e)=>setNewPositionTitle(e.target.value)} placeholder="New role title"/><button type="button" className="btn-primary btn-sm" onClick={createDepartmentPosition} disabled={creatingPosition||!newPositionTitle.trim()}>{creatingPosition?"Saving…":"Save role"}</button></div>}
+        </div>}
 
         {/* Department & Location */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

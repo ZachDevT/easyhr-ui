@@ -273,6 +273,7 @@ export default function TimeOffPage() {
   const { isHRAdmin, isManager } = useRole();
 
   const [activeTab, setActiveTab] = useState<"my_leave" | "hr_management">("my_leave");
+  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<LeaveRequest | null>(null);
   const [currentEmployeeId, setCurrentEmployeeId] = useState("");
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
 
@@ -1159,7 +1160,9 @@ export default function TimeOffPage() {
                     {myRequests.map((req) => (
                       <tr
                         key={req.id}
-                        style={{
+                        onClick={() => setSelectedLeaveRequest(req)}
+                        title="View leave request details"
+                        style={{ cursor: "pointer",
                           borderBottom: "1px solid var(--card-border)",
                           transition: "background 0.1s",
                         }}
@@ -1615,7 +1618,9 @@ export default function TimeOffPage() {
                     {pendingRequests.map((r) => (
                       <tr
                         key={r.id}
-                        style={{ borderBottom: "1px solid var(--card-border)" }}
+                        onClick={() => setSelectedLeaveRequest(r)}
+                        title="View leave request details"
+                        style={{ cursor: "pointer", borderBottom: "1px solid var(--card-border)" }}
                         onMouseEnter={(e) =>
                           ((e.currentTarget as HTMLElement).style.background =
                             "var(--page-bg, #F7F7F5)")
@@ -2250,6 +2255,18 @@ export default function TimeOffPage() {
           </div>
         </form>
       </Modal>
+      {selectedLeaveRequest && <Modal isOpen onClose={() => setSelectedLeaveRequest(null)} title="Leave request details" subtitle={selectedLeaveRequest.employeeName || "Your leave request"}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div><small className="text-4">Leave type</small><div className="fw-700 mt-4">{selectedLeaveRequest.leaveTypeName || "Leave"}</div></div>
+          <div><small className="text-4">Status</small><div className="mt-4"><StatusBadge status={selectedLeaveRequest.status}/></div></div>
+          <div><small className="text-4">Start date</small><div className="fw-700 mt-4">{selectedLeaveRequest.startDate}</div></div>
+          <div><small className="text-4">End date</small><div className="fw-700 mt-4">{selectedLeaveRequest.endDate}</div></div>
+          <div><small className="text-4">Requested duration</small><div className="fw-700 mt-4">{(selectedLeaveRequest.requestedMinutes/60).toFixed(1)} hours</div></div>
+          <div><small className="text-4">Submitted</small><div className="fw-700 mt-4">{new Date(selectedLeaveRequest.createdAt).toLocaleString()}</div></div>
+          <div style={{gridColumn:"1/-1"}}><small className="text-4">Reason</small><div className="mt-4" style={{whiteSpace:"pre-wrap"}}>{selectedLeaveRequest.reason || "No reason provided."}</div></div>
+        </div>
+      </Modal>}
+
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import {
   DollarSign,
   Clock,
@@ -88,6 +89,13 @@ interface PayrollPayslip { id:string;employeeId:string;employeeName:string;email
 
 const TABS = ['Overview', 'Run Payroll', 'Paystubs', 'Settings'];
 const WIZARD_STEPS = ['Hours & Attendance', 'Earnings & Adjustments', 'Taxes & Deductions', 'Review & Finalize'];
+const COUNTRY_CURRENCIES: Record<string,string> = { UG:'UGX', KE:'KES', RW:'RWF', TZ:'TZS', US:'USD', GB:'GBP', CA:'CAD', NG:'NGN', ZA:'ZAR', GH:'GHS', IN:'INR', AU:'AUD', NZ:'NZD', EU:'EUR', DE:'EUR', FR:'EUR', IE:'EUR', NL:'EUR', BE:'EUR', ES:'EUR', IT:'EUR', JP:'JPY', CN:'CNY', AE:'AED', SA:'SAR', ET:'ETB', ZM:'ZMW', MW:'MWK', BI:'BIF', SS:'SSP', EG:'EGP', BR:'BRL', MX:'MXN', SG:'SGD', CH:'CHF' };
+const COUNTRY_OPTIONS = (() => {
+  const regions = new Intl.DisplayNames(['en'], { type:'region' });
+  return Array.from({length:26},(_,i)=>String.fromCharCode(65+i)).flatMap(a=>Array.from({length:26},(_,j)=>a+String.fromCharCode(65+j)))
+    .filter(code=>code!=='ZZ' && regions.of(code)!==code)
+    .map(code=>({code,name:regions.of(code)!,currency:COUNTRY_CURRENCIES[code]||''})).sort((a,b)=>a.name.localeCompare(b.name));
+})();
 
 export default function PayrollPage() {
   const { getToken } = useAuth();
@@ -110,7 +118,10 @@ export default function PayrollPage() {
   const [payrollConfigForm, setPayrollConfigForm] = useState({ country: '', currency: '', standardMonthlyMinutes: '' });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [taxRules,setTaxRules]=useState<any[]>([]);
-  const [taxRuleForm,setTaxRuleForm]=useState({ruleName:'Income tax',ruleType:'progressive_tax',ratePercent:'0',bands:'[{"upTo":1000000,"ratePercent":0},{"upTo":0,"ratePercent":10}]'});
+  const [taxRuleForm,setTaxRuleForm]=useState({ruleName:'NSSF',ruleType:'flat_deduction',ratePercent:'8',amount:'',appliesTo:'all_employees',appliesToId:''});
+  const [countrySearch,setCountrySearch]=useState('');
+  const [payrollDepartments,setPayrollDepartments]=useState<{id:string;name:string}[]>([]);
+  const [payrollPositions,setPayrollPositions]=useState<{id:string;title:string;departmentName:string}[]>([]);
   const [isSavingTaxRule,setIsSavingTaxRule]=useState(false);
 
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
@@ -131,12 +142,13 @@ export default function PayrollPage() {
       const token = await getToken();
       const headers = getAuthHeaders(token);
 
-      const [periodsRes, configsRes, compensationRes, employeesRes,taxRulesRes] = await Promise.all([
+      const [periodsRes, configsRes, compensationRes, employeesRes,taxRulesRes,departmentsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/payroll/periods`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/payroll/compensation`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/employees?limit=100`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`,{headers}),
+        fetch(`${API_BASE_URL}/api/v1/departments`,{headers}),
       ]);
 
       if (periodsRes.ok) {
@@ -153,6 +165,8 @@ export default function PayrollPage() {
         if (configs[0]) setPayrollConfigForm({ country: configs[0].country, currency: configs[0].currency, standardMonthlyMinutes: String(configs[0].standardMonthlyMinutes) });
       }
       if(taxRulesRes.ok){const d=await taxRulesRes.json();setTaxRules(d.data||[])}
+      if(departmentsRes.ok){const d=await departmentsRes.json();const departments=d.data||d||[];setPayrollDepartments(departments);const groups=await Promise.all(departments.map(async (department:{id:string;name:string})=>{const response=await fetch(`${API_BASE_URL}/api/v1/departments/${department.id}/positions`,{headers});if(!response.ok)return[];const data=await response.json();return(data.data||data||[]).filter((p:{status:string})=>p.status==='active').map((p:{id:string;title:string})=>({...p,departmentName:department.name}))}));setPayrollPositions(groups.flat())}
+      if(departmentsRes.ok){const d=await departmentsRes.json();const departments=d.data||d||[];setPayrollDepartments(departments);const groups=await Promise.all(departments.map(async (department:{id:string;name:string})=>{const response=await fetch(`${API_BASE_URL}/api/v1/departments/${department.id}/positions`,{headers});if(!response.ok)return[];const data=await response.json();return(data.data||data||[]).filter((p:{status:string})=>p.status==='active').map((p:{id:string;title:string})=>({...p,departmentName:department.name}))}));setPayrollPositions(groups.flat())}
       if (compensationRes.ok) {
         const compData = await compensationRes.json();
         setCompensation(Array.isArray(compData) ? compData : []);
@@ -206,7 +220,7 @@ export default function PayrollPage() {
     }
   };
 
-  const saveTaxRule=async()=>{setIsSavingTaxRule(true);try{const token=await getToken();if(!token||!configurations[0])throw new Error('Save payroll jurisdiction first');const body={country:configurations[0].country,currency:configurations[0].currency,ruleName:taxRuleForm.ruleName,ruleType:taxRuleForm.ruleType,ratePercent:Number(taxRuleForm.ratePercent),bands:taxRuleForm.ruleType==='progressive_tax'?JSON.parse(taxRuleForm.bands):[]};const response=await fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`,{method:'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok){const e=await response.json().catch(()=>({}));throw new Error(e.detail||'Could not save tax rule')}toast.success('Tax rule saved','Payroll will apply this organization rule to future calculations.');await fetchPayrollData()}catch(e){toast.error('Tax rule not saved',e instanceof Error?e.message:'Invalid rule')}finally{setIsSavingTaxRule(false)}};
+  const saveTaxRule=async()=>{setIsSavingTaxRule(true);try{const token=await getToken();if(!token||!configurations[0])throw new Error('Save payroll jurisdiction first');const body={country:configurations[0].country,currency:configurations[0].currency,ruleName:taxRuleForm.ruleName,ruleType:'flat_deduction',ratePercent:taxRuleForm.amount?'0':Number(taxRuleForm.ratePercent),amountMinor:taxRuleForm.amount?Math.round(Number(taxRuleForm.amount)*100):0,appliesTo:taxRuleForm.appliesTo,appliesToId:taxRuleForm.appliesTo==='all_employees'?'':taxRuleForm.appliesToId,cadence:'monthly',bands:[]};const response=await fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`,{method:'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok){const e=await response.json().catch(()=>({}));throw new Error(e.detail||'Could not save tax rule')}toast.success('Tax rule saved','Payroll will apply this organization rule to future calculations.');await fetchPayrollData()}catch(e){toast.error('Tax rule not saved',e instanceof Error?e.message:'Invalid rule')}finally{setIsSavingTaxRule(false)}};
 
   const saveCompensation = async () => {
     const amount = Number(compensationForm.amount);
@@ -861,14 +875,14 @@ export default function PayrollPage() {
         <CardHeader title="Company Payroll Configuration" />
         <CardBody>
           <div className="row gap-20 mb-24">
-            <label className="col gap-8" style={{ flex: 1 }}>
-              <span className="text-sm fw-600 text-2">Country code (ISO 3166-1)</span>
-              <input className="input" maxLength={2} value={payrollConfigForm.country} placeholder="e.g. UG" onChange={(e) => setPayrollConfigForm((v) => ({ ...v, country: e.target.value }))} />
+            <label className="col gap-8" style={{ flex: 1 }}><span className="text-sm fw-600 text-2">Payroll country</span>
+              <input className="input" value={countrySearch} placeholder="Search countries…" onChange={(e)=>setCountrySearch(e.target.value)} list="payroll-country-options" />
+              <small className="text-4">Choose a country; we’ll suggest its currency.</small>
+              <select className="input" value={payrollConfigForm.country} onChange={(e)=>{const option=COUNTRY_OPTIONS.find(x=>x.code===e.target.value);setPayrollConfigForm(v=>({...v,country:e.target.value,currency:option?.currency||v.currency}));setCountrySearch(option?.name||'')}}>
+                <option value="">Choose country</option>{COUNTRY_OPTIONS.filter(x=>!countrySearch||x.name.toLowerCase().includes(countrySearch.toLowerCase())||x.code.toLowerCase().includes(countrySearch.toLowerCase())).map(x=><option key={x.code} value={x.code}>{x.name} · {x.code}{x.currency?` · ${x.currency}`:''}</option>)}
+              </select>
             </label>
-            <label className="col gap-8" style={{ flex: 1 }}>
-              <span className="text-sm fw-600 text-2">Currency code (ISO 4217)</span>
-              <input className="input" maxLength={3} value={payrollConfigForm.currency} placeholder="e.g. UGX" onChange={(e) => setPayrollConfigForm((v) => ({ ...v, currency: e.target.value }))} />
-            </label>
+            <label className="col gap-8" style={{ flex: 1 }}><span className="text-sm fw-600 text-2">Currency</span><input className="input" maxLength={3} value={payrollConfigForm.currency} placeholder="Set by country or edit code" onChange={(e) => setPayrollConfigForm((v) => ({ ...v, currency: e.target.value.toUpperCase() }))} /></label>
           </div>
           <label className="col gap-8 mb-24" style={{ maxWidth: 380 }}>
             <span className="text-sm fw-600 text-2">Standard monthly work minutes</span>
@@ -881,7 +895,7 @@ export default function PayrollPage() {
           </button>
         </CardBody>
       </Card>
-      <Card style={{marginTop:24}}><CardHeader title="Statutory tax & deduction rules"/><CardBody><p className="text-sm text-4 mb-16">Rules are stored per company and jurisdiction. Progressive band thresholds are in minor currency units; use <code>0</code> for the final uncapped band.</p><div className="grid-2 gap-12 mb-12"><input className="input" value={taxRuleForm.ruleName} onChange={e=>setTaxRuleForm(v=>({...v,ruleName:e.target.value}))} placeholder="Rule name"/><select className="input" value={taxRuleForm.ruleType} onChange={e=>setTaxRuleForm(v=>({...v,ruleType:e.target.value}))}><option value="progressive_tax">Progressive tax</option><option value="flat_deduction">Percentage deduction</option></select></div>{taxRuleForm.ruleType==='progressive_tax'?<textarea className="input" rows={5} value={taxRuleForm.bands} onChange={e=>setTaxRuleForm(v=>({...v,bands:e.target.value}))}/>:<label className="col gap-8 mb-12">Deduction percentage<input className="input" type="number" min="0" max="100" step="0.01" value={taxRuleForm.ratePercent} onChange={e=>setTaxRuleForm(v=>({...v,ratePercent:e.target.value}))}/></label>}<button className="btn-primary mt-12" disabled={isSavingTaxRule||!configurations.length} onClick={saveTaxRule}>{isSavingTaxRule?'Saving…':'Save tax rule'}</button><div className="col gap-8 mt-20">{taxRules.map(rule=><div key={rule.id} className="row-between p-12" style={{borderTop:'1px solid var(--border)'}}><span><strong>{rule.ruleName}</strong> · {rule.country} · {rule.ruleType}</span><Badge variant="success">Active</Badge></div>)}</div></CardBody></Card>
+      <Card style={{marginTop:24}}><CardHeader title="Monthly deductions"/><CardBody><p className="text-sm text-4 mb-16">Create a clear rule such as NSSF at 8% or a fixed local tax. Rules apply to future payroll runs.</p><div className="grid-2 gap-12 mb-12"><input className="input" value={taxRuleForm.ruleName} onChange={e=>setTaxRuleForm(v=>({...v,ruleName:e.target.value}))} placeholder="Deduction name, e.g. NSSF or PAYE"/><select className="input" value={taxRuleForm.appliesTo} onChange={e=>setTaxRuleForm(v=>({...v,appliesTo:e.target.value,appliesToId:''}))}><option value="all_employees">All employees</option><option value="department">A department</option><option value="position">A role / position</option></select>{taxRuleForm.appliesTo==='department'&&<select className="input" value={taxRuleForm.appliesToId} onChange={e=>setTaxRuleForm(v=>({...v,appliesToId:e.target.value}))}><option value="">Choose department</option>{payrollDepartments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}{taxRuleForm.appliesTo==='position'&&<select className="input" value={taxRuleForm.appliesToId} onChange={e=>setTaxRuleForm(v=>({...v,appliesToId:e.target.value}))}><option value="">Choose role</option>{payrollPositions.map(p=><option key={p.id} value={p.id}>{p.title} · {p.departmentName}</option>)}</select>}</div><div className="grid-2 gap-12 mb-12"><label className="col gap-8">Percentage<input className="input" type="number" min="0" max="100" step="0.01" value={taxRuleForm.ratePercent} disabled={!!taxRuleForm.amount} onChange={e=>setTaxRuleForm(v=>({...v,ratePercent:e.target.value}))}/></label><label className="col gap-8">Fixed amount ({configurations[0]?.currency||'currency'})<input className="input" type="number" min="0" step="1" value={taxRuleForm.amount} disabled={Number(taxRuleForm.ratePercent)>0} onChange={e=>setTaxRuleForm(v=>({...v,amount:e.target.value}))}/></label></div><button className="btn-primary mt-12" disabled={isSavingTaxRule||!configurations.length||(taxRuleForm.appliesTo!=='all_employees'&&!taxRuleForm.appliesToId)} onClick={saveTaxRule}>{isSavingTaxRule?'Saving…':'Add monthly deduction'}</button><div className="col gap-8 mt-20">{taxRules.map(rule=><div key={rule.id} className="row-between p-12" style={{borderTop:'1px solid var(--border)'}}><span><strong>{rule.ruleName}</strong> · {rule.country} · {rule.amountMinor>0?`${(rule.amountMinor/100).toLocaleString()} ${rule.currency}`:`${rule.ratePercent}%`} · {rule.cadence||'monthly'}</span><Badge variant="success">{rule.appliesTo==='all_employees'?'All employees':rule.appliesTo}</Badge></div>)}</div></CardBody></Card>
       <Card style={{ marginTop: 24 }}>
         <CardHeader title="Employee Monthly Compensation" />
         <CardBody>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Book,
   Plus,
@@ -53,6 +53,8 @@ export default function PoliciesPage() {
   const [newCategory, setNewCategory] = useState("General");
   const [newRequiresSig, setNewRequiresSig] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const policyFileRef = useRef<HTMLInputElement>(null);
 
   const fetchPolicies = useCallback(async () => {
     setIsLoading(true);
@@ -80,14 +82,25 @@ export default function PoliciesPage() {
     setIsSubmitting(true);
     try {
       const token = await getToken();
+      if (!selectedFile) throw new Error("Choose the policy file to upload.");
+      const contentType = selectedFile.type || "application/octet-stream";
+      const intentRes = await fetch(`${API_BASE_URL}/api/v1/documents/upload-intents`, {
+        method: "POST", headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: selectedFile.name, category: "compliance", contentType, sizeBytes: selectedFile.size }),
+      });
+      if (!intentRes.ok) { const e = await intentRes.json().catch(() => ({})); throw new Error(e.detail || "Could not prepare policy upload."); }
+      const intent = await intentRes.json();
+      const docId = intent.document?.id || intent.id;
+      if (!docId || !intent.uploadUrl) throw new Error("Storage did not return an upload location.");
+      const uploaded = await fetch(intent.uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: selectedFile });
+      if (!uploaded.ok) throw new Error("The policy file could not be uploaded.");
+      const digest = await crypto.subtle.digest("SHA-256", await selectedFile.arrayBuffer());
+      const checksumSha256 = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const complete = await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, { method: "POST", headers: { ...getAuthHeaders(token), "Content-Type": "application/json" }, body: JSON.stringify({ checksumSha256 }) });
+      if (!complete.ok) throw new Error("The policy upload could not be finalized.");
       const res = await fetch(`${API_BASE_URL}/api/v1/policies`, {
-        method: "POST",
-        headers: getAuthHeaders(token),
-        body: JSON.stringify({
-          title: newTitle.trim(),
-          category: newCategory,
-          requiresSignature: newRequiresSig,
-        }),
+        method: "POST", headers: { ...getAuthHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle.trim(), category: newCategory, requiresSignature: newRequiresSig, documentId: docId }),
       });
 
       if (res.ok) {
@@ -96,6 +109,7 @@ export default function PoliciesPage() {
         setNewTitle("");
         setNewCategory("General");
         setNewRequiresSig(false);
+        setSelectedFile(null);
         fetchPolicies();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -105,6 +119,19 @@ export default function PoliciesPage() {
       toast.error("Error", "Could not create policy.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePolicyDownload = async (documentId?: string | null) => {
+    if (!documentId) return toast.info("No policy file", "This older policy does not have an attached file.");
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/download-url`, { headers: getAuthHeaders(token) });
+      const data = await res.json();
+      if (!res.ok || !data.downloadUrl) throw new Error(data.detail || "Could not create a download link.");
+      window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error("Download unavailable", error instanceof Error ? error.message : "Could not download policy.");
     }
   };
 
@@ -297,7 +324,7 @@ export default function PoliciesPage() {
                         className="row-between align-center pt-16 mt-8"
                         style={{ borderTop: "1px dashed var(--border)" }}
                       >
-                        <Badge variant="neutral">{policy.category}</Badge>
+                        <div className="row gap-8 align-center"><Badge variant="neutral">{policy.category}</Badge><button className="btn-neutral btn-sm" onClick={() => handlePolicyDownload(policy.documentId)}><FileText size={14}/> View file</button></div>
                         {policy.requiresSignature ? (
                           <div className="row gap-8 align-center text-sm">
                             <CheckSquare size={16} className="text-warning" />
@@ -403,7 +430,7 @@ export default function PoliciesPage() {
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          title="Add Company Policy"
+          title="Upload Company Policy"
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
@@ -415,6 +442,15 @@ export default function PoliciesPage() {
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
               />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Policy file</label>
+              <input ref={policyFileRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" style={{ display: "none" }} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+              <button type="button" className="btn-neutral" onClick={() => policyFileRef.current?.click()} style={{ width: "100%", justifyContent: "flex-start", minHeight: 44 }}>
+                <UploadCloud size={16} /> {selectedFile ? selectedFile.name : "Choose PDF, Word document, or image"}
+              </button>
+              <small className="text-4">The file is stored in the secure company document library and linked to this policy.</small>
             </div>
 
             <div>
@@ -481,7 +517,7 @@ export default function PoliciesPage() {
               <button
                 className="btn-primary"
                 onClick={handleCreatePolicy}
-                disabled={!newTitle.trim() || isSubmitting}
+                disabled={!newTitle.trim() || !selectedFile || isSubmitting}
               >
                 {isSubmitting && <Loader2 size={14} className="spin mr-4" />}
                 Publish Policy
