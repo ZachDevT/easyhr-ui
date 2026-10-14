@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileSignature,
   Shield,
-  Edit3,
   Download,
   ArrowRight,
   CheckCircle2,
@@ -26,6 +25,15 @@ interface MySignatureDoc {
   requestId: string;
   documentId: string;
   documentName: string;
+  documentUrl?: string;
+  body?: string;
+  header?: string;
+  footer?: string;
+  logoUrl?: string;
+  brandColor?: string;
+  websiteUrl?: string;
+  contactPhone?: string;
+  contactEmail?: string;
   senderName: string;
   senderRole: string;
   status: 'pending' | 'signed' | 'declined';
@@ -44,6 +52,12 @@ export default function MySignaturesPage() {
   const [isSubmittingSign, setIsSubmittingSign] = useState(false);
   const [declineModalOpen, setDeclineModalOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
+  const [typedSignature, setTypedSignature] = useState('');
+  const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn' | 'uploaded'>('typed');
+  const [signatureImage, setSignatureImage] = useState('');
+  const [hasDrawnSignature, setHasDrawnSignature] = useState(false);
+  const [consentToSign, setConsentToSign] = useState(false);
+  const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const fetchMySignatures = useCallback(async () => {
     if (!isSignedIn) return;
@@ -74,10 +88,22 @@ export default function MySignaturesPage() {
 
   const pendingDocs = docs.filter((d) => d.status === 'pending');
   const completedDocs = docs.filter((d) => d.status === 'signed');
+  const signatureReady = signatureMode === 'typed' ? !!typedSignature.trim() : signatureMode === 'uploaded' ? !!signatureImage : hasDrawnSignature;
 
   // Handle Sign
   const handleSignComplete = async () => {
     if (!signingDoc) return;
+    let signatureType = signatureMode;
+    let signatureData = typedSignature.trim();
+    if (signatureMode === 'drawn') {
+      signatureData = signatureCanvasRef.current?.toDataURL('image/png') || '';
+    } else if (signatureMode === 'uploaded') {
+      signatureData = signatureImage;
+    }
+    if (!signatureData || !consentToSign) {
+      toast.error('Signature required', 'Add a signature and confirm consent before signing.');
+      return;
+    }
     setIsSubmittingSign(true);
     try {
       const token = await getToken();
@@ -89,7 +115,7 @@ export default function MySignaturesPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ signatureData: 'e-signed-verified' }),
+        body: JSON.stringify({ signatureType, signatureData, consent: consentToSign }),
       });
 
       if (res.ok) {
@@ -193,7 +219,7 @@ export default function MySignaturesPage() {
               <button
                 className="btn-primary"
                 onClick={handleSignComplete}
-                disabled={isSubmittingSign}
+                disabled={isSubmittingSign || !signatureReady || !consentToSign}
               >
                 {isSubmittingSign ? (
                   <>
@@ -222,6 +248,9 @@ export default function MySignaturesPage() {
                   padding: 80,
                 }}
               >
+                <div style={{height:5,background:signingDoc.brandColor||'#4F46E5',marginBottom:20}} />
+                {signingDoc.logoUrl && <img src={signingDoc.logoUrl} alt={`${signingDoc.senderName} logo`} style={{maxWidth:180,maxHeight:56,objectFit:'contain',marginBottom:20}} />}
+                {(signingDoc.header || signingDoc.footer) && <div style={{whiteSpace:'pre-wrap',fontSize:12,color:'#667085',borderBottom:'1px solid #e5e7eb',paddingBottom:16,marginBottom:24}}>{signingDoc.header}</div>}
                 <div style={{ textAlign: 'center', marginBottom: 40 }}>
                   <h1 className="text-2xl fw-800 text-1 mb-8" style={{ fontFamily: 'serif' }}>
                     {signingDoc.documentName}
@@ -232,18 +261,14 @@ export default function MySignaturesPage() {
                 </div>
 
                 <div className="text-sm text-1" style={{ lineHeight: 1.8, fontFamily: 'serif' }}>
-                  <p className="mb-16">
-                    This document acknowledgement is made effective as of the date signed below.
-                  </p>
-                  <p className="mb-16">
-                    By signing this document, the signer acknowledges that they have received, read, and understood
-                    the contents and conditions outlined herein. The signer agrees to comply with all company
-                    policies, agreements, and procedures.
-                  </p>
-                  <p className="mb-16">
-                    Furthermore, this document serves as an official electronic record binding between the parties in
-                    accordance with the Electronic Signatures in Global and National Commerce (ESIGN) Act.
-                  </p>
+                  {signingDoc.documentUrl ? (
+                    <iframe src={signingDoc.documentUrl} title={signingDoc.documentName} style={{ width: '100%', height: '850px', border: 0 }} />
+                  ) : signingDoc.body ? (
+                    <div style={{whiteSpace:'pre-wrap',fontFamily:'Georgia,serif'}}>{signingDoc.body}</div>
+                  ) : (
+                    <p className="mb-16">The uploaded document preview is unavailable. Return to your signatures list and try again.</p>
+                  )}
+                  {!signingDoc.documentUrl && (signingDoc.footer || signingDoc.websiteUrl || signingDoc.contactEmail || signingDoc.contactPhone) && <div style={{whiteSpace:'pre-wrap',borderTop:'1px solid #e5e7eb',marginTop:28,paddingTop:14,fontSize:12,color:'#667085'}}>{[signingDoc.footer,signingDoc.websiteUrl,signingDoc.contactEmail,signingDoc.contactPhone].filter(Boolean).join('\n')}</div>}
                   <br />
                   <br />
                   <br />
@@ -264,11 +289,8 @@ export default function MySignaturesPage() {
                           justifyContent: 'center',
                           cursor: 'pointer',
                         }}
-                        onClick={handleSignComplete}
                       >
-                        <div className="row gap-8 text-primary fw-600 text-sm">
-                          <Edit3 size={16} /> Click Finish & Sign to Authorize
-                        </div>
+                        {signatureMode === 'typed' ? <span className="text-primary fw-600 text-sm" style={{ fontFamily: 'cursive', fontSize: 22 }}>{typedSignature || 'Type your signature below'}</span> : signatureMode === 'uploaded' ? (signatureImage ? <img src={signatureImage} alt="Signature preview" style={{ maxWidth: 240, maxHeight: 44, objectFit: 'contain' }} /> : <span className="text-primary fw-600 text-sm">Upload your signature image</span>) : hasDrawnSignature ? <img src={signatureCanvasRef.current?.toDataURL('image/png')} alt="Signature preview" style={{ maxWidth: 240, maxHeight: 44, objectFit: 'contain' }} /> : <span className="text-primary fw-600 text-sm">Draw your signature below</span>}
                       </div>
                     </div>
 
@@ -328,14 +350,23 @@ export default function MySignaturesPage() {
                   </div>
                 )}
 
+                <div className="col gap-8">
+                  <span className="text-xs text-5">Choose how to sign</span>
+                  <div className="row gap-6">
+                    {(['typed', 'drawn', 'uploaded'] as const).map((mode) => <button type="button" key={mode} className={signatureMode === mode ? 'btn-primary btn-sm' : 'btn-neutral btn-sm'} onClick={() => setSignatureMode(mode)}>{mode === 'typed' ? 'Type' : mode === 'drawn' ? 'Draw' : 'Upload'}</button>)}
+                  </div>
+                  {signatureMode === 'typed' && <input className="input" aria-label="Type your full legal name" value={typedSignature} maxLength={200} onChange={(e) => setTypedSignature(e.target.value)} autoComplete="name" placeholder="Type your full legal name" />}
+                  {signatureMode === 'drawn' && <div className="col gap-6"><canvas ref={signatureCanvasRef} width={500} height={160} aria-label="Draw your signature" style={{ width: '100%', height: 128, border: '1px solid var(--border)', borderRadius: 8, touchAction: 'none', background: '#fff' }} onPointerDown={(e) => { const canvas = signatureCanvasRef.current; if (!canvas) return; canvas.setPointerCapture(e.pointerId); const rect = canvas.getBoundingClientRect(); const ctx = canvas.getContext('2d'); if (!ctx) return; ctx.strokeStyle = '#111827'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height); setHasDrawnSignature(true); }} onPointerMove={(e) => { if (!(e.buttons & 1)) return; const canvas = signatureCanvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return; const rect = canvas.getBoundingClientRect(); ctx.lineTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height); ctx.stroke(); }} /><button type="button" className="btn-neutral btn-sm" onClick={() => { const canvas = signatureCanvasRef.current; canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height); setHasDrawnSignature(false); }}>Clear drawing</button></div>}
+                  {signatureMode === 'uploaded' && <div className="col gap-6"><input type="file" accept="image/png,image/jpeg" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 512000) { toast.error('Image too large', 'Signature images must be 500 KB or smaller.'); e.target.value = ''; return; } const reader = new FileReader(); reader.onload = () => setSignatureImage(typeof reader.result === 'string' ? reader.result : ''); reader.readAsDataURL(file); }} /><span className="text-xs text-5">Upload a PNG or JPEG signature image, up to 500 KB.</span></div>}
+                </div>
+                <label className="row gap-8 align-start text-xs text-4">
+                  <input type="checkbox" checked={consentToSign} onChange={(e) => setConsentToSign(e.target.checked)} />
+                  <span>I have reviewed the attached document and consent to apply my {signatureMode} signature to this request.</span>
+                </label>
+
                 <div className="divider" />
 
-                <button
-                  className="btn-secondary w-full row-center gap-8"
-                  onClick={() => toast.success('Downloaded', 'Copy saved for offline review.')}
-                >
-                  <Download size={14} /> Download PDF Copy
-                </button>
+                {signingDoc.documentUrl ? <a className="btn-secondary w-full row-center gap-8" href={signingDoc.documentUrl} target="_blank" rel="noreferrer"><Download size={14} /> Open uploaded document</a> : null}
               </div>
             </div>
           </div>
@@ -469,7 +500,7 @@ export default function MySignaturesPage() {
                         </div>
                       </div>
 
-                      <button className="btn-primary w-full row-center gap-8" onClick={() => setSigningDoc(doc)}>
+                      <button className="btn-primary w-full row-center gap-8" onClick={() => { setTypedSignature(''); setSignatureImage(''); setSignatureMode('typed'); setHasDrawnSignature(false); setConsentToSign(false); setSigningDoc(doc); }}>
                         Review & Sign <ArrowRight size={16} />
                       </button>
                     </CardBody>
@@ -549,16 +580,11 @@ export default function MySignaturesPage() {
                           </td>
                           <td style={{ padding: '20px 24px' }}>
                             <div className="row gap-8 text-xs text-5 align-center">
-                              <Shield size={14} className="text-success" /> Verified ESIGN
+                              <Shield size={14} className="text-success" /> Signature recorded
                             </div>
                           </td>
                           <td style={{ padding: '20px 24px', textAlign: 'right' }}>
-                            <button
-                              className="btn-secondary btn-sm row gap-8"
-                              onClick={() => toast.success('Downloaded', 'Copy saved for offline records.')}
-                            >
-                              <Download size={14} /> PDF
-                            </button>
+                            {doc.documentUrl ? <a className="btn-secondary btn-sm row gap-8" href={doc.documentUrl} target="_blank" rel="noreferrer"><Download size={14} /> Open document</a> : null}
                           </td>
                         </tr>
                       ))}

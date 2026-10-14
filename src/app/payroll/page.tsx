@@ -5,6 +5,7 @@ import {
   DollarSign,
   Clock,
   FileText,
+  Mail,
   CheckCircle2,
   ChevronRight,
   Download,
@@ -17,7 +18,6 @@ import {
   Edit3,
   Save,
   Info,
-  Mail,
   Paperclip,
   CalendarDays,
   TrendingDown,
@@ -31,10 +31,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatRibbon } from '@/components/ui/StatRibbon';
-import { CurrencySelect } from '@/components/ui/CurrencySelect';
-import { SearchableSelect, SelectOption } from '@/components/ui/SearchableSelect';
 import { Modal } from '@/components/ui/Modal';
-import { UgandaTaxEngine, PayrollInput, formatCurrency } from '@/utils/payrollCalc';
+import { UgandaTaxEngine, formatCurrency } from '@/utils/payrollCalc';
 import { toast } from '@/components/ui/Toast';
 
 export interface PayrollRecord {
@@ -68,6 +66,26 @@ interface PayrollBackendConfig {
   standardMonthlyMinutes: number;
 }
 
+interface PayrollEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+}
+
+interface PayrollCompensation {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  effectiveDate: string;
+  currency: string;
+  payFrequency: string;
+  baseAmountMinor: number;
+  payType: string;
+  reason: string;
+}
+interface PayrollPayslip { id:string;employeeId:string;employeeName:string;email:string;periodStart:string;periodEnd:string;payDate:string;currency:string;basePay:number;earnings:number;deductions:number;netPay:number;deliveryStatus:string }
+
 const TABS = ['Overview', 'Run Payroll', 'Paystubs', 'Settings'];
 const WIZARD_STEPS = ['Hours & Attendance', 'Earnings & Adjustments', 'Taxes & Deductions', 'Review & Finalize'];
 
@@ -83,12 +101,21 @@ export default function PayrollPage() {
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
   const [configurations, setConfigurations] = useState<PayrollBackendConfig[]>([]);
+  const [payrollEmployees, setPayrollEmployees] = useState<PayrollEmployee[]>([]);
+  const [compensation, setCompensation] = useState<PayrollCompensation[]>([]);
+  const [payrollRunId, setPayrollRunId] = useState('');
+  const [payslips, setPayslips] = useState<PayrollPayslip[]>([]);
+  const [compensationForm, setCompensationForm] = useState({ employeeId: '', amount: '', effectiveDate: new Date().toISOString().slice(0, 10), reason: '' });
+  const [isSavingCompensation, setIsSavingCompensation] = useState(false);
+  const [payrollConfigForm, setPayrollConfigForm] = useState({ country: '', currency: '', standardMonthlyMinutes: '' });
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [taxRules,setTaxRules]=useState<any[]>([]);
+  const [taxRuleForm,setTaxRuleForm]=useState({ruleName:'Income tax',ruleType:'progressive_tax',ratePercent:'0',bands:'[{"upTo":1000000,"ratePercent":0},{"upTo":0,"ratePercent":10}]'});
+  const [isSavingTaxRule,setIsSavingTaxRule]=useState(false);
 
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
 
   // Email payslips modal
-  const [isEmailAllModalOpen, setIsEmailAllModalOpen] = useState(false);
-  const [isSendingEmails, setIsSendingEmails] = useState(false);
 
   // Adjust Record state
   const [adjustRecord, setAdjustRecord] = useState<PayrollRecord | null>(null);
@@ -104,69 +131,118 @@ export default function PayrollPage() {
       const token = await getToken();
       const headers = getAuthHeaders(token);
 
-      const [periodsRes, configsRes, empsRes] = await Promise.all([
+      const [periodsRes, configsRes, compensationRes, employeesRes,taxRulesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/payroll/periods`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, { headers }),
-        fetch(`${API_BASE_URL}/api/v1/employees?limit=200`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/payroll/compensation`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/employees?limit=100`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`,{headers}),
       ]);
 
       if (periodsRes.ok) {
         const pData = await periodsRes.json();
         setPeriods(Array.isArray(pData) ? pData : []);
+        const latestLocked=(Array.isArray(pData)?pData:[]).find((p:PayrollPeriod)=>p.status==='locked'||p.status==='paid');
+        if(latestLocked){const runsRes=await fetch(`${API_BASE_URL}/api/v1/payroll/periods/${latestLocked.id}/runs`,{headers});if(runsRes.ok){const runs=await runsRes.json();const approved=Array.isArray(runs)?runs.find((run:any)=>run.status==='approved'):null;if(approved){const slipsRes=await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${approved.id}/payslips`,{headers});if(slipsRes.ok){const slips=await slipsRes.json();setPayslips(slips.data||[]);setPayrollRunId(approved.id)}}}}
       }
 
       if (configsRes.ok) {
         const cData = await configsRes.json();
-        setConfigurations(Array.isArray(cData) ? cData : []);
+        const configs = Array.isArray(cData) ? cData : [];
+        setConfigurations(configs);
+        if (configs[0]) setPayrollConfigForm({ country: configs[0].country, currency: configs[0].currency, standardMonthlyMinutes: String(configs[0].standardMonthlyMinutes) });
+      }
+      if(taxRulesRes.ok){const d=await taxRulesRes.json();setTaxRules(d.data||[])}
+      if (compensationRes.ok) {
+        const compData = await compensationRes.json();
+        setCompensation(Array.isArray(compData) ? compData : []);
+      }
+      if (employeesRes.ok) {
+        const employeeData = await employeesRes.json();
+        const employeeList = Array.isArray(employeeData) ? employeeData : employeeData.data || [];
+        setPayrollEmployees(employeeList.filter((e: PayrollEmployee) => e.status === 'active'));
+        if (employeeList.length) setCompensationForm((v) => ({ ...v, employeeId: v.employeeId || employeeList.find((e: PayrollEmployee) => e.status === 'active')?.id || '' }));
       }
 
-      if (empsRes.ok) {
-        const empsData = await empsRes.json();
-        const empsList = empsData.data || [];
-
-        // Build dynamic payroll records for all directory employees
-        const initialRecords: PayrollRecord[] = empsList.map((emp: any, index: number) => {
-          // Tiered default salary (UGX) based on role/index
-          const baseSalaries = [5500000, 3800000, 2900000, 2400000, 1800000, 1500000];
-          const baseSalary = baseSalaries[index % baseSalaries.length];
-          const absentHours = 0;
-          const overtimeHours = 0;
-          const allowances = 0;
-          const bonuses = 0;
-
-          const results = UgandaTaxEngine.calculate({
-            baseSalary,
-            allowances,
-            bonuses,
-            absentHours,
-            overtimeHours,
-          });
-
-          return {
-            id: emp.id,
-            employeeName: `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Employee',
-            email: emp.workEmail || 'employee@easyhr.pro',
-            avatar: emp.avatarUrl || '',
-            department: emp.departmentName || 'General',
-            baseSalary,
-            expectedHours: UgandaTaxEngine.config.standardMonthlyHours,
-            actualHours: UgandaTaxEngine.config.standardMonthlyHours,
-            absentHours,
-            overtimeHours,
-            allowances,
-            bonuses,
-            results,
-          };
-        });
-
-        setRecords(initialRecords);
-      }
+      // Payroll rows must come from calculated payroll run items; roster
+      // membership alone does not imply an employee has an active salary.
+      setRecords([]);
     } catch (err) {
       console.error("Failed to load payroll data", err);
+      toast.error("Payroll data unavailable", "Refresh the page or contact an administrator if this continues.");
     } finally {
       setIsLoading(false);
     }
   }, [getToken]);
+
+  const loadPayslips = useCallback(async (runId:string) => { const token=await getToken();if(!token)return;const response=await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${runId}/payslips`,{headers:getAuthHeaders(token)});if(response.ok){const data=await response.json();setPayslips(data.data||[]);setPayrollRunId(runId)} },[getToken]);
+  const emailPayslips = async () => { if(!payrollRunId)return;try{const token=await getToken();if(!token)throw new Error('Not authenticated');const response=await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${payrollRunId}/payslips/email`,{method:'POST',headers:getAuthHeaders(token)});const data=await response.json();if(!response.ok)throw new Error(data.detail||'Could not email payslips');toast.success('Payslips emailed',`${data.sent} sent · ${data.failed} failed`);await loadPayslips(payrollRunId)}catch(e){toast.error('Email failed',e instanceof Error?e.message:'Could not send payslips')} };
+
+  const savePayrollConfiguration = async () => {
+    const minutes = Number(payrollConfigForm.standardMonthlyMinutes);
+    if (payrollConfigForm.country.trim().length !== 2 || payrollConfigForm.currency.trim().length !== 3 || !Number.isInteger(minutes) || minutes <= 0) {
+      toast.error('Check payroll settings', 'Enter a 2-letter country code, 3-letter currency code, and positive monthly minutes.');
+      return;
+    }
+    setIsSavingConfig(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country: payrollConfigForm.country.trim().toUpperCase(), currency: payrollConfigForm.currency.trim().toUpperCase(), standardMonthlyMinutes: minutes }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Could not save payroll settings.');
+      }
+      toast.success('Payroll settings saved', 'Company jurisdiction, currency, and monthly minutes are updated.');
+      await fetchPayrollData();
+    } catch (error) {
+      toast.error('Save failed', error instanceof Error ? error.message : 'Could not save payroll settings.');
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const saveTaxRule=async()=>{setIsSavingTaxRule(true);try{const token=await getToken();if(!token||!configurations[0])throw new Error('Save payroll jurisdiction first');const body={country:configurations[0].country,currency:configurations[0].currency,ruleName:taxRuleForm.ruleName,ruleType:taxRuleForm.ruleType,ratePercent:Number(taxRuleForm.ratePercent),bands:taxRuleForm.ruleType==='progressive_tax'?JSON.parse(taxRuleForm.bands):[]};const response=await fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`,{method:'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok){const e=await response.json().catch(()=>({}));throw new Error(e.detail||'Could not save tax rule')}toast.success('Tax rule saved','Payroll will apply this organization rule to future calculations.');await fetchPayrollData()}catch(e){toast.error('Tax rule not saved',e instanceof Error?e.message:'Invalid rule')}finally{setIsSavingTaxRule(false)}};
+
+  const saveCompensation = async () => {
+    const amount = Number(compensationForm.amount);
+    if (!configurations.length || !compensationForm.employeeId || !Number.isFinite(amount) || amount <= 0 || !compensationForm.effectiveDate) {
+      toast.error('Complete compensation details', 'Save company payroll settings, choose an active employee, and enter a positive monthly salary and effective date.');
+      return;
+    }
+    setIsSavingCompensation(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`${API_BASE_URL}/api/v1/payroll/compensation`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: compensationForm.employeeId,
+          country: configurations[0].country,
+          effectiveDate: compensationForm.effectiveDate,
+          currency: configurations[0].currency,
+          baseAmountMinor: Math.round(amount * 100),
+          reason: compensationForm.reason.trim(),
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Could not save employee compensation.');
+      }
+      toast.success('Compensation saved', 'The monthly salary record is effective for the date you selected.');
+      setCompensationForm((v) => ({ ...v, amount: '', reason: '' }));
+      await fetchPayrollData();
+    } catch (error) {
+      toast.error('Save failed', error instanceof Error ? error.message : 'Could not save employee compensation.');
+    } finally {
+      setIsSavingCompensation(false);
+    }
+  };
 
   useEffect(() => {
     fetchPayrollData();
@@ -249,17 +325,11 @@ export default function PayrollPage() {
       const token = await getToken();
       const headers = getAuthHeaders(token);
 
-      // 1. Ensure configuration exists
       if (configurations.length === 0) {
-        await fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ country: "UG", currency: "UGX", standardMonthlyMinutes: 9600 }),
-        });
+        throw new Error("Configure your company payroll jurisdiction and currency in Settings first.");
       }
 
-      // 2. Determine or create period
-      let periodId = periods[0]?.id;
+      let periodId = periods.find((period) => period.status === "draft")?.id;
       if (!periodId) {
         const now = new Date();
         const y = now.getFullYear();
@@ -274,39 +344,32 @@ export default function PayrollPage() {
           headers,
           body: JSON.stringify({ startDate, endDate, payDate }),
         });
-        if (periodRes.ok) {
-          const createdP = await periodRes.json();
-          periodId = createdP.id;
-        }
+        if (!periodRes.ok) throw new Error("Could not create a payroll period.");
+        const createdP = await periodRes.json();
+        periodId = createdP.id;
       }
 
-      // 3. Trigger payroll run on the backend if period is available
-      if (periodId) {
-        await fetch(`${API_BASE_URL}/api/v1/payroll/periods/${periodId}/runs`, {
-          method: "POST",
-          headers,
-        });
+      if (!periodId) throw new Error("No payroll period is available.");
+      const runRes = await fetch(`${API_BASE_URL}/api/v1/payroll/periods/${periodId}/runs`, { method: "POST", headers });
+      if (!runRes.ok) {
+        const error = await runRes.json().catch(() => ({}));
+        throw new Error(error.detail || "Payroll calculation failed. Check employee compensation records and payroll settings.");
       }
 
+      const createdRun=await runRes.json();
+      const lockRes=await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${createdRun.id}/lock`,{method:'POST',headers});
+      if(!lockRes.ok)throw new Error('Payroll calculated, but approval and paystub generation could not be completed.');
+      await loadPayslips(createdRun.id);
       setPayrollRun(true);
       setActiveTab('Overview');
       setWizardStep(0);
       toast.success("Payroll executed", "Current pay period processed and recorded successfully.");
       await fetchPayrollData();
     } catch (err) {
-      toast.error("Execution error", "Could not complete payroll run.");
+      toast.error("Execution error", err instanceof Error ? err.message : "Could not complete payroll run.");
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleSendEmails = () => {
-    setIsSendingEmails(true);
-    setTimeout(() => {
-      setIsSendingEmails(false);
-      setIsEmailAllModalOpen(false);
-      toast.success("Payslips dispatched", `Payslips queued for delivery to ${records.length} employees.`);
-    }, 1200);
   };
 
   const renderOverview = () => (
@@ -318,7 +381,7 @@ export default function PayrollPage() {
             <Badge variant="primary">
               Pay Period: {periods[0] ? `${periods[0].startDate} to ${periods[0].endDate}` : 'Current Month'}
             </Badge>
-            <span className="text-sm text-4">Uganda Statutory Regulations (URA &middot; NSSF)</span>
+            <span className="text-sm text-4">{configurations[0] ? `${configurations[0].country} · ${configurations[0].currency}` : 'Payroll configuration required'}</span>
           </div>
         </div>
         <button className="btn-primary" onClick={() => setActiveTab('Run Payroll')}>
@@ -330,31 +393,31 @@ export default function PayrollPage() {
         stats={[
           {
             label: 'Total Employer Cost',
-            value: formatCurrency(payrollTotals.totalEmployerCost),
+            value: records.length ? formatCurrency(payrollTotals.totalEmployerCost, configurations[0]?.currency || 'UGX') : '—',
             color: 'var(--primary)',
             icon: <Building size={18} />,
-            description: 'Includes NSSF 10% Contribution',
+            description: 'From finalized payroll run items',
           },
           {
             label: 'Total Net Pay',
-            value: formatCurrency(payrollTotals.totalNet),
+            value: records.length ? formatCurrency(payrollTotals.totalNet, configurations[0]?.currency || 'UGX') : '—',
             color: 'var(--success)',
             icon: <DollarSign size={18} />,
-            description: 'To be disbursed to employees',
+            description: 'From finalized payroll run items',
           },
           {
-            label: 'Total PAYE Withheld',
-            value: formatCurrency(payrollTotals.totalPaye),
+            label: 'Total deductions',
+            value: records.length ? formatCurrency(payrollTotals.totalPaye, configurations[0]?.currency || 'UGX') : '—',
             color: 'var(--warning)',
             icon: <FileText size={18} />,
-            description: 'To be remitted to URA',
+            description: 'From finalized payroll run items',
           },
           {
-            label: 'Total NSSF (15%)',
-            value: formatCurrency(payrollTotals.totalNssfEmployee + payrollTotals.totalNssfEmployer),
+            label: 'Employees in run',
+            value: records.length,
             color: 'var(--text-1)',
             icon: <Clock size={18} />,
-            description: 'Employer (10%) + Employee (5%)',
+            description: 'Included in current payroll calculation',
           },
         ]}
         style={{ marginBottom: 40 }}
@@ -412,7 +475,25 @@ export default function PayrollPage() {
     </div>
   );
 
-  const renderWizard = () => (
+  const renderWizard = () => records.length === 0 ? (
+    <Card>
+      <CardBody style={{ padding: 32 }}>
+        <h2 className="text-2xl fw-800 text-1 mb-8">Payroll calculation is not ready</h2>
+        <p className="text-base text-4 mb-16">
+          This workspace has no finalized run items to review. Payroll needs effective compensation records for every active employee. Tax and deduction rules are currently implemented only for Uganda; custom company rules are not yet supported.
+        </p>
+        <p className="text-sm text-4 mb-24">
+          Current jurisdiction: {configurations[0]?.country || 'not configured'} · Currency: {configurations[0]?.currency || 'not configured'}
+        </p>
+        <div className="row gap-12">
+          <button className="btn-neutral" onClick={() => setActiveTab('Settings')}>Review payroll settings</button>
+          <button className="btn-primary" onClick={handleRunPayroll} disabled={isProcessing || configurations.length === 0}>
+            {isProcessing ? <Loader2 size={16} className="spin mr-8" /> : null} Check payroll readiness
+          </button>
+        </div>
+      </CardBody>
+    </Card>
+  ) : (
     <div style={{ margin: '0 auto' }}>
       <div className="row-between mb-32">
         <div>
@@ -716,11 +797,9 @@ export default function PayrollPage() {
       <div className="row-between mb-32">
         <div>
           <h2 className="text-2xl fw-800 text-1">Employee Paystubs</h2>
-          <p className="text-base text-4 mt-4">Inspect, generate PDF, and dispatch monthly paystubs.</p>
+          <p className="text-base text-4 mt-4">Review generated pay statements and email them to employees.</p>
         </div>
-        <button className="btn-secondary" onClick={() => setIsEmailAllModalOpen(true)}>
-          <Mail size={16} className="mr-8" /> Deliver All Payslips
-        </button>
+        <button className="btn-primary" disabled={!payrollRunId||payslips.length===0} onClick={emailPayslips}><Mail size={16}/> Email payslips</button>
       </div>
 
       <Card>
@@ -736,11 +815,14 @@ export default function PayrollPage() {
               </tr>
             </thead>
             <tbody>
-              {records.map((r, i) => (
+              {payslips.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--text-4)' }}>Finalize a payroll run to generate payslips.</td></tr>
+              )}
+              {payslips.map((r) => (
                 <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '20px 32px' }}>
                     <div className="row gap-16">
-                      <Avatar src={r.avatar} name={r.employeeName} size="md" />
+                      <Avatar name={r.employeeName} size="md" />
                       <div>
                         <div className="text-base fw-700 text-1">{r.employeeName}</div>
                         <div className="text-xs text-5 mt-2">{r.email}</div>
@@ -748,22 +830,17 @@ export default function PayrollPage() {
                     </div>
                   </td>
                   <td style={{ padding: '20px 32px', fontSize: 14 }}>
-                    {periods[0] ? `${periods[0].startDate} to ${periods[0].endDate}` : 'Active Cycle'}
+                    {r.periodStart} to {r.periodEnd}
                   </td>
                   <td style={{ padding: '20px 32px', fontSize: 15, fontWeight: 700 }}>
-                    {formatCurrency(r.results.netPay)}
+                    {formatCurrency(r.netPay / 100, r.currency)}
                   </td>
                   <td style={{ padding: '20px 32px' }}>
-                    {i % 2 === 0 ? <Badge variant="success">Delivered</Badge> : <Badge variant="neutral">Pending</Badge>}
+                    <Badge variant={r.deliveryStatus==='delivered'?'success':'warning'}>{r.deliveryStatus}</Badge>
                   </td>
                   <td style={{ padding: '20px 32px', textAlign: 'right' }}>
                     <div className="row gap-8 justify-end">
-                      <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => setSelectedRecord(r)}>
-                        View
-                      </button>
-                      <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={() => toast.info("Dispatching payslip", `Emailing payslip to ${r.employeeName}...`)}>
-                        <Mail size={14} />
-                      </button>
+                      <a className="btn-secondary" style={{ padding: '8px 12px' }} href={`/payroll/payslips/${r.id}`} target="_blank">View</a>
                     </div>
                   </td>
                 </tr>
@@ -772,79 +849,79 @@ export default function PayrollPage() {
           </table>
         </CardBody>
       </Card>
+
     </div>
   );
 
   const renderSettings = () => (
     <div style={{ maxWidth: 800 }}>
       <h2 className="text-2xl fw-800 text-1 mb-8">Payroll Settings</h2>
-      <p className="text-base text-4 mb-32">Configure global tax engines, standard work hours, and overtime rules.</p>
-
-      <Card style={{ marginBottom: 32 }}>
-        <CardHeader title="Tax Jurisdiction" />
+      <p className="text-base text-4 mb-32">Set the company payroll jurisdiction, currency, and standard work minutes.</p>
+      <Card>
+        <CardHeader title="Company Payroll Configuration" />
         <CardBody>
           <div className="row gap-20 mb-24">
-            <div style={{ flex: 1 }}>
-              <label className="text-sm fw-600 text-2 mb-8 block">Operating Country</label>
-              <SearchableSelect
-                value="UG"
-                onChange={(v) => console.log(v)}
-                options={[
-                  { value: 'UG', label: 'Uganda', description: 'Active - URA Rates' },
-                  { value: 'KE', label: 'Kenya', description: 'KRA Rates' },
-                  { value: 'RW', label: 'Rwanda', description: 'RRA Rates' },
-                  { value: 'NG', label: 'Nigeria', description: 'FIRS Rates' },
-                ]}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="text-sm fw-600 text-2 mb-8 block">Currency Display</label>
-              <CurrencySelect value="UGX" onChange={(v) => console.log(v)} />
-            </div>
+            <label className="col gap-8" style={{ flex: 1 }}>
+              <span className="text-sm fw-600 text-2">Country code (ISO 3166-1)</span>
+              <input className="input" maxLength={2} value={payrollConfigForm.country} placeholder="e.g. UG" onChange={(e) => setPayrollConfigForm((v) => ({ ...v, country: e.target.value }))} />
+            </label>
+            <label className="col gap-8" style={{ flex: 1 }}>
+              <span className="text-sm fw-600 text-2">Currency code (ISO 4217)</span>
+              <input className="input" maxLength={3} value={payrollConfigForm.currency} placeholder="e.g. UGX" onChange={(e) => setPayrollConfigForm((v) => ({ ...v, currency: e.target.value }))} />
+            </label>
           </div>
-          <div className="p-16" style={{ background: '#F9FAFB', border: '1px solid var(--border)', borderRadius: 8 }}>
-            <div className="text-sm fw-700 text-1 mb-8">Uganda Tax Engine Details</div>
-            <div className="text-sm text-5 mb-4">PAYE Brackets: 2024/2025 applied (Includes 10% Solidarity Tax &gt; 10M)</div>
-            <div className="text-sm text-5">NSSF: 5% Employee / 10% Employer</div>
-          </div>
+          <label className="col gap-8 mb-24" style={{ maxWidth: 380 }}>
+            <span className="text-sm fw-600 text-2">Standard monthly work minutes</span>
+            <input className="input" type="number" min={1} step={1} value={payrollConfigForm.standardMonthlyMinutes} placeholder="Enter your standard monthly minutes" onChange={(e) => setPayrollConfigForm((v) => ({ ...v, standardMonthlyMinutes: e.target.value }))} />
+          </label>
+          <p className="text-sm text-4 mb-24">Configure your organization’s statutory brackets and deductions below. Payroll runs require at least one active rule for this jurisdiction.</p>
+          <button className="btn-primary" onClick={savePayrollConfiguration} disabled={isSavingConfig}>
+            {isSavingConfig ? <Loader2 size={16} className="mr-8 spin" /> : <Save size={16} className="mr-8" />}
+            Save payroll settings
+          </button>
         </CardBody>
       </Card>
-
-      <Card>
-        <CardHeader title="Work Hours & Multipliers" />
+      <Card style={{marginTop:24}}><CardHeader title="Statutory tax & deduction rules"/><CardBody><p className="text-sm text-4 mb-16">Rules are stored per company and jurisdiction. Progressive band thresholds are in minor currency units; use <code>0</code> for the final uncapped band.</p><div className="grid-2 gap-12 mb-12"><input className="input" value={taxRuleForm.ruleName} onChange={e=>setTaxRuleForm(v=>({...v,ruleName:e.target.value}))} placeholder="Rule name"/><select className="input" value={taxRuleForm.ruleType} onChange={e=>setTaxRuleForm(v=>({...v,ruleType:e.target.value}))}><option value="progressive_tax">Progressive tax</option><option value="flat_deduction">Percentage deduction</option></select></div>{taxRuleForm.ruleType==='progressive_tax'?<textarea className="input" rows={5} value={taxRuleForm.bands} onChange={e=>setTaxRuleForm(v=>({...v,bands:e.target.value}))}/>:<label className="col gap-8 mb-12">Deduction percentage<input className="input" type="number" min="0" max="100" step="0.01" value={taxRuleForm.ratePercent} onChange={e=>setTaxRuleForm(v=>({...v,ratePercent:e.target.value}))}/></label>}<button className="btn-primary mt-12" disabled={isSavingTaxRule||!configurations.length} onClick={saveTaxRule}>{isSavingTaxRule?'Saving…':'Save tax rule'}</button><div className="col gap-8 mt-20">{taxRules.map(rule=><div key={rule.id} className="row-between p-12" style={{borderTop:'1px solid var(--border)'}}><span><strong>{rule.ruleName}</strong> · {rule.country} · {rule.ruleType}</span><Badge variant="success">Active</Badge></div>)}</div></CardBody></Card>
+      <Card style={{ marginTop: 24 }}>
+        <CardHeader title="Employee Monthly Compensation" />
         <CardBody>
-          <div className="row gap-20 mb-24">
-            <div style={{ flex: 1 }}>
-              <label className="text-sm fw-600 text-2 mb-8 block">Standard Monthly Hours</label>
-              <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
-                <Clock size={16} className="text-4 mr-8" />
-                <input type="number" defaultValue="173.33" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
-              </div>
-              <p className="text-xs text-4 mt-4">Used to calculate hourly rates for deductions/overtime.</p>
-            </div>
+          <p className="text-sm text-4 mb-20">Set each active employee’s effective monthly salary. Payroll uses the latest record effective on the pay period end date, in the company payroll currency.</p>
+          {configurations.length === 0 && <p className="text-sm text-warning mb-16">Save company payroll settings before adding employee compensation.</p>}
+          <div className="grid-2 gap-16 mb-16">
+            <label className="col gap-8">
+              <span className="text-sm fw-600 text-2">Active employee</span>
+              <select className="input" value={compensationForm.employeeId} onChange={(e) => setCompensationForm((v) => ({ ...v, employeeId: e.target.value }))}>
+                <option value="">Choose an employee</option>
+                {payrollEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}
+              </select>
+            </label>
+            <label className="col gap-8">
+              <span className="text-sm fw-600 text-2">Monthly salary ({configurations[0]?.currency || 'company currency'})</span>
+              <input className="input" type="number" min="0.01" step="0.01" value={compensationForm.amount} placeholder="Enter agreed monthly salary" onChange={(e) => setCompensationForm((v) => ({ ...v, amount: e.target.value }))} />
+            </label>
           </div>
-
-          <div className="row gap-20 mb-24">
-            <div style={{ flex: 1 }}>
-              <label className="text-sm fw-600 text-2 mb-8 block">Standard Overtime Rate (1.5x)</label>
-              <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
-                <span className="text-4 fw-600 mr-8">x</span>
-                <input type="number" defaultValue="1.5" step="0.1" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
-              </div>
-              <p className="text-xs text-4 mt-4">Multiplier applied to base hourly rate for OT.</p>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="text-sm fw-600 text-2 mb-8 block">Holiday / Rest Day Rate (2.0x)</label>
-              <div className="input" style={{ display: 'flex', alignItems: 'center', padding: '10px 16px' }}>
-                <span className="text-4 fw-600 mr-8">x</span>
-                <input type="number" defaultValue="2.0" step="0.1" style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%' }} />
-              </div>
-              <p className="text-xs text-4 mt-4">Multiplier for hours worked on public holidays.</p>
-            </div>
+          <div className="grid-2 gap-16 mb-16">
+            <label className="col gap-8">
+              <span className="text-sm fw-600 text-2">Effective from</span>
+              <input className="input" type="date" value={compensationForm.effectiveDate} onChange={(e) => setCompensationForm((v) => ({ ...v, effectiveDate: e.target.value }))} />
+            </label>
+            <label className="col gap-8">
+              <span className="text-sm fw-600 text-2">Reason (optional)</span>
+              <input className="input" maxLength={1000} value={compensationForm.reason} placeholder="New hire, annual review, promotion..." onChange={(e) => setCompensationForm((v) => ({ ...v, reason: e.target.value }))} />
+            </label>
           </div>
-          <button className="btn-primary" onClick={() => toast.success("Configuration saved", "Updated payroll operational parameters.")}>
-            <Save size={16} className="mr-8" /> Save Configurations
+          <button className="btn-primary mb-24" onClick={saveCompensation} disabled={isSavingCompensation || configurations.length === 0 || payrollEmployees.length === 0}>
+            {isSavingCompensation ? <Loader2 size={16} className="mr-8 spin" /> : <Save size={16} className="mr-8" />} Save compensation
           </button>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th className="text-left p-12 text-xs text-4">Employee</th><th className="text-left p-12 text-xs text-4">Effective date</th><th className="text-right p-12 text-xs text-4">Monthly salary</th><th className="text-left p-12 text-xs text-4">Reason</th></tr></thead>
+              <tbody>
+                {compensation.map((item) => <tr key={item.id} style={{ borderTop: '1px solid var(--border)' }}><td className="p-12 text-sm fw-600">{item.employeeName}</td><td className="p-12 text-sm">{item.effectiveDate}</td><td className="p-12 text-sm text-right">{item.currency} {(item.baseAmountMinor / 100).toLocaleString()}</td><td className="p-12 text-sm text-4">{item.reason || '—'}</td></tr>)}
+                {compensation.length === 0 && <tr><td colSpan={4} className="p-16 text-sm text-4 text-center">No employee compensation records yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </CardBody>
       </Card>
     </div>
@@ -854,7 +931,7 @@ export default function PayrollPage() {
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
       <PageHeader
         title="Payroll Processing"
-        subtitle="Manage payroll cycles, Ugandan taxes, and compliance."
+        subtitle="Configure payroll and review calculated pay runs."
         tabs={TABS}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -865,8 +942,8 @@ export default function PayrollPage() {
           <div className="mb-40 p-24 row gap-20" style={{ background: 'var(--success-tint)', border: '1px solid var(--success)', borderRadius: 12, color: 'var(--success)' }}>
             <CheckCircle2 size={32} />
             <div>
-              <div className="text-lg fw-800">Payroll Completed Successfully!</div>
-              <div className="text-sm mt-4 fw-600">Payslips have been generated and tax liabilities logged for remittance. You can now distribute payslips in the Paystubs tab.</div>
+              <div className="text-lg fw-800">Payroll calculated</div>
+              <div className="text-sm mt-4 fw-600">The run is approved and pay statements are ready. Email them from the Paystubs tab.</div>
             </div>
           </div>
         )}
@@ -959,32 +1036,6 @@ export default function PayrollPage() {
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* Email All Modal */}
-      <Modal
-        isOpen={isEmailAllModalOpen}
-        onClose={() => !isSendingEmails && setIsEmailAllModalOpen(false)}
-        title="Send Payslips to Employees"
-        width={450}
-        footer={
-          <div className="row-between w-100">
-            <button className="btn-neutral" onClick={() => setIsEmailAllModalOpen(false)} disabled={isSendingEmails}>Cancel</button>
-            <button className="btn-primary" onClick={handleSendEmails} disabled={isSendingEmails} style={{ background: 'var(--primary)' }}>
-              {isSendingEmails ? 'Sending Emails...' : 'Yes, Send Payslips'}
-            </button>
-          </div>
-        }
-      >
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div className="icon-chip mx-auto mb-24" style={{ width: 80, height: 80, background: 'var(--primary-tint)', color: 'var(--primary)' }}>
-            <Mail size={40} />
-          </div>
-          <h3 className="text-xl fw-800 text-1 mb-12">Deliver {records.length} Payslips</h3>
-          <p className="text-base text-5">
-            This will email the finalized payslips for the active period to all {records.length} employees securely.
-          </p>
-        </div>
       </Modal>
 
       {/* Payslip Preview Modal */}

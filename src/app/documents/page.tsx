@@ -111,8 +111,8 @@ export default function DocumentsPage() {
 
   const handleCreateDocument = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.filename.trim() || !form.employeeId) {
-      toast.error("Required fields", "Please specify a document filename and select an employee.");
+    if (!form.filename.trim() || !selectedFile) {
+      toast.error("Required fields", "Choose a document file and enter its filename.");
       return;
     }
 
@@ -121,8 +121,8 @@ export default function DocumentsPage() {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated");
 
-      const sizeBytes = selectedFile ? selectedFile.size : 1048576;
-      const contentType = selectedFile ? (selectedFile.type || "application/pdf") : "application/pdf";
+      const sizeBytes = selectedFile.size;
+      const contentType = selectedFile.type || "application/octet-stream";
 
       // 1. Request upload intent from backend
       const res = await fetch(`${API_BASE_URL}/api/v1/documents/upload-intents`, {
@@ -133,7 +133,7 @@ export default function DocumentsPage() {
         },
         body: JSON.stringify({
           filename: form.filename.trim(),
-          employeeId: form.employeeId,
+          employeeId: form.employeeId || undefined,
           category: form.category,
           contentType: contentType,
           sizeBytes: sizeBytes,
@@ -151,35 +151,32 @@ export default function DocumentsPage() {
       const uploadUrl = intent.uploadUrl;
 
       // 2. If user selected a file and uploadUrl exists, stream bytes to cloud storage
-      if (selectedFile && uploadUrl) {
-        try {
-          await fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": contentType,
-            },
-            body: selectedFile,
-          });
-        } catch (uploadErr) {
-          console.warn("Direct storage PUT completed or skipped", uploadErr);
-        }
-      }
+      if (!docId || !uploadUrl) throw new Error("Storage did not return an upload location.");
+      const uploaded = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: selectedFile,
+      });
+      if (!uploaded.ok) throw new Error("The document could not be uploaded to storage.");
+      const digest = await crypto.subtle.digest("SHA-256", await selectedFile.arrayBuffer());
+      const checksumSha256 = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
       // 3. Complete the upload so document status becomes available immediately
-      if (docId) {
-        await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, {
+      {
+        const completed = await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            checksumSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            checksumSha256,
           }),
-        }).catch(() => {});
+        });
+        if (!completed.ok) throw new Error("The document upload could not be finalized.");
       }
 
-      toast.success("Document uploaded", "Document file saved and available in employee record.");
+      toast.success("Document uploaded", form.employeeId ? "Document saved to employee record." : "Company document is ready to share for signature.");
       setIsAddModalOpen(false);
       setSelectedFile(null);
       setForm({ filename: "", employeeId: "", category: "contract", expiresOn: "" });
@@ -420,8 +417,8 @@ export default function DocumentsPage() {
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Add Employee Document"
-        subtitle="Record and index a compliance or contractual file"
+        title="Add Company or Employee Document"
+        subtitle="Upload a real document, then optionally link it to an employee"
         width={560}
         footer={
           <>
@@ -501,13 +498,13 @@ export default function DocumentsPage() {
 
           <div>
             <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
-              Employee *
+              Employee (optional)
             </label>
             <SearchableSelect
               value={form.employeeId}
               onChange={(val) => setForm({ ...form, employeeId: val })}
               options={employeeOptions}
-              placeholder="Select employee..."
+              placeholder="Company-wide document"
               searchPlaceholder="Search by employee name..."
             />
           </div>

@@ -922,49 +922,37 @@ export default function HrOnboardingPage() {
                                     },
                                     body: JSON.stringify({
                                       filename: file.name,
-                                      employeeId: "00000000-0000-0000-0000-000000000000",
                                       category: "compliance",
                                       contentType: file.type || "application/pdf",
                                       sizeBytes: file.size,
                                     }),
                                   });
-                                  if (res.ok) {
-                                    const intent = await res.json();
-                                    if (intent.uploadUrl) {
-                                      await fetch(intent.uploadUrl, {
-                                        method: "PUT",
-                                        headers: { "Content-Type": file.type || "application/pdf" },
-                                        body: file,
-                                      }).catch(() => {});
-                                    }
-                                    const docId = intent.document?.id || intent.id;
-                                    if (docId) {
-                                      await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, {
-                                        method: "POST",
-                                        headers: {
-                                          "Content-Type": "application/json",
-                                          Authorization: `Bearer ${token}`,
-                                        },
-                                        body: JSON.stringify({
-                                          checksumSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                        }),
-                                      }).catch(() => {});
-                                      const dlRes = await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/download-url`, {
-                                        headers: { Authorization: `Bearer ${token}` },
-                                      });
-                                      if (dlRes.ok) {
-                                        const dlJson = await dlRes.json();
-                                        if (dlJson.url) {
-                                          setOnboardingSettings((prev) => ({ ...prev, handbookUrl: dlJson.url }));
-                                          toast.success("Handbook uploaded", `${file.name} attached successfully.`);
-                                          return;
-                                        }
-                                      }
-                                    }
+                                  if (!res.ok) {
+                                    const error = await res.json().catch(() => ({}));
+                                    throw new Error(error.detail || "Could not create handbook upload.");
                                   }
-                                  // Fallback: save name
-                                  setOnboardingSettings((prev) => ({ ...prev, handbookUrl: file.name }));
-                                  toast.success("Handbook selected", `${file.name} ready to save.`);
+                                  const intent = await res.json();
+                                  if (!intent.uploadUrl || !intent.document?.id) throw new Error("Storage did not return an upload location.");
+                                  const uploaded = await fetch(intent.uploadUrl, {
+                                    method: "PUT",
+                                    headers: { "Content-Type": file.type || "application/pdf" },
+                                    body: file,
+                                  });
+                                  if (!uploaded.ok) throw new Error("The handbook file could not be uploaded to storage.");
+                                  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+                                  const checksumSha256 = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+                                  const docId = intent.document?.id;
+                                  const completed = await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      Authorization: `Bearer ${token}`,
+                                    },
+                                    body: JSON.stringify({ checksumSha256 }),
+                                  });
+                                  if (!completed.ok) throw new Error("The handbook upload could not be finalized.");
+                                  setOnboardingSettings((prev) => ({ ...prev, handbookUrl: `document:${docId}` }));
+                                  toast.success("Handbook uploaded", `${file.name} attached successfully.`);
                                 } catch (err: any) {
                                   toast.error("Upload error", err.message || "Failed to upload handbook.");
                                 }
@@ -973,7 +961,7 @@ export default function HrOnboardingPage() {
                           </label>
                         </div>
                         <input
-                          type="url"
+                          type="text"
                           className="input"
                           value={onboardingSettings.handbookUrl}
                           onChange={(e) => setOnboardingSettings({ ...onboardingSettings, handbookUrl: e.target.value })}

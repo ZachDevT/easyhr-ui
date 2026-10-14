@@ -94,9 +94,9 @@ export default function BenefitsPage() {
     name: "",
     category: "health",
     description: "",
-    employerCost: 450,
+    employerCost: 0,
     employeeCost: 0,
-    currency: "USD",
+    currency: "",
   });
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -172,8 +172,8 @@ export default function BenefitsPage() {
 
   // Handle Create Plan
   const handleCreatePlan = async () => {
-    if (!planForm.name.trim()) {
-      toast.error("Plan name required", "Please enter a name for the benefit plan.");
+    if (!planForm.name.trim() || !/^[A-Za-z]{3}$/.test(planForm.currency)) {
+      toast.error("Plan details required", "Enter a plan name and a three-letter currency code.");
       return;
     }
     setIsSubmittingPlan(true);
@@ -204,9 +204,9 @@ export default function BenefitsPage() {
           name: "",
           category: "health",
           description: "",
-          employerCost: 450,
+          employerCost: 0,
           employeeCost: 0,
-          currency: "USD",
+          currency: "",
         });
         await fetchData();
       } else {
@@ -713,12 +713,37 @@ export default function BenefitsPage() {
               </Select>
             </div>
             <div className="col gap-6">
-              <label className="text-xs fw-700 text-2">Employer Cost / Employee ($/mo)</label>
+              <label className="text-xs fw-700 text-2">Currency (ISO code)</label>
+              <Input
+                type="text"
+                maxLength={3}
+                placeholder="e.g. UGX"
+                value={planForm.currency}
+                onChange={(e) => setPlanForm({ ...planForm, currency: e.target.value.toUpperCase() })}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2 gap-16">
+            <div className="col gap-6">
+              <label className="text-xs fw-700 text-2">Employer Cost per Employee / Month ({planForm.currency || "currency"})</label>
               <Input
                 type="number"
-                placeholder="450"
+                min="0"
+                placeholder="0"
                 value={String(planForm.employerCost)}
                 onChange={(e) => setPlanForm({ ...planForm, employerCost: Number(e.target.value) })}
+                leftIcon={<DollarSign size={16} />}
+              />
+            </div>
+            <div className="col gap-6">
+              <label className="text-xs fw-700 text-2">Employee Cost / Month ({planForm.currency || "currency"})</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={String(planForm.employeeCost)}
+                onChange={(e) => setPlanForm({ ...planForm, employeeCost: Number(e.target.value) })}
                 leftIcon={<DollarSign size={16} />}
               />
             </div>

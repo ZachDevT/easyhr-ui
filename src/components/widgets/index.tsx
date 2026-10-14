@@ -1988,12 +1988,7 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
 
 export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
   const { getToken, isSignedIn } = useAuth();
-  const [holidays, setHolidays] = useState<Array<{ id: string; name: string; date: string }>>([
-    { id: '1', name: 'Jamhuri Day',   date: 'Dec 12, 2026' },
-    { id: '2', name: 'Christmas Day', date: 'Dec 25, 2026' },
-    { id: '3', name: 'Boxing Day',    date: 'Dec 26, 2026' },
-    { id: '4', name: 'New Year Day',  date: 'Jan 01, 2027' },
-  ]);
+  const [holidays, setHolidays] = useState<Array<{ id: string; name: string; date: string }>>([]);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -2007,13 +2002,7 @@ export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; p
         if (res.ok) {
           const json = await res.json();
           const items = Array.isArray(json) ? json : json.data || [];
-          if (items.length > 0) {
-            setHolidays(items.map((h: any) => ({
-              id: h.id,
-              name: h.name,
-              date: h.holidayDate || h.date,
-            })));
-          }
+          setHolidays(items.map((h: any) => ({ id: h.id, name: h.name, date: h.holidayDate || h.date })));
         }
       } catch {}
     }
@@ -2030,6 +2019,7 @@ export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; p
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
       <CardBody style={{ padding: 0 }}>
+        {holidays.length === 0 && <p className="text-sm text-5" style={{ padding: '16px 20px' }}>No company holidays have been added.</p>}
         {holidays.map((h) => (
           <div key={h.id || h.name} className="list-row" style={{ padding: '12px 20px' }}>
             <div className="icon-chip" style={{ width: 32, height: 32 }}><Building size={14} strokeWidth={2.5} /></div>
@@ -2050,6 +2040,18 @@ export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; p
 /* -------------------------------------------------------------------------- */
 
 export function OrgUpdatesWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
+  const { getToken, isSignedIn } = useAuth();
+  const [updates, setUpdates] = useState<AnnouncementItem[]>([]);
+  useEffect(() => {
+    if (!isSignedIn) return;
+    getToken().then(async (token) => {
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/v1/announcements`, { headers: getAuthHeaders(token) });
+      if (!response.ok) return;
+      const json = await response.json();
+      setUpdates((Array.isArray(json) ? json : json.data || []).slice(0, 3));
+    }).catch(() => setUpdates([]));
+  }, [isSignedIn, getToken]);
   return (
     <Card className={preview ? '' : 'mb-16'}>
       <div className="card-header">
@@ -2060,18 +2062,14 @@ export function OrgUpdatesWidget({ onRemove, preview }: { onRemove?: () => void;
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
       <CardBody>
-        <div className="feed-item" style={{ paddingTop: 0 }}>
-          <div className="feed-content">
-            <p className="feed-title"><strong>Operations & Engineering</strong> aligned headcount for Q4.</p>
-            <p className="feed-sub">Active sprint organization update</p>
+        {updates.length === 0 ? <p className="text-sm text-5">No company updates have been published.</p> : updates.map((update) => (
+          <div key={update.id} className="feed-item">
+            <div className="feed-content">
+              <p className="feed-title"><strong>{update.title}</strong></p>
+              <p className="feed-sub">{update.category} · {update.timeAgo || update.createdAt}</p>
+            </div>
           </div>
-        </div>
-        <div className="feed-item" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-          <div className="feed-content">
-            <p className="feed-title"><strong>People Team</strong> updated performance review cycle timeline.</p>
-            <p className="feed-sub">Company wide update</p>
-          </div>
-        </div>
+        ))}
       </CardBody>
     </Card>
   );
@@ -2082,10 +2080,19 @@ export function OrgUpdatesWidget({ onRemove, preview }: { onRemove?: () => void;
 /* -------------------------------------------------------------------------- */
 
 export function SignaturesWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
-  const [docs, setDocs] = useState([
-    'Employment Agreement & Terms.pdf',
-    'Employee Handbook Acknowledgement.pdf',
-  ]);
+  const { getToken, isSignedIn } = useAuth();
+  const [docs, setDocs] = useState<Array<{ requestId: string; documentName: string }>>([]);
+  useEffect(() => {
+    if (!isSignedIn) return;
+    getToken().then(async (token) => {
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/v1/signatures/me`, { headers: getAuthHeaders(token) });
+      if (!response.ok) return;
+      const json = await response.json();
+      const items = Array.isArray(json) ? json : json.data || [];
+      setDocs(items.filter((item: any) => item.status === 'pending').slice(0, 3).map((item: any) => ({ requestId: item.requestId, documentName: item.documentName })));
+    }).catch(() => setDocs([]));
+  }, [isSignedIn, getToken]);
 
   return (
     <Card className={preview ? '' : 'mb-16'}>
@@ -2097,24 +2104,17 @@ export function SignaturesWidget({ onRemove, preview }: { onRemove?: () => void;
         {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
       </div>
       <CardBody>
-        {docs.map((name, i, arr) => (
-          <div key={name} className="doc-card" style={{ marginBottom: i === arr.length - 1 ? 0 : 12 }}>
+        {docs.length === 0 && <p className="text-sm text-5">No documents need your signature.</p>}
+        {docs.map((doc) => (
+          <div key={doc.requestId} className="doc-card" style={{ marginBottom: 12 }}>
             <div className="doc-card-icon" style={{ width: 34, height: 34 }}>
               <FileSignature size={16} strokeWidth={2.5} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="doc-card-name">{name}</div>
+              <div className="doc-card-name">{doc.documentName}</div>
               <div className="doc-card-sub">Awaiting your electronic signature</div>
             </div>
-            <button
-              className="btn-primary btn-sm"
-              style={{ padding: '4px 12px', fontSize: 12 }}
-              onClick={() => {
-                toast.success('Document opened', 'Document loaded for DocuSign completion.');
-              }}
-            >
-              Sign
-            </button>
+            <Link className="btn-primary btn-sm" style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }} href="/my-signatures">Review</Link>
           </div>
         ))}
       </CardBody>

@@ -1,0 +1,10 @@
+'use client';
+
+import { useEffect,useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
+import { API_BASE_URL,getAuthHeaders } from '@/lib/api';
+import { Loader2,Printer } from 'lucide-react';
+
+type Slip={employeeName:string;periodStart:string;periodEnd:string;payDate:string;currency:string;basePay:number;earnings:number;deductions:number;netPay:number};
+export default function PayslipPage(){const {id}=useParams<{id:string}>();const {getToken}=useAuth();const [slip,setSlip]=useState<Slip|null>(null);const [error,setError]=useState('');useEffect(()=>{getToken().then(token=>fetch(`${API_BASE_URL}/api/v1/payroll/payslips/${id}`,{headers:getAuthHeaders(token)})).then(async r=>{if(!r.ok)throw new Error('Payslip unavailable');setSlip(await r.json())}).catch(e=>setError(e.message||'Could not load payslip'))},[getToken,id]);const money=(n:number)=>new Intl.NumberFormat(undefined,{style:'currency',currency:slip?.currency||'USD'}).format(n/100);return <main style={{maxWidth:820,margin:'48px auto',padding:32,background:'white',boxShadow:'0 6px 28px #0001',fontFamily:'system-ui'}}>{error&&<p role="alert">{error}</p>}{!slip&&!error?<Loader2 className="animate-spin"/>:slip&&<><div style={{display:'flex',justifyContent:'space-between'}}><div><h1>Pay statement</h1><p>{slip.periodStart} – {slip.periodEnd}</p><p>Pay date: {slip.payDate}</p></div><button onClick={()=>window.print()} className="btn-secondary"><Printer size={16}/> Print / Save PDF</button></div><hr/><h2>{slip.employeeName}</h2><table style={{width:'100%',borderCollapse:'collapse',marginTop:24}}><tbody>{[['Base pay',slip.basePay],['Additional earnings',slip.earnings],['Deductions',-slip.deductions],['Net pay',slip.netPay]].map(([label,value])=><tr key={String(label)}><td style={{padding:14,borderBottom:'1px solid #eaecf0'}}>{label}</td><td style={{padding:14,textAlign:'right',fontWeight:label==='Net pay'?700:400,borderBottom:'1px solid #eaecf0'}}>{money(Number(value))}</td></tr>)}</tbody></table></>}</main>}

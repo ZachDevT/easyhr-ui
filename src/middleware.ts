@@ -51,6 +51,7 @@ const isPublicRoute = createRouteMatcher([
   '/contact(.*)',
   '/auth/(.*)',
   '/my-onboarding(.*)',
+  '/sign/(.*)',
   '/sso-callback',
   '/workspace-not-found(.*)',
   '/api/public/(.*)',

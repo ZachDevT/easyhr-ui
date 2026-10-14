@@ -229,6 +229,7 @@ export function Sidebar() {
           { label: "Organization Chart", href: "/org-chart" },
           { label: "Departments", href: "/departments" },
           { label: "My Team", href: "/my-team" },
+          { label: "Promotions", href: "/promotions" },
         ],
       },
       {

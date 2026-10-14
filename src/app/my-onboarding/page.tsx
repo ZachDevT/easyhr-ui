@@ -179,6 +179,17 @@ export default function MyOnboardingPage() {
         });
         if (settingsRes.ok) {
           const cfg = await settingsRes.json();
+          if (typeof cfg.handbookUrl === "string" && cfg.handbookUrl.startsWith("document:")) {
+            const linkRes = await fetch(`${API_BASE_URL}/api/v1/onboarding/handbook-download-url`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (linkRes.ok) {
+              const link = await linkRes.json();
+              cfg.handbookUrl = link.url || "";
+            } else {
+              cfg.handbookUrl = "";
+            }
+          }
           setSettings(cfg);
         }
 
@@ -349,8 +360,8 @@ export default function MyOnboardingPage() {
 
   // Final onboarding submission & automatic redirect to dashboard
   const handleCompleteOnboarding = async () => {
-    if (settings.requireHandbook && !handbookAgreed) {
-      toast.warning("Handbook agreement required", "Please acknowledge and digitally sign the employee handbook.");
+    if (settings.requireHandbook && (!handbookAgreed || !signatureName.trim())) {
+      toast.warning("Handbook agreement required", "Type your full legal name and acknowledge the handbook before continuing.");
       return;
     }
 
@@ -393,7 +404,8 @@ export default function MyOnboardingPage() {
           bankName: paymentMethod === "Mobile Money" ? (mobileMoneyProvider === "Other" ? (customProvider.trim() || "Mobile Money") : mobileMoneyProvider) : (paymentMethod === "PayPal / Digital Wallet" ? "PayPal" : bankName || undefined),
           bankRoutingNumber: paymentMethod === "Wire Transfer / SWIFT" ? swiftCode || undefined : (routingNumber || undefined),
           bankAccountNumber: paymentMethod === "Mobile Money" ? mobileMoneyPhone : (paymentMethod === "PayPal / Digital Wallet" ? walletEmail : accountNumber || undefined),
-          handbookSignedAt: new Date().toISOString(),
+          handbookSignedAt: settings.requireHandbook ? new Date().toISOString() : undefined,
+          handbookSignatureName: settings.requireHandbook ? signatureName.trim() : undefined,
         }),
       });
 

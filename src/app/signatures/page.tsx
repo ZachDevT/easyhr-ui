@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FileSignature,
   CheckCircle2,
@@ -61,33 +61,48 @@ interface OrgEmployee {
   firstName: string;
   lastName: string;
   email?: string;
+  workEmail?: string;
   department?: string;
   jobTitle?: string;
 }
-
-const TEMPLATES = [
-  { id: 'tpl_offer', name: 'Standard Offer Letter', category: 'Onboarding' },
-  { id: 'tpl_handbook', name: 'Employee Handbook Acknowledgement', category: 'Policy' },
-  { id: 'tpl_deposit', name: 'Direct Deposit Authorization Form', category: 'Finance' },
-  { id: 'tpl_nda', name: 'Confidentiality and IP Agreement (NDA)', category: 'Legal' },
-];
+interface OrgDocument {
+  id: string;
+  filename: string;
+  category: string;
+  status: string;
+  employeeId?: string | null;
+}
+interface SignatureTemplate { id: string; name: string; category: string; description: string; body: string; headerText:string; footerText:string; expiresInDays: number; isActive: boolean }
+interface TemplateBranding { companyName:string;legalName:string;registrationNumber:string;websiteUrl:string;contactEmail:string;contactPhone:string;address:string;locations:string[];logoUrl:string;brandColor:string;defaultHeader:string;defaultFooter:string }
 
 export default function SignaturesAdminPage() {
   const { getToken, isSignedIn } = useAuth();
   const [activeTab, setActiveTab] = useState('Overview');
   const [showSendModal, setShowSendModal] = useState(false);
-  const [requestType, setRequestType] = useState<'template' | 'upload'>('template');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Live state
   const [requests, setRequests] = useState<SignatureRequestItem[]>([]);
   const [employees, setEmployees] = useState<OrgEmployee[]>([]);
+  const [documents, setDocuments] = useState<OrgDocument[]>([]);
+  const [templates, setTemplates] = useState<SignatureTemplate[]>([]);
+  const [requestSource, setRequestSource] = useState<'document'|'template'>('template');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateName, setTemplateName] = useState('');
+  const [editingTemplateId,setEditingTemplateId]=useState('');
+  const [templateCategory, setTemplateCategory] = useState('General');
+  const [templateBody, setTemplateBody] = useState('');
+  const [templateHeader,setTemplateHeader]=useState('');
+  const [templateFooter,setTemplateFooter]=useState('');
+  const [templateBranding,setTemplateBranding]=useState<TemplateBranding|null>(null);
+  const brandingLoaded=useRef(false);
+  const [templateDays, setTemplateDays] = useState(14);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Request Form State
-  const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
-  const [customDocName, setCustomDocName] = useState(TEMPLATES[0].name);
+  const [selectedDocumentId, setSelectedDocumentId] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [customRecipientName, setCustomRecipientName] = useState('');
   const [customRecipientEmail, setCustomRecipientEmail] = useState('');
@@ -101,9 +116,12 @@ export default function SignaturesAdminPage() {
       const token = await getToken();
       if (!token) return;
 
-      const [reqRes, empRes] = await Promise.all([
+      const [reqRes, empRes, docsRes, templatesRes, brandingRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/signatures`, { headers: getAuthHeaders(token) }),
         fetch(`${API_BASE_URL}/api/v1/employees`, { headers: getAuthHeaders(token) }),
+        fetch(`${API_BASE_URL}/api/v1/documents?limit=100`, { headers: getAuthHeaders(token) }),
+        fetch(`${API_BASE_URL}/api/v1/signatures/templates`, { headers: getAuthHeaders(token) }),
+        fetch(`${API_BASE_URL}/api/v1/signatures/branding`, { headers: getAuthHeaders(token) }),
       ]);
 
       if (reqRes.ok) {
@@ -120,6 +138,15 @@ export default function SignaturesAdminPage() {
           setSelectedEmployeeId(eList[0].id);
         }
       }
+      if (docsRes.ok) {
+        const dJson = await docsRes.json();
+        const docs = (Array.isArray(dJson) ? dJson : dJson.data || []) as OrgDocument[];
+        const available = docs.filter((doc) => doc.status === 'available');
+        setDocuments(available);
+        setSelectedDocumentId((current) => available.some((doc) => doc.id === current) ? current : available[0]?.id || '');
+      }
+      if (templatesRes.ok) { const data=await templatesRes.json(); const items=(Array.isArray(data)?data:data.data||[]) as SignatureTemplate[]; setTemplates(items); setSelectedTemplateId((current)=>items.some(t=>t.id===current)?current:items[0]?.id||''); }
+      if(brandingRes.ok){const b=await brandingRes.json() as TemplateBranding;setTemplateBranding(b);if(!brandingLoaded.current){setTemplateHeader(b.defaultHeader||'');setTemplateFooter(b.defaultFooter||'');brandingLoaded.current=true}}
     } catch (err) {
       console.error('Failed to load signatures data', err);
     } finally {
@@ -130,15 +157,6 @@ export default function SignaturesAdminPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // Update doc name on template select
-  const handleTemplateChange = (tplId: string) => {
-    setSelectedTemplateId(tplId);
-    const found = TEMPLATES.find((t) => t.id === tplId);
-    if (found) {
-      setCustomDocName(found.name);
-    }
-  };
 
   // Submit New Request
   const handleCreateRequest = async () => {
@@ -155,7 +173,7 @@ export default function SignaturesAdminPage() {
         const emp = employees.find((e) => e.id === selectedEmployeeId);
         if (emp) {
           recName = `${emp.firstName} ${emp.lastName}`.trim();
-          recEmail = emp.email || `${emp.firstName.toLowerCase()}.${emp.lastName.toLowerCase()}@easyhr.internal`;
+          recEmail = emp.email || emp.workEmail || '';
         }
       }
 
@@ -165,28 +183,27 @@ export default function SignaturesAdminPage() {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/signatures`, {
+      if (requestSource === 'document' && !selectedDocumentId) {
+        toast.error('Document required', 'Upload and complete a document before requesting signatures.');
+        setIsSubmitting(false);
+        return;
+      }
+      if(requestSource==='template'&&!selectedTemplateId){toast.error('Template required','Create or select a template first.');setIsSubmitting(false);return;}
+      const documentName = requestSource==='template' ? templates.find(t=>t.id===selectedTemplateId)?.name||templateName : documents.find((doc) => doc.id === selectedDocumentId)?.filename || 'Document';
+      const res = await fetch(requestSource==='template' ? `${API_BASE_URL}/api/v1/signatures` : `${API_BASE_URL}/api/v1/documents/${selectedDocumentId}/signatures`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          templateId: selectedTemplateId,
-          documentName: customDocName.trim(),
-          customMessage: customMessage.trim(),
-          recipients: [
-            {
-              name: recName,
-              email: recEmail,
-              employeeId: empId || undefined,
-            },
-          ],
+          message: customMessage.trim(), recipients: [{ name: recName, email: recEmail }],
+          ...(requestSource==='template'?{templateId:selectedTemplateId,mergeFields:{employee_name:recName,effective_date:new Date().toISOString().slice(0,10)}}:{}),
         }),
       });
 
       if (res.ok) {
-        toast.success('Signature Request Sent', `Sent "${customDocName}" to ${recName}.`);
+        toast.success('Signature Request Sent', `Sent "${documentName}" to ${recName}.`);
         setShowSendModal(false);
         await loadData();
       } else {
@@ -199,6 +216,8 @@ export default function SignaturesAdminPage() {
       setIsSubmitting(false);
     }
   };
+
+  const saveTemplate = async () => { setIsSavingTemplate(true); try { const token=await getToken(); if(!token)throw new Error('Not authenticated'); const res=await fetch(`${API_BASE_URL}/api/v1/signatures/templates${editingTemplateId?`/${editingTemplateId}`:''}`,{method:editingTemplateId?'PUT':'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify({name:templateName,category:templateCategory,body:templateBody,headerText:templateHeader,footerText:templateFooter,expiresInDays:templateDays})}); if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Could not save template')}toast.success('Template saved','Your organization template is ready to use.');setTemplateName('');setTemplateBody('');setEditingTemplateId('');await loadData();}catch(e){toast.error('Template not saved',e instanceof Error?e.message:'Could not save template')}finally{setIsSavingTemplate(false)} };
 
   // Filtered requests
   const filteredRequests = useMemo(() => {
@@ -220,7 +239,7 @@ export default function SignaturesAdminPage() {
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
       <PageHeader
         title="Document Signatures"
-        subtitle="Manage legally binding e-signatures, initiate requests from templates, and track execution statuses."
+        subtitle="Send uploaded documents for signature and track recipient responses."
         icon={<FileSignature size={28} className="text-white" />}
         tabs={['Overview', 'Sent Requests', 'Template Builder']}
         activeTab={activeTab}
@@ -293,8 +312,6 @@ export default function SignaturesAdminPage() {
                           <button
                             className="btn-secondary row gap-8"
                             onClick={() => {
-                              setSelectedTemplateId(TEMPLATES[0].id);
-                              setCustomDocName(req.documentName);
                               setShowSendModal(true);
                             }}
                           >
@@ -317,7 +334,7 @@ export default function SignaturesAdminPage() {
                   </div>
                   <h3 className="text-base fw-700 text-1 mb-8">Standard Document Templates</h3>
                   <p className="text-xs text-4 mb-20">
-                    Send pre-approved employment offers, handbook policies, and tax deposit forms to candidates or existing staff.
+                    Choose an uploaded, available company document and send it to an employee or external signer.
                   </p>
                   <button className="btn-primary w-full" onClick={() => setShowSendModal(true)}>
                     Create Signature Request
@@ -332,7 +349,7 @@ export default function SignaturesAdminPage() {
                   </div>
                   <h3 className="text-base fw-700 text-1 mb-8">Audit Trail & Compliance</h3>
                   <p className="text-xs text-4 mb-20">
-                    All signatures are tamper-sealed with SHA-256 cryptographic hashes and full ESIGN audit certificates.
+                    Signature records capture the signer’s consent, typed name, timestamp, request details, and a SHA-256 digest in the audit trail.
                   </p>
                   <button
                     className="btn-neutral w-full"
@@ -483,90 +500,23 @@ export default function SignaturesAdminPage() {
         )}
 
         {activeTab === 'Template Builder' && (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div
-              style={{
-                width: 800,
-                background: 'white',
-                borderRadius: 16,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-                padding: 48,
-                position: 'relative',
-              }}
-            >
-              <div className="row-between mb-32 pb-24 border-b border-border">
-                <div className="row gap-12 align-center">
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 10,
-                      background: 'var(--primary)',
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                    }}
-                  >
-                    EH
-                  </div>
-                  <div>
-                    <h3 className="text-base fw-800 text-1 m-0">Standard Employment Offer Template</h3>
-                    <div className="text-xs text-5 mt-2">Built-in Token Merging Enabled</div>
-                  </div>
+          <div style={{ maxWidth: 760, margin: '0 auto' }}>
+            <Card>
+              <CardBody style={{ padding: 28 }}>
+                <h2 className="text-xl fw-800 text-1 mb-8">Professional document template generator</h2>
+                <p className="text-sm text-4 mb-20">Write reusable HR documents with safe merge fields. Available fields: <code>{'{{employee_name}}'}</code>, <code>{'{{company_name}}'}</code>, <code>{'{{job_title}}'}</code>, <code>{'{{effective_date}}'}</code>, <code>{'{{today}}'}</code>.</p>
+                <div className="grid-2 gap-12 mb-16"><Input value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Template name, e.g. Employment Agreement"/><Input value={templateCategory} onChange={e=>setTemplateCategory(e.target.value)} placeholder="Category"/></div>
+                <div className="grid-2 gap-16 mb-16">
+                  <div className="col gap-8"><label className="text-sm fw-700 text-1">Editable company header</label><Textarea rows={5} value={templateHeader} onChange={e=>setTemplateHeader(e.target.value)} placeholder="Company name, registration number, office address"/><button type="button" className="btn-neutral btn-sm" style={{alignSelf:'flex-start'}} onClick={()=>{setTemplateHeader(templateBranding?.defaultHeader||'');setTemplateFooter(templateBranding?.defaultFooter||'')}}>Reset to company defaults</button></div>
+                  <div className="col gap-8"><label className="text-sm fw-700 text-1">Editable company footer</label><Textarea rows={5} value={templateFooter} onChange={e=>setTemplateFooter(e.target.value)} placeholder="Website, contact email, phone, office locations"/><span className="text-xs text-5">Defaults include active locations, and can be edited for this template.</span></div>
                 </div>
-              </div>
-
-              <h1 className="text-2xl fw-800 text-1 text-center mb-32">OFFER OF EMPLOYMENT</h1>
-
-              <div className="text-sm text-1" style={{ lineHeight: 1.8 }}>
-                <p>
-                  Dear{' '}
-                  <span style={{ background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, color: '#92400E', fontWeight: 700 }}>
-                    [Candidate Name]
-                  </span>
-                  ,
-                </p>
-                <p>
-                  We are delighted to offer you the position of{' '}
-                  <span style={{ background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, color: '#92400E', fontWeight: 700 }}>
-                    [Job Title]
-                  </span>{' '}
-                  at EasyHR. We believe your background and experience are an outstanding fit for our organization.
-                </p>
-                <p>
-                  In this position, you will report to{' '}
-                  <span style={{ background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, color: '#92400E', fontWeight: 700 }}>
-                    [Manager Name]
-                  </span>
-                  . Your base compensation will be established at competitive market benchmark rates.
-                </p>
-              </div>
-
-              <div className="grid-2 gap-40 mt-48">
-                <div className="col gap-12">
-                  <div className="text-sm fw-700 text-1">For EasyHR Inc.</div>
-                  <div style={{ height: 48, borderBottom: '1px solid var(--border)' }} />
-                  <div className="text-xs text-5">Authorized Corporate Officer</div>
-                </div>
-                <div className="col gap-12">
-                  <div className="text-sm fw-700 text-1">Candidate Acceptance</div>
-                  <div
-                    style={{
-                      height: 48,
-                      borderBottom: '2px dashed var(--primary)',
-                      background: 'var(--primary-tint)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <span className="text-sm text-primary fw-700">Digital Signature Anchor</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                <label className="text-sm fw-700 text-1 mb-8" style={{display:'block'}}>Main document content</label><Textarea rows={14} value={templateBody} onChange={e=>setTemplateBody(e.target.value)} placeholder={'EMPLOYMENT AGREEMENT\n\nThis agreement is between {{company_name}} and {{employee_name}}...'} />
+                <div className="p-16 mt-12" style={{background:'white',border:'1px solid var(--border)',borderRadius:10}}><div className="text-xs fw-700 text-5 mb-8">BRANDED DOCUMENT PREVIEW</div><div style={{height:5,background:templateBranding?.brandColor||'#4F46E5',borderRadius:4,marginBottom:14}}/>{templateBranding?.logoUrl&&<img src={templateBranding.logoUrl} alt={`${templateBranding.companyName} logo`} style={{maxWidth:180,maxHeight:56,objectFit:'contain',marginBottom:12}}/>}<div className="text-xs text-4 mb-16" style={{whiteSpace:'pre-wrap'}}>{templateHeader.replaceAll('{{company_name}}',templateBranding?.companyName||'Company').replaceAll('{{today}}',new Date().toISOString().slice(0,10))}</div><div className="text-sm text-2" style={{whiteSpace:'pre-wrap',lineHeight:1.7,minHeight:100}}>{templateBody.replaceAll('{{employee_name}}','Alex Morgan').replaceAll('{{company_name}}',templateBranding?.companyName||'Your Company').replaceAll('{{job_title}}','People Operations Specialist').replaceAll('{{effective_date}}','2026-11-01').replaceAll('{{today}}',new Date().toISOString().slice(0,10))||'Your generated document preview will appear here.'}</div><div className="divider my-12"/><div className="text-xs text-4" style={{whiteSpace:'pre-wrap'}}>{templateFooter.replaceAll('{{company_name}}',templateBranding?.companyName||'Company').replaceAll('{{today}}',new Date().toISOString().slice(0,10))}</div></div>
+                <div className="row-between mt-16"><label className="text-sm text-4">Signing link expiry (days) <Input type="number" min={1} max={365} value={templateDays} onChange={e=>setTemplateDays(Number(e.target.value))}/></label><button className="btn-primary" onClick={saveTemplate} disabled={isSavingTemplate||!templateName.trim()||!templateBody.trim()}>{isSavingTemplate?<Loader2 size={16} className="animate-spin"/>:editingTemplateId?'Update reusable template':'Save reusable template'}</button></div>
+                <div className="divider my-20"/><h3 className="text-base fw-700 text-1">Organization templates ({templates.length})</h3>
+                <div className="col gap-8 mt-12">{templates.map(t=><div key={t.id} className="row-between p-12" style={{border:'1px solid var(--border)',borderRadius:10}}><div><strong>{t.name}</strong><div className="text-xs text-5">{t.category} · expires in {t.expiresInDays} days</div></div><div className="row gap-8"><button className="btn-neutral btn-sm" onClick={()=>{setEditingTemplateId(t.id);setTemplateName(t.name);setTemplateCategory(t.category);setTemplateBody(t.body);setTemplateHeader(t.headerText||'');setTemplateFooter(t.footerText||'');setTemplateDays(t.expiresInDays);window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button className="btn-secondary btn-sm" onClick={()=>{setSelectedTemplateId(t.id);setRequestSource('template');setShowSendModal(true)}}>Generate &amp; send</button></div></div>)}</div>
+              </CardBody>
+            </Card>
           </div>
         )}
       </div>
@@ -597,31 +547,26 @@ export default function SignaturesAdminPage() {
         }
       >
         <div className="col gap-20 p-8">
-          {/* Template Selector */}
+          <div className="row gap-8"><button type="button" className={requestSource==='template'?'btn-primary btn-sm':'btn-neutral btn-sm'} onClick={()=>setRequestSource('template')}>Generate from HR template</button><button type="button" className={requestSource==='document'?'btn-primary btn-sm':'btn-neutral btn-sm'} onClick={()=>setRequestSource('document')}>Use uploaded document</button></div>
+          {requestSource==='template' ? <div className="col gap-8"><label className="text-sm fw-700 text-1">Organization template</label><Select value={selectedTemplateId} onChange={e=>setSelectedTemplateId(e.target.value)}><option value="">Choose a saved template</option>{templates.filter(t=>t.isActive).map(t=><option value={t.id} key={t.id}>{t.name} · {t.category}</option>)}</Select><p className="text-xs text-4">Generated documents include employee and company merge fields. External signers receive a unique expiring link by email.</p></div> : <>
+          {/* Uploaded document selector */}
           <div className="col gap-8">
-            <label className="text-sm fw-700 text-1">Select Document Template</label>
+            <label className="text-sm fw-700 text-1">Select Uploaded Document</label>
             <Select
-              value={selectedTemplateId}
-              onChange={(e) => handleTemplateChange(e.target.value)}
+              value={selectedDocumentId}
+              onChange={(e) => setSelectedDocumentId(e.target.value)}
               style={{ padding: '10px 14px', fontSize: 14 }}
             >
-              {TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.category})
+              <option value="">-- Choose an available document --</option>
+              {documents.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.filename} ({doc.category})
                 </option>
               ))}
             </Select>
+            {documents.length === 0 && <p className="text-xs text-4 m-0">No available documents yet. Upload one in Documents or create handbook content in Onboarding.</p>}
           </div>
-
-          {/* Document Title */}
-          <div className="col gap-8">
-            <label className="text-sm fw-700 text-1">Document Name</label>
-            <Input
-              value={customDocName}
-              onChange={(e) => setCustomDocName(e.target.value)}
-              placeholder="e.g. Standard Offer Letter - Frontend Engineer"
-            />
-          </div>
+          </>}
 
           {/* Recipient Picker */}
           <div className="col gap-8">

@@ -52,6 +52,7 @@ interface DayEntry {
     isBillable: boolean;
   }[];
 }
+interface TimesheetReview { id:string; employeeName:string; weekStart:string; weekEnd:string; totalMinutes:number; status:string; employeeNote:string }
 
 export default function TimeTrackingPage() {
   const { getToken, isSignedIn } = useAuth();
@@ -62,6 +63,9 @@ export default function TimeTrackingPage() {
   const [punches, setPunches] = useState<AttendancePunch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [timesheets, setTimesheets] = useState<TimesheetReview[]>([]);
+  const [canReviewTimesheets, setCanReviewTimesheets] = useState(false);
+  const [isSubmittingTimesheet, setIsSubmittingTimesheet] = useState(false);
 
   // Manual entry form
   const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -131,12 +135,17 @@ export default function TimeTrackingPage() {
         const dataList = Array.isArray(json) ? json : json.data || [];
         setPunches(dataList);
       }
+      const reviewRes=await fetch(`${API_BASE_URL}/api/v1/timesheets`,{headers:getAuthHeaders(token)});
+      if(reviewRes.ok){const j=await reviewRes.json();setTimesheets(j.data||[]);setCanReviewTimesheets(true)}else setCanReviewTimesheets(false);
     } catch (err) {
       console.error('Failed to load punches', err);
     } finally {
       setIsLoading(false);
     }
   }, [isSignedIn, getToken]);
+
+  const submitWeek = async () => { setIsSubmittingTimesheet(true); try { const token=await getToken(); if(!token)throw new Error('Not authenticated');const weekStart=`${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;const res=await fetch(`${API_BASE_URL}/api/v1/timesheets/submit`,{method:'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify({weekStart,note:''})});if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Could not submit timesheet')}toast.success('Timesheet submitted','Your weekly hours are now waiting for manager approval.');await fetchPunches()}catch(e){toast.error('Submission failed',e instanceof Error?e.message:'Could not submit timesheet')}finally{setIsSubmittingTimesheet(false)} };
+  const reviewWeek = async (id:string,decision:'approved'|'rejected') => {try{const token=await getToken();if(!token)throw new Error('Not authenticated');const res=await fetch(`${API_BASE_URL}/api/v1/timesheets/${id}/review`,{method:'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify({decision})});if(!res.ok)throw new Error('Could not update timesheet');setTimesheets(v=>v.filter(t=>t.id!==id));toast.success(decision==='approved'?'Timesheet approved':'Timesheet returned','Timesheet review saved.')}catch(e){toast.error('Review failed',e instanceof Error?e.message:'Could not review timesheet')} };
 
   useEffect(() => {
     fetchPunches();
@@ -429,6 +438,7 @@ export default function TimeTrackingPage() {
                     Current Week
                   </button>
                 )}
+                <button className="btn-primary btn-sm" onClick={submitWeek} disabled={isSubmittingTimesheet||weekOffset!==0}>{isSubmittingTimesheet?'Submitting…':'Submit week'}</button>
               </div>
             </div>
 
@@ -572,6 +582,7 @@ export default function TimeTrackingPage() {
               )}
             </CardBody>
           </Card>
+          {canReviewTimesheets && <Card><CardBody><h2 className="text-lg fw-700 text-1 mb-16">Timesheets awaiting review</h2>{timesheets.filter(t=>t.status==='submitted').map(t=><div key={t.id} className="row-between p-12" style={{borderTop:'1px solid var(--border)'}}><div><strong>{t.employeeName}</strong><div className="text-xs text-5">{t.weekStart} · {Math.floor(t.totalMinutes/60)}h {t.totalMinutes%60}m</div></div><div className="row gap-8"><button className="btn-secondary btn-sm" onClick={()=>reviewWeek(t.id,'rejected')}>Return</button><button className="btn-primary btn-sm" onClick={()=>reviewWeek(t.id,'approved')}>Approve</button></div></div>)}{timesheets.every(t=>t.status!=='submitted')&&<p className="text-sm text-5">No timesheets are waiting for review.</p>}</CardBody></Card>}
         </div>
 
         {/* RIGHT COLUMN: Clock Widget */}

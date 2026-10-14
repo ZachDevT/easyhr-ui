@@ -203,10 +203,9 @@ export default function PromotionsPage() {
               color: "var(--success)",
             },
             {
-              label: "Retention health",
-              value: "96.4%",
-              trend: "+2.1%",
-              trendType: "positive",
+              label: "Promotions this year",
+              value: promotions.filter((p) => new Date(p.effectiveDate).getFullYear() === new Date().getFullYear()).length,
+              trendType: "neutral",
               icon: <CheckCircle2 size={20} />,
               color: "var(--warning)",
             },
