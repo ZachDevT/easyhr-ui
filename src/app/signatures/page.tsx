@@ -21,6 +21,10 @@ import {
   XCircle,
   AlertTriangle,
   Loader2,
+  Eye,
+  Printer,
+  FileDown,
+  ChevronLeft,
 } from 'lucide-react';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -91,6 +95,8 @@ export default function SignaturesAdminPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [editingTemplateId,setEditingTemplateId]=useState('');
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const [templateView, setTemplateView] = useState<'edit' | 'preview'>('edit');
   const [templateCategory, setTemplateCategory] = useState('General');
   const [templateBody, setTemplateBody] = useState('');
   const [templateHeader,setTemplateHeader]=useState('');
@@ -218,7 +224,59 @@ export default function SignaturesAdminPage() {
     }
   };
 
-  const saveTemplate = async () => { setIsSavingTemplate(true); try { const token=await getToken(); if(!token)throw new Error('Not authenticated'); const res=await fetch(`${API_BASE_URL}/api/v1/signatures/templates${editingTemplateId?`/${editingTemplateId}`:''}`,{method:editingTemplateId?'PUT':'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify({name:templateName,category:templateCategory,body:templateBody,headerText:templateHeader,footerText:templateFooter,expiresInDays:templateDays})}); if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Could not save template')}toast.success('Template saved','Your organization template is ready to use.');setTemplateName('');setTemplateBody('');setEditingTemplateId('');await loadData();}catch(e){toast.error('Template not saved',e instanceof Error?e.message:'Could not save template')}finally{setIsSavingTemplate(false)} };
+  const resetTemplateDraft = () => {
+    setEditingTemplateId('');
+    setTemplateName('');
+    setTemplateCategory('General');
+    setTemplateBody('');
+    setTemplateHeader(templateBranding?.defaultHeader || '');
+    setTemplateFooter(templateBranding?.defaultFooter || '');
+    setTemplateDays(14);
+    setTemplateView('edit');
+    setShowTemplateEditor(true);
+  };
+  const editTemplate = (template: SignatureTemplate) => {
+    setEditingTemplateId(template.id);
+    setTemplateName(template.name);
+    setTemplateCategory(template.category);
+    setTemplateBody(template.body);
+    setTemplateHeader(template.headerText || '');
+    setTemplateFooter(template.footerText || '');
+    setTemplateDays(template.expiresInDays);
+    setTemplateView('edit');
+    setShowTemplateEditor(true);
+  };
+  const templateHtml = (saved?: SignatureTemplate) => {
+    const name = saved?.name || templateName;
+    const bodyDraft = saved?.body || templateBody;
+    const headerDraft = saved?.headerText ?? templateHeader;
+    const footerDraft = saved?.footerText ?? templateFooter;
+    const replace = (text: string) => text
+      .replaceAll('{{employee_name}}', 'Alex Morgan')
+      .replaceAll('{{company_name}}', templateBranding?.companyName || 'Your Company')
+      .replaceAll('{{job_title}}', 'People Operations Specialist')
+      .replaceAll('{{effective_date}}', '2026-11-01')
+      .replaceAll('{{today}}', new Date().toISOString().slice(0, 10));
+    const brand = templateBranding?.brandColor || '#4F46E5';
+    const logo = templateBranding?.logoUrl ? `<img src="${templateBranding.logoUrl}" alt="Company logo" style="max-width:180px;max-height:60px;object-fit:contain;margin:0 0 24px"/>` : '';
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${name || 'HR document'}</title><style>body{font:15px/1.65 Arial,sans-serif;color:#202124;margin:0;background:#f3f4f6}.paper{box-sizing:border-box;width:210mm;min-height:297mm;margin:32px auto;padding:22mm;background:white;box-shadow:0 8px 30px #10182822}.brand{height:7px;background:${brand};margin:-22mm -22mm 24px}.header,.footer{white-space:pre-wrap;color:#596273;font-size:12px}.content{margin:32px 0;min-height:500px}.footer{border-top:1px solid #e5e7eb;padding-top:16px}@media print{body{background:white}.paper{margin:0;box-shadow:none;width:auto;min-height:0}}</style></head><body><article class="paper"><div class="brand"></div>${logo}<header class="header">${replace(headerDraft)}</header><main class="content">${replace(bodyDraft || '<p>Your document content will appear here.</p>')}</main><footer class="footer">${replace(footerDraft)}</footer></article></body></html>`;
+  };
+  const previewTemplate = (saved?: SignatureTemplate) => {
+    const preview = window.open('', '_blank', 'noopener,noreferrer');
+    if (!preview) { toast.error('Preview blocked', 'Allow pop-ups to preview this document.'); return; }
+    preview.document.write(templateHtml(saved));
+    preview.document.close();
+  };
+  const downloadTemplate = () => {
+    const blob = new Blob([templateHtml()], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(templateName || 'hr-template').trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const saveTemplate = async () => { setIsSavingTemplate(true); try { const token=await getToken(); if(!token)throw new Error('Not authenticated'); const res=await fetch(`${API_BASE_URL}/api/v1/signatures/templates${editingTemplateId?`/${editingTemplateId}`:''}`,{method:editingTemplateId?'PUT':'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify({name:templateName,category:templateCategory,body:templateBody,headerText:templateHeader,footerText:templateFooter,expiresInDays:templateDays})}); if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Could not save template')}toast.success('Template saved','Your organization template is ready to use.');setShowTemplateEditor(false);setTemplateName('');setTemplateBody('');setEditingTemplateId('');await loadData();}catch(e){toast.error('Template not saved',e instanceof Error?e.message:'Could not save template')}finally{setIsSavingTemplate(false)} };
 
   // Filtered requests
   const filteredRequests = useMemo(() => {
@@ -501,21 +559,21 @@ export default function SignaturesAdminPage() {
         )}
 
         {activeTab === 'Template Builder' && (
-          <div style={{ maxWidth: 760, margin: '0 auto' }}>
+          <div style={{ maxWidth: 1180, margin: '0 auto' }}>
             <Card>
               <CardBody style={{ padding: 28 }}>
-                <h2 className="text-xl fw-800 text-1 mb-8">Professional document template generator</h2>
-                <p className="text-sm text-4 mb-20">Write reusable HR documents with safe merge fields. Available fields: <code>{'{{employee_name}}'}</code>, <code>{'{{company_name}}'}</code>, <code>{'{{job_title}}'}</code>, <code>{'{{effective_date}}'}</code>, <code>{'{{today}}'}</code>.</p>
-                <div className="grid-2 gap-12 mb-16"><Input value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Template name, e.g. Employment Agreement"/><Input value={templateCategory} onChange={e=>setTemplateCategory(e.target.value)} placeholder="Category"/></div>
-                <div className="grid-2 gap-16 mb-16">
-                  <div className="col gap-8"><label className="text-sm fw-700 text-1">Editable company header</label><Textarea rows={5} value={templateHeader} onChange={e=>setTemplateHeader(e.target.value)} placeholder="Company name, registration number, office address"/><button type="button" className="btn-neutral btn-sm" style={{alignSelf:'flex-start'}} onClick={()=>{setTemplateHeader(templateBranding?.defaultHeader||'');setTemplateFooter(templateBranding?.defaultFooter||'')}}>Reset to company defaults</button></div>
-                  <div className="col gap-8"><label className="text-sm fw-700 text-1">Editable company footer</label><Textarea rows={5} value={templateFooter} onChange={e=>setTemplateFooter(e.target.value)} placeholder="Website, contact email, phone, office locations"/><span className="text-xs text-5">Defaults include active locations, and can be edited for this template.</span></div>
+                <div className="row-between gap-16" style={{ alignItems: 'flex-start' }}>
+                  <div>
+                    <div className="row gap-8 align-center mb-8"><FileText size={20} className="text-primary"/><h2 className="text-xl fw-800 text-1 m-0">Company document templates</h2></div>
+                    <p className="text-sm text-4 m-0" style={{ maxWidth: 650 }}>Create polished, reusable HR documents with your company branding and safe employee merge fields. Edit, preview, print, or download each template.</p>
+                  </div>
+                  <button type="button" className="btn-primary" onClick={resetTemplateDraft}><Plus size={16}/> New template</button>
                 </div>
-                <label className="text-sm fw-700 text-1 mb-8" style={{display:'block'}}>Main document content</label><RichTextEditor value={templateBody} onChange={setTemplateBody} placeholder={'EMPLOYMENT AGREEMENT\n\nThis agreement is between {{company_name}} and {{employee_name}}...'} minHeight={320} showFooter />
-                <div className="p-16 mt-12" style={{background:'white',border:'1px solid var(--border)',borderRadius:10}}><div className="text-xs fw-700 text-5 mb-8">BRANDED DOCUMENT PREVIEW</div><div style={{height:5,background:templateBranding?.brandColor||'#4F46E5',borderRadius:4,marginBottom:14}}/>{templateBranding?.logoUrl&&<img src={templateBranding.logoUrl} alt={`${templateBranding.companyName} logo`} style={{maxWidth:180,maxHeight:56,objectFit:'contain',marginBottom:12}}/>}<div className="text-xs text-4 mb-16" style={{whiteSpace:'pre-wrap'}}>{templateHeader.replaceAll('{{company_name}}',templateBranding?.companyName||'Company').replaceAll('{{today}}',new Date().toISOString().slice(0,10))}</div><div className="text-sm text-2" style={{lineHeight:1.7,minHeight:100}}><RichTextRenderer content={templateBody.replaceAll('{{employee_name}}','Alex Morgan').replaceAll('{{company_name}}',templateBranding?.companyName||'Your Company').replaceAll('{{job_title}}','People Operations Specialist').replaceAll('{{effective_date}}','2026-11-01').replaceAll('{{today}}',new Date().toISOString().slice(0,10))||'Your generated document preview will appear here.'}/></div><div className="divider my-12"/><div className="text-xs text-4" style={{whiteSpace:'pre-wrap'}}>{templateFooter.replaceAll('{{company_name}}',templateBranding?.companyName||'Company').replaceAll('{{today}}',new Date().toISOString().slice(0,10))}</div></div>
-                <div className="row-between mt-16"><label className="text-sm text-4">Signing link expiry (days) <Input type="number" min={1} max={365} value={templateDays} onChange={e=>setTemplateDays(Number(e.target.value))}/></label><button className="btn-primary" onClick={saveTemplate} disabled={isSavingTemplate||!templateName.trim()||!templateBody.trim()}>{isSavingTemplate?<Loader2 size={16} className="animate-spin"/>:editingTemplateId?'Update reusable template':'Save reusable template'}</button></div>
-                <div className="divider my-20"/><h3 className="text-base fw-700 text-1">Organization templates ({templates.length})</h3>
-                <div className="col gap-8 mt-12">{templates.map(t=><div key={t.id} className="row-between p-12" style={{border:'1px solid var(--border)',borderRadius:10}}><div><strong>{t.name}</strong><div className="text-xs text-5">{t.category} · expires in {t.expiresInDays} days</div></div><div className="row gap-8"><button className="btn-neutral btn-sm" onClick={()=>{setEditingTemplateId(t.id);setTemplateName(t.name);setTemplateCategory(t.category);setTemplateBody(t.body);setTemplateHeader(t.headerText||'');setTemplateFooter(t.footerText||'');setTemplateDays(t.expiresInDays);window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button className="btn-secondary btn-sm" onClick={()=>{setSelectedTemplateId(t.id);setRequestSource('template');setShowSendModal(true)}}>Generate &amp; send</button></div></div>)}</div>
+                <div className="grid-3 gap-12 mt-20 mb-20">
+                  {[['Your templates', String(templates.length)], ['Available merge fields', '5'], ['Company branding', templateBranding?.companyName || 'Configured']].map(([label, value]) => <div key={label} className="p-16" style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface, #fff)' }}><div className="text-xs text-5">{label}</div><div className="text-base fw-800 text-1 mt-4">{value}</div></div>)}
+                </div>
+                <div className="row-between gap-12 mb-12"><h3 className="text-base fw-800 text-1 m-0">Saved templates</h3><span className="text-xs text-5">Employee · Company · Role · Effective date · Today</span></div>
+                {templates.length === 0 ? <div className="p-32 text-center" style={{ border: '1px dashed var(--border)', borderRadius: 12 }}><FileText size={32} className="text-4 mb-12"/><h3 className="text-base fw-700 text-1">Start with a company template</h3><p className="text-sm text-4">Build an employment agreement, policy, letter, or any reusable HR document.</p><button className="btn-primary" onClick={resetTemplateDraft}><Plus size={16}/> Create template</button></div> : <div className="col gap-10">{templates.map((t) => <div key={t.id} className="row-between gap-16 p-16" style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface, #fff)' }}><div className="row gap-12 align-center" style={{ minWidth: 0 }}><div style={{ width: 42, height: 42, borderRadius: 10, display: 'grid', placeItems: 'center', color: 'var(--primary)', background: 'var(--primary-tint, #eef2ff)', flex: '0 0 auto' }}><FileText size={20}/></div><div style={{ minWidth: 0 }}><div className="text-sm fw-800 text-1">{t.name}</div><div className="text-xs text-5 mt-4">{t.category} · {t.expiresInDays} day signing links{t.isActive ? ' · Active' : ' · Inactive'}</div></div></div><div className="row gap-8" style={{ flex: '0 0 auto' }}><button className="btn-neutral btn-sm" onClick={() => editTemplate(t)}><Edit3 size={14}/> Edit</button><button className="btn-neutral btn-sm" onClick={() => { setTemplateName(t.name);setTemplateCategory(t.category);setTemplateBody(t.body);setTemplateHeader(t.headerText||'');setTemplateFooter(t.footerText||'');setTemplateDays(t.expiresInDays);previewTemplate(t); }}><Eye size={14}/> Preview</button><button className="btn-secondary btn-sm" onClick={() => {setSelectedTemplateId(t.id);setRequestSource('template');setShowSendModal(true)}}><Send size={14}/> Use template</button></div></div>)}</div>}
               </CardBody>
             </Card>
           </div>
@@ -625,6 +683,28 @@ export default function SignaturesAdminPage() {
           </div>
         </div>
       </Modal>
+
+      {showTemplateEditor && (
+        <div onMouseDown={(event) => { if (event.target === event.currentTarget) setShowTemplateEditor(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(16,24,40,.42)' }}>
+          <section role="dialog" aria-modal="true" aria-label={editingTemplateId ? 'Edit document template' : 'Create document template'} style={{ position: 'absolute', inset: '0 0 0 auto', width: 'min(1120px, 94vw)', height: '100%', background: '#f5f6f8', display: 'flex', flexDirection: 'column', boxShadow: '-16px 0 48px rgba(16,24,40,.18)' }}>
+            <header className="row-between gap-16 p-16" style={{ background: '#fff', borderBottom: '1px solid var(--border)' }}>
+              <div className="row gap-12 align-center"><button type="button" className="btn-neutral btn-sm" onClick={() => setShowTemplateEditor(false)} aria-label="Close editor"><ChevronLeft size={16}/></button><div><div className="text-base fw-800 text-1">{editingTemplateId ? 'Edit template' : 'Create a template'}</div><div className="text-xs text-5 mt-4">Professional document workspace · saved to your organization</div></div></div>
+              <div className="row gap-8"><button type="button" className="btn-neutral btn-sm" onClick={() => setTemplateView(templateView === 'edit' ? 'preview' : 'edit')}><Eye size={15}/>{templateView === 'edit' ? 'Preview' : 'Back to editor'}</button><button type="button" className="btn-neutral btn-sm" onClick={() => { const w = window.open('', '_blank'); if(w){w.document.write(templateHtml());w.document.close();w.focus();w.print();} }}><Printer size={15}/> Print</button><button type="button" className="btn-neutral btn-sm" onClick={downloadTemplate}><FileDown size={15}/> Download</button><button type="button" className="btn-primary btn-sm" disabled={isSavingTemplate||!templateName.trim()||!templateBody.trim()} onClick={saveTemplate}>{isSavingTemplate?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>} {editingTemplateId ? 'Save changes' : 'Save template'}</button><button type="button" className="btn-neutral btn-sm" onClick={() => setShowTemplateEditor(false)} aria-label="Close"><X size={16}/></button></div>
+            </header>
+            <div className="row gap-8 p-12" style={{ background: '#fff', borderBottom: '1px solid var(--border)' }}><span className="text-xs fw-700 text-4">DOCUMENT</span><span className="text-xs text-5">›</span><span className="text-xs fw-700" style={{color:'var(--primary)'}}>{templateName || 'Untitled template'}</span><span className="text-xs text-5" style={{marginLeft:'auto'}}>Changes save when you select Save template</span></div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 28 }}>
+              {templateView === 'edit' ? <div style={{ maxWidth: 850, margin: '0 auto' }}>
+                <div className="row gap-12 mb-16"><Input value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Document title, e.g. Employment Agreement"/><Input value={templateCategory} onChange={e=>setTemplateCategory(e.target.value)} placeholder="Category"/></div>
+                <div className="grid-2 gap-16 mb-16"><div className="col gap-8"><label className="text-xs fw-700 text-3">COMPANY HEADER</label><Textarea rows={4} value={templateHeader} onChange={e=>setTemplateHeader(e.target.value)} placeholder="Company name, registration number, office address"/></div><div className="col gap-8"><label className="text-xs fw-700 text-3">COMPANY FOOTER</label><Textarea rows={4} value={templateFooter} onChange={e=>setTemplateFooter(e.target.value)} placeholder="Website, email, phone, locations"/></div></div>
+                <div className="row-between mb-8"><div className="text-xs fw-700 text-3">DOCUMENT BODY</div><button type="button" className="btn-neutral btn-sm" onClick={() => {setTemplateHeader(templateBranding?.defaultHeader||'');setTemplateFooter(templateBranding?.defaultFooter||'')}}>Reset company branding</button></div>
+                <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 6px 24px rgba(16,24,40,.08)', overflow: 'hidden' }}><div className="row-between p-12" style={{background:'#fbfbfc',borderBottom:'1px solid var(--border)'}}><div><div className="text-xs fw-700 text-1">Formatting</div><div className="text-xs text-5 mt-4">Use the toolbar to format text, headings, lists, and links.</div></div><div className="text-xs text-5">Rich text editor</div></div><div style={{padding:18}}><RichTextEditor value={templateBody} onChange={setTemplateBody} placeholder={`Write your document here…\n\nUse merge fields such as {{employee_name}} and {{company_name}}.`} minHeight={430} showFooter/></div></div>
+                <div className="row-between mt-16 p-16" style={{background:'#fff',border:'1px solid var(--border)',borderRadius:12}}><div><div className="text-sm fw-700 text-1">Signing link expiry</div><div className="text-xs text-5 mt-4">How many days recipients have to sign.</div></div><Input type="number" min={1} max={365} value={templateDays} onChange={e=>setTemplateDays(Number(e.target.value))} style={{maxWidth:120}}/></div>
+                <div className="text-xs text-5 mt-12">Merge fields: <code>{'{{employee_name}}'}</code> · <code>{'{{company_name}}'}</code> · <code>{'{{job_title}}'}</code> · <code>{'{{effective_date}}'}</code> · <code>{'{{today}}'}</code></div>
+              </div> : <div style={{maxWidth:850,margin:'0 auto'}}><div className="row-between mb-12"><div><div className="text-base fw-800 text-1">Print preview</div><div className="text-xs text-5 mt-4">Sample merge fields are filled in to show the finished document.</div></div><button type="button" className="btn-neutral btn-sm" onClick={() => {const w=window.open('', '_blank');if(w){w.document.write(templateHtml());w.document.close();w.focus();w.print();}}}><Printer size={15}/> Print document</button></div><iframe title="Document template preview" srcDoc={templateHtml()} style={{width:'100%',height:'min(900px, calc(100vh - 220px))',border:'1px solid var(--border)',borderRadius:10,background:'#fff'}}/></div>}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
