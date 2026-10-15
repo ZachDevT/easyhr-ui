@@ -19,7 +19,8 @@ export async function renderPdfDocument(html: string): Promise<Blob> {
     .pdf-document ul,.pdf-document ol{padding-left:1.6em}
     .pdf-document table{width:100%;border-collapse:collapse;break-inside:auto}
     .pdf-document th,.pdf-document td{border:1px solid #d0d5dd;padding:8px 10px;vertical-align:top}
-    .pdf-document img{max-width:100%;height:auto}
+    .pdf-document img:not(.logo){max-width:100%;height:auto}
+    .pdf-document img.logo{display:block;width:auto!important;max-width:180px!important;height:auto!important;max-height:58px!important;object-fit:contain;object-position:left center}
   </style><div class="pdf-document">${parsed.body.innerHTML}</div>`;
   document.body.appendChild(root);
   try {

@@ -21,6 +21,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
+import { PdfPreview } from '@/components/shared/PdfPreview';
 
 interface MySignatureDoc {
   id: string;
@@ -340,7 +341,7 @@ export default function MySignaturesPage() {
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             {/* Document Preview (Left) */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 32, display: 'flex', justifyContent: 'center' }}>
-              {isRenderingSigningPdf || !signingPdfUrl ? <div className="text-sm text-4"><Loader2 size={18} className="animate-spin"/> Preparing PDF preview…</div> : <iframe title={`${signingDoc.documentName} PDF signing preview`} src={`${signingPdfUrl}#toolbar=0&view=FitH`} style={{ width: 'min(100%, 900px)', minHeight: 'calc(100vh - 190px)', height: '100%', border: 0, background: 'transparent' }} />}
+              {isRenderingSigningPdf || !signingPdfUrl ? <div className="text-sm text-4"><Loader2 size={18} className="animate-spin"/> Preparing PDF preview…</div> : <PdfPreview url={signingPdfUrl} title={`${signingDoc.documentName} PDF signing preview`} style={{ width: 'min(100%, 900px)', minHeight: 'calc(100vh - 190px)', height: '100%' }} />}
             </div>
 
             {/* Tools Panel (Right) */}

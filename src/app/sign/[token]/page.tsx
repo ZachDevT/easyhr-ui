@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { CheckCircle2, Download, ExternalLink, FileText, Loader2, Printer, Shield, UserRound } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
+import { PdfPreview } from '@/components/shared/PdfPreview';
 import styles from './public-signature.module.css';
 
 type Request = {
@@ -180,7 +181,7 @@ export default function ExternalSignPage() {
     {error && <div role="alert" className="p-12" style={{ background: '#fff1f0', color: 'var(--error, #b42318)' }}>{error}</div>}
     <div className={styles.workspace}>
       <section className={styles.previewStage} aria-label="Document preview">
-        {renderingPdf || !pdfUrl ? <div className={styles.previewState}><Loader2 className="animate-spin" size={19}/>Preparing PDF preview…</div> : <iframe className={styles.pdfFrame} src={`${pdfUrl}#toolbar=0&view=FitH`} title={`${request.title} PDF preview`}/>}
+        {renderingPdf || !pdfUrl ? <div className={styles.previewState}><Loader2 className="animate-spin" size={19}/>Preparing PDF preview…</div> : <PdfPreview url={pdfUrl} title={`${request.title} PDF preview`} style={{ width: 'min(100%, 980px)', height: '100%' }}/ >}
       </section>
 
       <aside className={styles.panel} aria-label="Signing details and controls">

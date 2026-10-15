@@ -40,6 +40,7 @@ import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { RichTextEditor, RichTextRenderer } from '@/components/ui/RichTextEditor';
 import { downloadPdfBlob, openPdfBlob, renderPdfDocument } from '@/lib/pdfDocument';
+import { PdfPreview } from '@/components/shared/PdfPreview';
 
 interface SignatureRecipient {
   id: string;
@@ -747,7 +748,7 @@ export default function SignaturesAdminPage() {
                 </div>
                 <div className="row-between mt-16 p-16" style={{background:'#fff',border:'1px solid var(--border)',borderRadius:12}}><div><div className="text-sm fw-700 text-1">Signing link expiry</div><div className="text-xs text-5 mt-4">How many days recipients have to sign.</div></div><Input type="number" min={1} max={365} value={templateDays} onChange={e=>setTemplateDays(Number(e.target.value))} style={{maxWidth:120}}/></div>
                 <div className="text-xs text-5 mt-12">Merge fields: <code>{'{{employee_name}}'}</code> · <code>{'{{company_name}}'}</code> · <code>{'{{job_title}}'}</code> · <code>{'{{effective_date}}'}</code> · <code>{'{{today}}'}</code></div>
-              </div> : <div style={{maxWidth:850,margin:'0 auto'}}><div className="row-between mb-12"><div><div className="text-base fw-800 text-1">PDF preview</div><div className="text-xs text-5 mt-4">This is the same A4 PDF that Download saves.</div></div><button type="button" className="btn-neutral btn-sm" onClick={printTemplate}><Printer size={15}/> Print PDF</button></div>{isRenderingTemplatePdf || !templatePdfUrl ? <div className="p-32 text-center"><Loader2 size={24} className="animate-spin"/> Preparing PDF preview…</div> : <iframe title="PDF document template preview" src={`${templatePdfUrl}#toolbar=0&view=FitH`} style={{width:'100%',height:'min(900px, calc(100vh - 220px))',border:'1px solid var(--border)',borderRadius:10,background:'#fff'}}/>}</div>}
+              </div> : <div style={{maxWidth:850,margin:'0 auto'}}><div className="row-between mb-12"><div><div className="text-base fw-800 text-1">PDF preview</div><div className="text-xs text-5 mt-4">This is the same A4 PDF that Download saves.</div></div><button type="button" className="btn-neutral btn-sm" onClick={printTemplate}><Printer size={15}/> Print PDF</button></div>{isRenderingTemplatePdf || !templatePdfUrl ? <div className="p-32 text-center"><Loader2 size={24} className="animate-spin"/> Preparing PDF preview…</div> : <PdfPreview url={templatePdfUrl} title="PDF document template preview" style={{width:'100%',height:'min(900px, calc(100vh - 220px))'}}/>}</div>}
             </div>
           </section>
         </div>
