@@ -64,6 +64,7 @@ export default function MySignaturesPage() {
   const [isRenderingSigningPdf, setIsRenderingSigningPdf] = useState(false);
   const [consentToSign, setConsentToSign] = useState(false);
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const consentCheckboxRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef(false);
   const didDrawRef = useRef(false);
 
@@ -178,8 +179,14 @@ export default function MySignaturesPage() {
     } else if (signatureMode === 'uploaded') {
       signatureData = signatureImage;
     }
-    if (!signatureData || !consentToSign) {
-      toast.error('Signature required', 'Add a signature and confirm consent before signing.');
+    if (!consentToSign) {
+      toast.warning('Review confirmation required', 'Please confirm that you have reviewed the document before signing.');
+      consentCheckboxRef.current?.focus();
+      consentCheckboxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!signatureData) {
+      toast.error('Signature required', 'Add your signature before signing.');
       return;
     }
     setIsSubmittingSign(true);
@@ -187,7 +194,7 @@ export default function MySignaturesPage() {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/signatures/${signingDoc.id}/sign`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/signatures/${encodeURIComponent(signingDoc.requestId || signingDoc.id)}/sign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -245,7 +252,7 @@ export default function MySignaturesPage() {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/signatures/${signingDoc.id}/decline`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/signatures/${encodeURIComponent(signingDoc.requestId || signingDoc.id)}/decline`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -322,7 +329,7 @@ export default function MySignaturesPage() {
               <button
                 className="btn-primary"
                 onClick={handleSignComplete}
-                disabled={isSubmittingSign || !signatureReady || !consentToSign}
+                disabled={isSubmittingSign || !signatureReady}
               >
                 {isSubmittingSign ? (
                   <>
@@ -388,7 +395,7 @@ export default function MySignaturesPage() {
                   {signatureMode === 'uploaded' && <div className="col gap-6"><input type="file" accept="image/png,image/jpeg" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 512000) { toast.error('Image too large', 'Signature images must be 500 KB or smaller.'); e.target.value = ''; return; } const reader = new FileReader(); reader.onload = () => setSignatureImage(typeof reader.result === 'string' ? reader.result : ''); reader.readAsDataURL(file); }} /><span className="text-xs text-5">Upload a PNG or JPEG signature image, up to 500 KB.</span></div>}
                 </div>
                 <label className="row gap-8 align-start text-xs text-4">
-                  <input type="checkbox" checked={consentToSign} onChange={(e) => setConsentToSign(e.target.checked)} />
+                  <input ref={consentCheckboxRef} type="checkbox" checked={consentToSign} onChange={(e) => setConsentToSign(e.target.checked)} />
                   <span>I have reviewed the attached document and consent to apply my {signatureMode} signature to this request.</span>
                 </label>
 

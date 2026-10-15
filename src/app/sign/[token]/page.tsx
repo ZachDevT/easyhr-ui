@@ -54,6 +54,7 @@ export default function ExternalSignPage() {
   const [pdfUrl, setPdfUrl] = useState('');
   const [renderingPdf, setRenderingPdf] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const consentCheckbox = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
   const hasStroke = useRef(false);
 
@@ -128,7 +129,17 @@ export default function ExternalSignPage() {
 
   const sign = async () => {
     const data = mode === 'typed' ? name.trim() : mode === 'uploaded' ? image : drawnImage;
-    if (!data || !consent) return;
+    if (!consent) {
+      setError('Please confirm that you have reviewed the document by selecting the checkbox below before signing.');
+      consentCheckbox.current?.focus();
+      consentCheckbox.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!data) {
+      setError('Add your signature before signing.');
+      return;
+    }
+    setError('');
     setBusy(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/public/signatures/${encodeURIComponent(token)}/sign`, {
@@ -205,10 +216,10 @@ export default function ExternalSignPage() {
           </div>
 
           {request.documentUrl && <a className="btn-neutral btn-sm row gap-8" href={request.documentUrl} target="_blank" rel="noreferrer"><FileText size={14}/>Open uploaded document<ExternalLink size={13}/></a>}
-          <label className={styles.consent}><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)}/><span>I have reviewed this document and consent to sign it electronically.</span></label>
+          <label className={styles.consent}><input ref={consentCheckbox} type="checkbox" checked={consent} onChange={(event) => { setConsent(event.target.checked); if (event.target.checked) setError(''); }}/><span>I have reviewed this document and consent to sign it electronically.</span></label>
         </div>
         <div className={styles.panelActions}>
-          <button type="button" className={styles.finishButton} disabled={busy || !consent || !signatureReady} onClick={sign}>{busy ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>} {busy ? 'Signing…' : 'Finish & Sign'}</button>
+          <button type="button" className={styles.finishButton} disabled={busy || !signatureReady} onClick={sign}>{busy ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>} {busy ? 'Signing…' : 'Finish & Sign'}</button>
           <span className={styles.helpText} style={{ textAlign: 'center' }}><Shield size={11} style={{ verticalAlign: '-2px', marginRight: 4 }}/>Your signature will be submitted securely.</span>
         </div>
       </aside>
