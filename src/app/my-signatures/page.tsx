@@ -5,6 +5,7 @@ import {
   FileSignature,
   Shield,
   Download,
+  Printer,
   ArrowRight,
   CheckCircle2,
   Clock,
@@ -56,8 +57,11 @@ export default function MySignaturesPage() {
   const [signatureMode, setSignatureMode] = useState<'typed' | 'drawn' | 'uploaded'>('typed');
   const [signatureImage, setSignatureImage] = useState('');
   const [hasDrawnSignature, setHasDrawnSignature] = useState(false);
+  const [drawnSignatureImage, setDrawnSignatureImage] = useState('');
   const [consentToSign, setConsentToSign] = useState(false);
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingRef = useRef(false);
+  const didDrawRef = useRef(false);
 
   const fetchMySignatures = useCallback(async () => {
     if (!isSignedIn) return;
@@ -88,7 +92,87 @@ export default function MySignaturesPage() {
 
   const pendingDocs = docs.filter((d) => d.status === 'pending');
   const completedDocs = docs.filter((d) => d.status === 'signed');
-  const signatureReady = signatureMode === 'typed' ? !!typedSignature.trim() : signatureMode === 'uploaded' ? !!signatureImage : hasDrawnSignature;
+  const signatureReady = signatureMode === 'typed' ? !!typedSignature.trim() : signatureMode === 'uploaded' ? !!signatureImage : hasDrawnSignature && !!drawnSignatureImage;
+
+  const startDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const canvas = signatureCanvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    const bounds = canvas.getBoundingClientRect();
+    canvas.setPointerCapture(event.pointerId);
+    context.strokeStyle = '#172554';
+    context.lineWidth = 3.5;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.beginPath();
+    context.moveTo((event.clientX - bounds.left) * canvas.width / bounds.width, (event.clientY - bounds.top) * canvas.height / bounds.height);
+    drawingRef.current = true;
+    didDrawRef.current = false;
+  };
+
+  const continueDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
+    event.preventDefault();
+    const canvas = signatureCanvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    const bounds = canvas.getBoundingClientRect();
+    context.lineTo((event.clientX - bounds.left) * canvas.width / bounds.width, (event.clientY - bounds.top) * canvas.height / bounds.height);
+    context.stroke();
+    didDrawRef.current = true;
+  };
+
+  const finishDrawing = (event?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    const canvas = signatureCanvasRef.current;
+    if (event && canvas?.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    if (didDrawRef.current && canvas) {
+      setDrawnSignatureImage(canvas.toDataURL('image/png'));
+      setHasDrawnSignature(true);
+    }
+  };
+
+  const clearDrawing = () => {
+    const canvas = signatureCanvasRef.current;
+    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    didDrawRef.current = false;
+    setHasDrawnSignature(false);
+    setDrawnSignatureImage('');
+  };
+
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
+  const signingDocumentHtml = (doc: MySignatureDoc, signature = '') => {
+    const color = doc.brandColor || '#4F46E5';
+    const logo = doc.logoUrl ? `<img src="${escapeHtml(doc.logoUrl)}" alt="Company logo" class="logo"/>` : '';
+    const header = doc.header || [doc.senderName, doc.contactEmail, doc.contactPhone].filter(Boolean).join('\n');
+    const footer = doc.footer || [doc.websiteUrl, doc.contactEmail, doc.contactPhone].filter(Boolean).join('\n');
+    const body = doc.documentUrl ? '<p>This is an uploaded document. Open the original file using the document link.</p>' : (doc.body || '<p>Document content is unavailable.</p>');
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(doc.documentName)}</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f4f7;color:#202124;font:14px/1.65 Arial,sans-serif}.page{width:210mm;min-height:297mm;margin:28px auto;padding:20mm 22mm;background:#fff;box-shadow:0 4px 24px #10182818;display:flex;flex-direction:column}.brand{height:7px;background:${color};margin:-20mm -22mm 25px}.logo{display:block;max-width:180px;max-height:58px;object-fit:contain;margin:0 0 18px}.doc-header{white-space:pre-wrap;color:#475467;font-size:11px;padding:0 0 14px;border-bottom:1px solid #d0d5dd}.title{text-align:center;margin:28px 0 24px}.title h1{font:700 24px/1.25 Georgia,serif;margin:0 0 8px}.muted{color:#667085;font-size:12px}.body{font:15px/1.75 Georgia,serif;min-height:360px;margin-bottom:30px}.body p{margin:0 0 1em}.body h1,.body h2,.body h3{line-height:1.25;margin:1.2em 0 .6em}.doc-footer{white-space:pre-wrap;border-top:1px solid #d0d5dd;padding-top:14px;margin-top:auto;color:#475467;font-size:11px}.signatures{display:grid;grid-template-columns:1fr 180px;gap:32px;margin-top:30px;break-inside:avoid}.signatures label{display:block;color:#667085;font-size:11px;margin-bottom:8px}.signature{height:58px;border-bottom:1px solid #98a2b3;display:flex;align-items:center}.signature img{max-height:54px;max-width:100%;object-fit:contain}.date{height:58px;border-bottom:1px solid #98a2b3;padding:24px 0 4px;font-family:monospace}@page{size:A4;margin:0}@media print{body{background:#fff}.page{margin:0;box-shadow:none;width:auto;min-height:297mm;page-break-after:always}}</style></head><body><article class="page"><div class="brand"></div>${logo}<header class="doc-header">${escapeHtml(header)}</header><div class="title"><h1>${escapeHtml(doc.documentName)}</h1><div class="muted">Sent ${escapeHtml(doc.sentAt || '')}</div></div><main class="body">${body}</main><footer class="doc-footer">${escapeHtml(footer)}</footer><section class="signatures"><div><label>Authorized recipient signature</label><div class="signature">${signature}</div></div><div><label>Date</label><div class="date">${new Date().toISOString().slice(0,10)}</div></div></section></article></body></html>`;
+  };
+
+  const printSigningDocument = () => {
+    if (!signingDoc) return;
+    const signature = signatureMode === 'typed' ? `<span style="font:italic 24px cursive">${escapeHtml(typedSignature)}</span>` : `<img src="${signatureMode === 'drawn' ? drawnSignatureImage : signatureImage}" alt="Signature"/>`;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { toast.error('Print window blocked', 'Allow pop-ups to print or save this document.'); return; }
+    printWindow.document.write(signingDocumentHtml(signingDoc, signature));
+    printWindow.document.close();
+    printWindow.onload = () => printWindow.print();
+  };
+
+  const downloadSigningDocument = () => {
+    if (!signingDoc) return;
+    const signature = signatureMode === 'typed' ? `<span style="font:italic 24px cursive">${escapeHtml(typedSignature)}</span>` : `<img src="${signatureMode === 'drawn' ? drawnSignatureImage : signatureImage}" alt="Signature"/>`;
+    const blob = new Blob([signingDocumentHtml(signingDoc, signature)], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${signingDoc.documentName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Handle Sign
   const handleSignComplete = async () => {
@@ -96,7 +180,7 @@ export default function MySignaturesPage() {
     let signatureType = signatureMode;
     let signatureData = typedSignature.trim();
     if (signatureMode === 'drawn') {
-      signatureData = signatureCanvasRef.current?.toDataURL('image/png') || '';
+      signatureData = drawnSignatureImage;
     } else if (signatureMode === 'uploaded') {
       signatureData = signatureImage;
     }
@@ -132,6 +216,12 @@ export default function MySignaturesPage() {
       setIsSubmittingSign(false);
     }
   };
+
+  const activeSignaturePreview = signatureMode === 'typed'
+    ? `<span style="font:italic 24px cursive">${escapeHtml(typedSignature)}</span>`
+    : signatureMode === 'drawn'
+      ? (drawnSignatureImage ? `<img src="${drawnSignatureImage}" alt="Recipient signature"/>` : '')
+      : (signatureImage ? `<img src="${signatureImage}" alt="Recipient signature"/>` : '');
 
   // Handle Decline
   const handleDecline = async () => {
@@ -192,7 +282,9 @@ export default function MySignaturesPage() {
             className="row-between p-16"
             style={{ background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}
           >
-            <div className="row gap-16">
+            <div className="row gap-8">
+              <button type="button" className="btn-neutral btn-sm" onClick={printSigningDocument}><Printer size={14}/> Print</button>
+              <button type="button" className="btn-neutral btn-sm" onClick={downloadSigningDocument}><Download size={14}/> Download</button>
               <button
                 className="btn-circle"
                 style={{ background: 'var(--bg-page)' }}
@@ -237,83 +329,8 @@ export default function MySignaturesPage() {
           {/* Editor Area */}
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             {/* Document Preview (Left) */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 40, display: 'flex', justifyContent: 'center' }}>
-              <div
-                style={{
-                  width: 850,
-                  minHeight: 1100,
-                  background: 'white',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                  position: 'relative',
-                  padding: 80,
-                }}
-              >
-                <div style={{height:5,background:signingDoc.brandColor||'#4F46E5',marginBottom:20}} />
-                {signingDoc.logoUrl && <img src={signingDoc.logoUrl} alt={`${signingDoc.senderName} logo`} style={{maxWidth:180,maxHeight:56,objectFit:'contain',marginBottom:20}} />}
-                {(signingDoc.header || signingDoc.footer) && <div style={{whiteSpace:'pre-wrap',fontSize:12,color:'#667085',borderBottom:'1px solid #e5e7eb',paddingBottom:16,marginBottom:24}}>{signingDoc.header}</div>}
-                <div style={{ textAlign: 'center', marginBottom: 40 }}>
-                  <h1 className="text-2xl fw-800 text-1 mb-8" style={{ fontFamily: 'serif' }}>
-                    {signingDoc.documentName}
-                  </h1>
-                  <p className="text-sm text-5">
-                    Sent Date: {signingDoc.sentAt ? new Date(signingDoc.sentAt).toLocaleDateString() : 'Today'}
-                  </p>
-                </div>
-
-                <div className="text-sm text-1" style={{ lineHeight: 1.8, fontFamily: 'serif' }}>
-                  {signingDoc.documentUrl ? (
-                    <iframe src={signingDoc.documentUrl} title={signingDoc.documentName} style={{ width: '100%', height: '850px', border: 0 }} />
-                  ) : signingDoc.body ? (
-                    <div style={{whiteSpace:'pre-wrap',fontFamily:'Georgia,serif'}}>{signingDoc.body}</div>
-                  ) : (
-                    <p className="mb-16">The uploaded document preview is unavailable. Return to your signatures list and try again.</p>
-                  )}
-                  {!signingDoc.documentUrl && (signingDoc.footer || signingDoc.websiteUrl || signingDoc.contactEmail || signingDoc.contactPhone) && <div style={{whiteSpace:'pre-wrap',borderTop:'1px solid #e5e7eb',marginTop:28,paddingTop:14,fontSize:12,color:'#667085'}}>{[signingDoc.footer,signingDoc.websiteUrl,signingDoc.contactEmail,signingDoc.contactPhone].filter(Boolean).join('\n')}</div>}
-                  <br />
-                  <br />
-                  <br />
-                  <br />
-
-                  <div className="row-between align-end">
-                    <div style={{ width: 300 }}>
-                      <div className="text-xs text-5 mb-8">Authorized Recipient Signature</div>
-                      <div
-                        style={{
-                          borderBottom: '2px solid var(--border)',
-                          height: 48,
-                          position: 'relative',
-                          background: 'rgba(124, 58, 237, 0.08)',
-                          borderRadius: '4px 4px 0 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {signatureMode === 'typed' ? <span className="text-primary fw-600 text-sm" style={{ fontFamily: 'cursive', fontSize: 22 }}>{typedSignature || 'Type your signature below'}</span> : signatureMode === 'uploaded' ? (signatureImage ? <img src={signatureImage} alt="Signature preview" style={{ maxWidth: 240, maxHeight: 44, objectFit: 'contain' }} /> : <span className="text-primary fw-600 text-sm">Upload your signature image</span>) : hasDrawnSignature ? <img src={signatureCanvasRef.current?.toDataURL('image/png')} alt="Signature preview" style={{ maxWidth: 240, maxHeight: 44, objectFit: 'contain' }} /> : <span className="text-primary fw-600 text-sm">Draw your signature below</span>}
-                      </div>
-                    </div>
-
-                    <div style={{ width: 200 }}>
-                      <div className="text-xs text-5 mb-8">Date</div>
-                      <div style={{ borderBottom: '2px solid var(--border)', height: 48, position: 'relative' }}>
-                        <div
-                          style={{
-                            fontSize: 15,
-                            color: 'var(--text-1)',
-                            position: 'absolute',
-                            bottom: 8,
-                            left: 8,
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {new Date().toISOString().slice(0, 10)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 32, display: 'flex', justifyContent: 'center' }}>
+              <iframe title={`${signingDoc.documentName} signing preview`} srcDoc={signingDocumentHtml(signingDoc, activeSignaturePreview)} sandbox="" style={{ width: 'min(100%, 900px)', minHeight: 'calc(100vh - 190px)', height: '100%', border: 0, background: 'transparent' }} />
             </div>
 
             {/* Tools Panel (Right) */}
@@ -356,7 +373,7 @@ export default function MySignaturesPage() {
                     {(['typed', 'drawn', 'uploaded'] as const).map((mode) => <button type="button" key={mode} className={signatureMode === mode ? 'btn-primary btn-sm' : 'btn-neutral btn-sm'} onClick={() => setSignatureMode(mode)}>{mode === 'typed' ? 'Type' : mode === 'drawn' ? 'Draw' : 'Upload'}</button>)}
                   </div>
                   {signatureMode === 'typed' && <input className="input" aria-label="Type your full legal name" value={typedSignature} maxLength={200} onChange={(e) => setTypedSignature(e.target.value)} autoComplete="name" placeholder="Type your full legal name" />}
-                  {signatureMode === 'drawn' && <div className="col gap-6"><canvas ref={signatureCanvasRef} width={500} height={160} aria-label="Draw your signature" style={{ width: '100%', height: 128, border: '1px solid var(--border)', borderRadius: 8, touchAction: 'none', background: '#fff' }} onPointerDown={(e) => { const canvas = signatureCanvasRef.current; if (!canvas) return; canvas.setPointerCapture(e.pointerId); const rect = canvas.getBoundingClientRect(); const ctx = canvas.getContext('2d'); if (!ctx) return; ctx.strokeStyle = '#111827'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height); setHasDrawnSignature(true); }} onPointerMove={(e) => { if (!(e.buttons & 1)) return; const canvas = signatureCanvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return; const rect = canvas.getBoundingClientRect(); ctx.lineTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height); ctx.stroke(); }} /><button type="button" className="btn-neutral btn-sm" onClick={() => { const canvas = signatureCanvasRef.current; canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height); setHasDrawnSignature(false); }}>Clear drawing</button></div>}
+                  {signatureMode === 'drawn' && <div className="col gap-6"><canvas ref={signatureCanvasRef} width={600} height={180} aria-label="Draw your signature" style={{ width: '100%', height: 144, border: '1px solid var(--border)', borderRadius: 8, touchAction: 'none', background: '#fff', cursor: 'crosshair' }} onPointerDown={startDrawing} onPointerMove={continueDrawing} onPointerUp={finishDrawing} onPointerCancel={finishDrawing} /><span className="text-xs text-5">Sign with your mouse, trackpad, or finger. Your signature appears on the document.</span><button type="button" className="btn-neutral btn-sm" onClick={clearDrawing}>Clear drawing</button></div>}
                   {signatureMode === 'uploaded' && <div className="col gap-6"><input type="file" accept="image/png,image/jpeg" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 512000) { toast.error('Image too large', 'Signature images must be 500 KB or smaller.'); e.target.value = ''; return; } const reader = new FileReader(); reader.onload = () => setSignatureImage(typeof reader.result === 'string' ? reader.result : ''); reader.readAsDataURL(file); }} /><span className="text-xs text-5">Upload a PNG or JPEG signature image, up to 500 KB.</span></div>}
                 </div>
                 <label className="row gap-8 align-start text-xs text-4">

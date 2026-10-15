@@ -80,6 +80,14 @@ interface OrgDocument {
 interface SignatureTemplate { id: string; name: string; category: string; description: string; body: string; headerText:string; footerText:string; expiresInDays: number; isActive: boolean }
 interface TemplateBranding { companyName:string;legalName:string;registrationNumber:string;websiteUrl:string;contactEmail:string;contactPhone:string;address:string;locations:string[];logoUrl:string;brandColor:string;defaultHeader:string;defaultFooter:string }
 
+function EditableDocumentText({ value, onChange, placeholder, style }: { value: string; onChange: (value: string) => void; placeholder: string; style?: React.CSSProperties }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current && ref.current.innerText !== value) ref.current.innerText = value;
+  }, [value]);
+  return <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" data-placeholder={placeholder} onInput={(event) => onChange(event.currentTarget.innerText)} style={{ outline: 'none', whiteSpace: 'pre-wrap', minHeight: 28, cursor: 'text', ...style }} />;
+}
+
 export default function SignaturesAdminPage() {
   const { getToken, isSignedIn } = useAuth();
   const [activeTab, setActiveTab] = useState('Overview');
@@ -695,9 +703,17 @@ export default function SignaturesAdminPage() {
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 28 }}>
               {templateView === 'edit' ? <div style={{ maxWidth: 850, margin: '0 auto' }}>
                 <div className="row gap-12 mb-16"><Input value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Document title, e.g. Employment Agreement"/><Input value={templateCategory} onChange={e=>setTemplateCategory(e.target.value)} placeholder="Category"/></div>
-                <div className="grid-2 gap-16 mb-16"><div className="col gap-8"><label className="text-xs fw-700 text-3">COMPANY HEADER</label><Textarea rows={4} value={templateHeader} onChange={e=>setTemplateHeader(e.target.value)} placeholder="Company name, registration number, office address"/></div><div className="col gap-8"><label className="text-xs fw-700 text-3">COMPANY FOOTER</label><Textarea rows={4} value={templateFooter} onChange={e=>setTemplateFooter(e.target.value)} placeholder="Website, email, phone, locations"/></div></div>
-                <div className="row-between mb-8"><div className="text-xs fw-700 text-3">DOCUMENT BODY</div><button type="button" className="btn-neutral btn-sm" onClick={() => {setTemplateHeader(templateBranding?.defaultHeader||'');setTemplateFooter(templateBranding?.defaultFooter||'')}}>Reset company branding</button></div>
-                <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 6px 24px rgba(16,24,40,.08)', overflow: 'hidden' }}><div className="row-between p-12" style={{background:'#fbfbfc',borderBottom:'1px solid var(--border)'}}><div><div className="text-xs fw-700 text-1">Formatting</div><div className="text-xs text-5 mt-4">Use the toolbar to format text, headings, lists, and links.</div></div><div className="text-xs text-5">Rich text editor</div></div><div style={{padding:18}}><RichTextEditor value={templateBody} onChange={setTemplateBody} placeholder={`Write your document here…\n\nUse merge fields such as {{employee_name}} and {{company_name}}.`} minHeight={430} showFooter/></div></div>
+                <div className="row-between mb-8"><div><div className="text-xs fw-700 text-3">DOCUMENT PAGE</div><div className="text-xs text-5 mt-4">Your company header and footer are part of the document. Click them to edit in place.</div></div><button type="button" className="btn-neutral btn-sm" onClick={() => {setTemplateHeader(templateBranding?.defaultHeader||'');setTemplateFooter(templateBranding?.defaultFooter||'')}}>Reset company branding</button></div>
+                <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 28px rgba(16,24,40,.10)', overflow: 'hidden' }}>
+                  <div style={{ height: 7, background: templateBranding?.brandColor || '#4F46E5' }}/>
+                  <div style={{ padding: '34px 48px 42px' }}>
+                    {templateBranding?.logoUrl && <img src={templateBranding.logoUrl} alt={`${templateBranding.companyName} logo`} style={{ maxWidth: 180, maxHeight: 56, objectFit: 'contain', display: 'block', marginBottom: 18 }}/ >}
+                    <EditableDocumentText value={templateHeader} onChange={setTemplateHeader} placeholder="Click to add the company name, registration number, or address" style={{ color: '#475467', fontSize: 12, lineHeight: 1.55, paddingBottom: 16, borderBottom: '1px solid #d0d5dd', marginBottom: 28 }}/>
+                    <div className="row-between mb-8"><div className="text-xs fw-700 text-3">DOCUMENT BODY</div><div className="text-xs text-5">Word-style formatting</div></div>
+                    <RichTextEditor value={templateBody} onChange={setTemplateBody} placeholder={`Write your document here…\n\nUse merge fields such as {{employee_name}} and {{company_name}}.`} minHeight={430} showFooter/>
+                    <EditableDocumentText value={templateFooter} onChange={setTemplateFooter} placeholder="Click to add website, email, phone, and office locations" style={{ color: '#475467', fontSize: 12, lineHeight: 1.6, paddingTop: 18, borderTop: '1px solid #d0d5dd', marginTop: 28 }}/>
+                  </div>
+                </div>
                 <div className="row-between mt-16 p-16" style={{background:'#fff',border:'1px solid var(--border)',borderRadius:12}}><div><div className="text-sm fw-700 text-1">Signing link expiry</div><div className="text-xs text-5 mt-4">How many days recipients have to sign.</div></div><Input type="number" min={1} max={365} value={templateDays} onChange={e=>setTemplateDays(Number(e.target.value))} style={{maxWidth:120}}/></div>
                 <div className="text-xs text-5 mt-12">Merge fields: <code>{'{{employee_name}}'}</code> · <code>{'{{company_name}}'}</code> · <code>{'{{job_title}}'}</code> · <code>{'{{effective_date}}'}</code> · <code>{'{{today}}'}</code></div>
               </div> : <div style={{maxWidth:850,margin:'0 auto'}}><div className="row-between mb-12"><div><div className="text-base fw-800 text-1">Print preview</div><div className="text-xs text-5 mt-4">Sample merge fields are filled in to show the finished document.</div></div><button type="button" className="btn-neutral btn-sm" onClick={() => {const w=window.open('', '_blank');if(w){w.document.write(templateHtml());w.document.close();w.focus();w.print();}}}><Printer size={15}/> Print document</button></div><iframe title="Document template preview" srcDoc={templateHtml()} style={{width:'100%',height:'min(900px, calc(100vh - 220px))',border:'1px solid var(--border)',borderRadius:10,background:'#fff'}}/></div>}
