@@ -90,12 +90,11 @@ interface PayrollPayslip { id:string;employeeId:string;employeeName:string;email
 const TABS = ['Overview', 'Run Payroll', 'Paystubs', 'Settings'];
 const WIZARD_STEPS = ['Hours & Attendance', 'Earnings & Adjustments', 'Taxes & Deductions', 'Review & Finalize'];
 const COUNTRY_CURRENCIES: Record<string,string> = { UG:'UGX', KE:'KES', RW:'RWF', TZ:'TZS', US:'USD', GB:'GBP', CA:'CAD', NG:'NGN', ZA:'ZAR', GH:'GHS', IN:'INR', AU:'AUD', NZ:'NZD', EU:'EUR', DE:'EUR', FR:'EUR', IE:'EUR', NL:'EUR', BE:'EUR', ES:'EUR', IT:'EUR', JP:'JPY', CN:'CNY', AE:'AED', SA:'SAR', ET:'ETB', ZM:'ZMW', MW:'MWK', BI:'BIF', SS:'SSP', EG:'EGP', BR:'BRL', MX:'MXN', SG:'SGD', CH:'CHF' };
-const COUNTRY_OPTIONS = (() => {
-  const regions = new Intl.DisplayNames(['en'], { type:'region' });
-  return Array.from({length:26},(_,i)=>String.fromCharCode(65+i)).flatMap(a=>Array.from({length:26},(_,j)=>a+String.fromCharCode(65+j)))
-    .filter(code=>code!=='ZZ' && regions.of(code)!==code)
-    .map(code=>({code,name:regions.of(code)!,currency:COUNTRY_CURRENCIES[code]||''})).sort((a,b)=>a.name.localeCompare(b.name));
-})();
+const COUNTRY_OPTIONS = Object.keys(COUNTRY_CURRENCIES).map((code) => ({
+  code,
+  name: new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code,
+  currency: COUNTRY_CURRENCIES[code],
+})).sort((a, b) => a.name.localeCompare(b.name));
 
 export default function PayrollPage() {
   const { getToken } = useAuth();
@@ -113,7 +112,7 @@ export default function PayrollPage() {
   const [compensation, setCompensation] = useState<PayrollCompensation[]>([]);
   const [payrollRunId, setPayrollRunId] = useState('');
   const [payslips, setPayslips] = useState<PayrollPayslip[]>([]);
-  const [compensationForm, setCompensationForm] = useState({ employeeId: '', amount: '', effectiveDate: new Date().toISOString().slice(0, 10), reason: '' });
+  const [compensationForm, setCompensationForm] = useState({ employeeId: '', amount: '', effectiveDate: '', reason: '' });
   const [isSavingCompensation, setIsSavingCompensation] = useState(false);
   const [payrollConfigForm, setPayrollConfigForm] = useState({ country: '', currency: '', standardMonthlyMinutes: '' });
   const [isSavingConfig, setIsSavingConfig] = useState(false);

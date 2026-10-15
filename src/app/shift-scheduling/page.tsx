@@ -62,9 +62,16 @@ export default function ShiftSchedulingPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
-  const [assignmentForm, setAssignmentForm] = useState({ employeeId: "", scheduleId: "", effectiveFrom: new Date().toISOString().slice(0,10) });
+  const [assignmentForm, setAssignmentForm] = useState({ employeeId: "", scheduleId: "", effectiveFrom: "" });
   const [isSaving, setIsSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", description: "", startTime: "09:00", endTime: "17:00", breakMinutes: "60", workDays: [1,2,3,4,5] as number[] });
+  const [form, setForm] = useState({ name: "", timezone: "UTC", description: "", startTime: "09:00", endTime: "17:00", breakMinutes: "60", workDays: [1,2,3,4,5] as number[] });
+
+  useEffect(() => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const today = new Date().toISOString().slice(0, 10);
+    setAssignmentForm((value) => ({ ...value, effectiveFrom: today }));
+    setForm((value) => ({ ...value, timezone }));
+  }, []);
 
   const loadData = useCallback(async () => {
     try {

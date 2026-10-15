@@ -57,11 +57,12 @@ export default function AttendancePage() {
   // Filters & Controls
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState('');
 
   // Current live clock for header
   const [currentTime, setCurrentTime] = useState("");
   useEffect(() => {
+    setSelectedDate(new Date().toISOString().slice(0, 10));
     const updateTime = () => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -428,7 +429,7 @@ export default function AttendancePage() {
                       <h3 className="m-0 text-base fw-700 text-1">My Daily Punch Record</h3>
                       <p className="m-0 text-xs text-4 mt-2">Verified time logs for this payroll cycle</p>
                     </div>
-                    <Badge variant="neutral">{new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</Badge>
+                    <Badge variant="neutral">{currentTime ? new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : ""}</Badge>
                   </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
                     <thead style={{ background: "#F9FAFB", borderBottom: "1px solid var(--border)" }}>
@@ -443,7 +444,7 @@ export default function AttendancePage() {
                     <tbody>
                       <tr style={{ borderBottom: "1px solid var(--border)" }}>
                         <td style={{ padding: "16px 24px", fontSize: 13, fontWeight: 600 }}>
-                          {new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} (Today)
+                        {currentTime ? new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }) : ""} (Today)
                         </td>
                         <td style={{ padding: "16px 20px", fontSize: 13, fontWeight: 600 }}>{formatTime(myRecord?.clockInAt)}</td>
                         <td style={{ padding: "16px 20px", fontSize: 13, fontWeight: 600 }}>{formatTime(myRecord?.clockOutAt)}</td>

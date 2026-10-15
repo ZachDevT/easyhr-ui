@@ -66,14 +66,20 @@ export default function TimeTrackingPage() {
   const [timesheets, setTimesheets] = useState<TimesheetReview[]>([]);
   const [canReviewTimesheets, setCanReviewTimesheets] = useState(false);
   const [isSubmittingTimesheet, setIsSubmittingTimesheet] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   // Manual entry form
-  const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [manualDate, setManualDate] = useState('');
   const [manualActivity, setManualActivity] = useState('Production');
   const [manualIsBillable, setManualIsBillable] = useState(true);
   const [manualStartTime, setManualStartTime] = useState('09:00');
   const [manualEndTime, setManualEndTime] = useState('17:00');
   const [manualNote, setManualNote] = useState('');
+
+  useEffect(() => {
+    setHydrated(true);
+    setManualDate(new Date().toISOString().slice(0, 10));
+  }, []);
 
   // Expanded row state
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -84,7 +90,7 @@ export default function TimeTrackingPage() {
 
   // Compute week bounds
   const { monday, sunday, dateLabel, daysList } = useMemo(() => {
-    const base = new Date();
+    const base = new Date(hydrated ? Date.now() : 0);
     base.setDate(base.getDate() + weekOffset * 7);
 
     const day = base.getDay();
@@ -116,7 +122,7 @@ export default function TimeTrackingPage() {
     }
 
     return { monday: mon, sunday: sun, dateLabel: label, daysList: days };
-  }, [weekOffset]);
+  }, [weekOffset, hydrated]);
 
   // Fetch punches from backend
   const fetchPunches = useCallback(async () => {

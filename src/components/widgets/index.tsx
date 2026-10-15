@@ -100,7 +100,7 @@ export function CompulsoryMyTimeWidget() {
   const [timeEntryModal, setTimeEntryModal] = useState(false);
 
   const [punches, setPunches] = useState<any[]>([]);
-  const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [manualDate, setManualDate] = useState('');
   const [manualStartTime, setManualStartTime] = useState('09:00');
   const [manualEndTime, setManualEndTime] = useState('17:00');
   const [manualActivityName, setManualActivityName] = useState('Production');
@@ -108,6 +108,10 @@ export function CompulsoryMyTimeWidget() {
   const [isSavingManual, setIsSavingManual] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setManualDate(new Date().toISOString().slice(0, 10));
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
