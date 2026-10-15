@@ -3,9 +3,19 @@ export async function renderPdfDocument(html: string): Promise<Blob> {
   const { default: html2pdf } = await import('html2pdf.js');
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const root = document.createElement('div');
-  root.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;';
+  // Keep the capture width exactly equal to the A4 page width in CSS pixels.
+  // Extra margins outside the page make html2pdf slice content at the wrong
+  // vertical positions and can force otherwise short documents onto extra pages.
+  root.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;max-width:794px;box-sizing:border-box;background:#fff;z-index:-1;';
   const styles = Array.from(parsed.head.querySelectorAll('style')).map((style) => style.outerHTML).join('');
-  root.innerHTML = `${styles}<div class="pdf-document">${parsed.body.innerHTML}</div>`;
+  root.innerHTML = `${styles}<style>
+    .pdf-document{width:794px;max-width:794px;margin:0 auto;box-sizing:border-box;background:#fff;color:#202124;font-family:'Questrial',Inter,Arial,sans-serif}
+    .pdf-document *{box-sizing:border-box}
+    .pdf-document > .paper,.pdf-document > .page{width:794px;max-width:794px;margin:0 auto!important;box-shadow:none!important}
+    .pdf-document h1,.pdf-document h2,.pdf-document h3,.pdf-document h4,.pdf-document h5,.pdf-document h6,
+    .pdf-document header,.pdf-document footer,.pdf-document .title,.pdf-document .signatures,.pdf-document .signature{break-inside:avoid;page-break-inside:avoid}
+    .pdf-document h1,.pdf-document h2,.pdf-document h3,.pdf-document h4,.pdf-document h5,.pdf-document h6{break-after:avoid;page-break-after:avoid}
+  </style><div class="pdf-document">${parsed.body.innerHTML}</div>`;
   document.body.appendChild(root);
   try {
     const images = Array.from(root.querySelectorAll('img'));
@@ -13,6 +23,8 @@ export async function renderPdfDocument(html: string): Promise<Blob> {
       image.onload = () => resolve();
       image.onerror = () => resolve();
     })));
+    await Promise.all(['Questrial', 'Inter'].map((family) => document.fonts.load(`15px "${family}"`).catch(() => [])));
+    await document.fonts.ready;
     const worker = html2pdf().set({
       margin: 0,
       image: { type: 'jpeg', quality: 0.98 },
