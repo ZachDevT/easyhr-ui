@@ -15,6 +15,11 @@ export async function renderPdfDocument(html: string): Promise<Blob> {
     .pdf-document h1,.pdf-document h2,.pdf-document h3,.pdf-document h4,.pdf-document h5,.pdf-document h6,
     .pdf-document header,.pdf-document footer,.pdf-document .title,.pdf-document .signatures,.pdf-document .signature{break-inside:avoid;page-break-inside:avoid}
     .pdf-document h1,.pdf-document h2,.pdf-document h3,.pdf-document h4,.pdf-document h5,.pdf-document h6{break-after:avoid;page-break-after:avoid}
+    .pdf-document p{orphans:3;widows:3}
+    .pdf-document ul,.pdf-document ol{padding-left:1.6em}
+    .pdf-document table{width:100%;border-collapse:collapse;break-inside:auto}
+    .pdf-document th,.pdf-document td{border:1px solid #d0d5dd;padding:8px 10px;vertical-align:top}
+    .pdf-document img{max-width:100%;height:auto}
   </style><div class="pdf-document">${parsed.body.innerHTML}</div>`;
   document.body.appendChild(root);
   try {
@@ -23,8 +28,28 @@ export async function renderPdfDocument(html: string): Promise<Blob> {
       image.onload = () => resolve();
       image.onerror = () => resolve();
     })));
-    await Promise.all(['Questrial', 'Inter'].map((family) => document.fonts.load(`15px "${family}"`).catch(() => [])));
+    const documentRoot = root.querySelector('.pdf-document') as HTMLElement;
+    const fontFamilies = new Set(['Questrial', 'Inter']);
+    documentRoot.querySelectorAll('font[face], [style]').forEach((element) => {
+      const family = element.getAttribute('face') || (element as HTMLElement).style.fontFamily;
+      family.split(',').map((name) => name.trim().replace(/["']/g, '')).filter(Boolean).forEach((name) => fontFamilies.add(name));
+    });
+    await Promise.all([...fontFamilies].map((family) => document.fonts.load(`15px "${family}"`).catch(() => [])));
     await document.fonts.ready;
+    const footer = documentRoot.querySelector('.paper > footer, .page > footer') as HTMLElement | null;
+    if (footer) {
+      // Place the company footer against the bottom content margin of the last
+      // A4 sheet, after body and signature content have taken their final height.
+      const pageHeight = 297 * 96 / 25.4;
+      const bottomMargin = 22 * 96 / 25.4;
+      const rootTop = documentRoot.getBoundingClientRect().top;
+      const footerBottom = footer.getBoundingClientRect().bottom - rootTop;
+      const pageNumber = Math.max(1, Math.ceil((footerBottom + bottomMargin) / pageHeight));
+      const targetBottom = pageNumber * pageHeight - bottomMargin;
+      const gap = Math.max(0, targetBottom - footerBottom);
+      const currentMargin = Number.parseFloat(getComputedStyle(footer).marginTop) || 0;
+      footer.style.marginTop = `${currentMargin + gap}px`;
+    }
     const worker = html2pdf().set({
       margin: 0,
       image: { type: 'jpeg', quality: 0.98 },

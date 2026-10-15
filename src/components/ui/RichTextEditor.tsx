@@ -186,7 +186,10 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const selectionRangeRef = useRef<Range | null>(null);
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
+  const [selectedFont, setSelectedFont] = useState('Questrial');
+  const [selectedFontSize, setSelectedFontSize] = useState('14');
   const isInitialized = useRef(false);
 
   // Height and expansion state
@@ -227,6 +230,21 @@ export function RichTextEditor({
       if (document.queryCommandState("insertUnorderedList")) formats.add("ul");
       if (document.queryCommandState("insertOrderedList")) formats.add("ol");
     } catch {}
+    const selection = window.getSelection();
+    if (selection?.rangeCount && editorRef.current?.contains(selection.anchorNode)) {
+      selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+      const anchor = selection.anchorNode;
+      const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+      if (element && editorRef.current.contains(element)) {
+        const computed = getComputedStyle(element);
+        const family = computed.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+        const fontOptions = ['Questrial', 'Inter', 'Arial', 'Georgia', 'Times New Roman', 'Verdana', 'Gilroy', 'Enzyme'];
+        setSelectedFont(fontOptions.find((font) => font.toLowerCase() === family.toLowerCase()) || 'Questrial');
+        const px = Number.parseFloat(computed.fontSize);
+        const sizes = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36];
+        if (Number.isFinite(px)) setSelectedFontSize(String(sizes.reduce((closest, size) => Math.abs(size - px) < Math.abs(closest - px) ? size : closest, sizes[0])));
+      }
+    }
     setActiveFormats(formats);
   }, []);
 
@@ -347,6 +365,36 @@ export function RichTextEditor({
     },
     [onChange, updateActiveFormats]
   );
+
+  const execSelectedStyle = useCallback((command: 'fontName' | 'fontSize', value: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const selection = window.getSelection();
+    if (selectionRangeRef.current && editor.contains(selectionRangeRef.current.commonAncestorContainer)) {
+      selection?.removeAllRanges();
+      selection?.addRange(selectionRangeRef.current);
+    }
+    if (command === 'fontSize') {
+      // execCommand only accepts legacy sizes; normalize the selected font node
+      // into a pixel sized span immediately so the document stores the real size.
+      document.execCommand('fontSize', false, '7');
+      const size = `${value}px`;
+      editor.querySelectorAll('font[size="7"]').forEach((font) => {
+        const span = document.createElement('span');
+        span.style.fontSize = size;
+        while (font.firstChild) span.appendChild(font.firstChild);
+        font.replaceWith(span);
+      });
+    } else {
+      document.execCommand('fontName', false, value);
+    }
+    if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
+      selectionRangeRef.current = selection.getRangeAt(0).cloneRange();
+    }
+    onChange(editor.innerHTML);
+    updateActiveFormats();
+  }, [onChange, updateActiveFormats]);
 
   const handleInsertLink = useCallback(() => {
     const url = window.prompt("Enter link URL (e.g. https://easyhr.pro):", "https://");
@@ -532,6 +580,35 @@ export function RichTextEditor({
           <RemoveFormatting size={15} strokeWidth={2} />
         </ToolbarBtn>
 
+        <Divider />
+
+        <select
+          aria-label="Font family"
+          title="Font family"
+          value={selectedFont}
+          onMouseDown={() => updateActiveFormats()}
+          onChange={(event) => { setSelectedFont(event.target.value); execSelectedStyle('fontName', event.target.value); }}
+          style={{ height: 32, maxWidth: 142, padding: '0 8px', border: '1px solid var(--card-border, #EAEAE4)', borderRadius: 6, background: '#fff', color: 'var(--text-2)', fontSize: 12 }}
+        >
+          <option value="Questrial">Questrial</option>
+          <option value="Inter">Inter</option>
+          <option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Gilroy">Gilroy</option>
+          <option value="Enzyme">Enzyme</option>
+        </select>
+        <select
+          aria-label="Font size"
+          title="Font size"
+          value={selectedFontSize}
+          onMouseDown={() => updateActiveFormats()}
+          onChange={(event) => { setSelectedFontSize(event.target.value); execSelectedStyle('fontSize', event.target.value); }}
+          style={{ height: 32, width: 68, padding: '0 7px', border: '1px solid var(--card-border, #EAEAE4)', borderRadius: 6, background: '#fff', color: 'var(--text-2)', fontSize: 12 }}
+        >
+          {[10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36].map((size) => <option key={size} value={size}>{size} px</option>)}
+        </select>
         <Divider />
 
         <ToolbarBtn onClick={() => exec("undo")} title="Undo (⌘Z)">
