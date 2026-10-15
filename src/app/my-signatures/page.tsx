@@ -429,6 +429,8 @@ export default function MySignaturesPage() {
               boxSizing: 'border-box',
               maxHeight: 'calc(100dvh - 40px)',
               overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
             }}
           >
@@ -438,14 +440,17 @@ export default function MySignaturesPage() {
             </p>
             <textarea
               className="input mb-16"
+              style={{ display: 'block', width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
               rows={4}
               placeholder="e.g. Disagreed with clause 4, or compensation details require amendment..."
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap', paddingTop: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, width: '100%', marginTop: 8, paddingTop: 16, borderTop: '1px solid var(--border)', flexShrink: 0 }}>
               <button
                 className="btn-neutral"
+                type="button"
+                style={{ minHeight: 42 }}
                 onClick={() => {
                   setDeclineModalOpen(false);
                   setDeclineReason('');
@@ -456,11 +461,11 @@ export default function MySignaturesPage() {
               <button
                 className="btn-primary"
                 type="button"
-                style={{ background: 'var(--error)', backgroundImage: 'none' }}
+                style={{ display: 'inline-flex', visibility: 'visible', minHeight: 42, minWidth: 0, padding: '10px 14px', backgroundColor: '#b42318', backgroundImage: 'none', color: '#fff', whiteSpace: 'nowrap', opacity: isSubmittingSign ? 0.65 : 1 }}
                 onClick={handleDecline}
                 disabled={isSubmittingSign || !declineReason.trim()}
               >
-                {isSubmittingSign ? 'Declining...' : 'Confirm Decline'}
+                {isSubmittingSign ? 'Declining…' : 'Confirm decline'}
               </button>
             </div>
           </div>
