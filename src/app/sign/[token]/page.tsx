@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle2, Download, Loader2, Printer, Shield } from 'lucide-react';
+import { CheckCircle2, Download, ExternalLink, FileText, Loader2, Printer, Shield, UserRound } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 import { downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
+import styles from './public-signature.module.css';
 
 type Request = {
   requestId: string;
@@ -157,27 +158,59 @@ export default function ExternalSignPage() {
   const documentTitle = request?.title || 'signed-document';
   const pdfFilename = `${documentTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
 
-  return <main style={{ minHeight: '100vh', background: '#f3f4f6', padding: 24, fontFamily: 'system-ui' }}><section style={{ maxWidth: 1040, margin: '0 auto', background: 'white', borderRadius: 18, padding: 28, boxShadow: '0 8px 32px #0001' }}>
-    <div style={{ display: 'flex', gap: 12, alignItems: 'center', color: '#4f46e5' }}><Shield/><div><strong>{request?.companyName || 'Secure signing'}</strong><div style={{ color: '#667085', fontSize: 13 }}>Protected external signature link</div></div>
-      {request && pdfUrl && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}><button onClick={() => openPdfUrl(pdfUrl, true)} style={buttonStyle}><Printer size={15}/>Print PDF</button><button onClick={() => downloadPdfUrl(pdfUrl, pdfFilename)} style={buttonStyle}><Download size={15}/>Download PDF</button></div>}
-    </div>
-    {error && <p role="alert" style={{ color: '#b42318', marginTop: 24 }}>{error}</p>}
-    {done ? <div style={{ textAlign: 'center', padding: 56 }}><CheckCircle2 size={48} color="#059669"/><h1>Document signed</h1><p>Your signature has been recorded securely.</p></div> : request && <>
-      <h1 style={{ marginTop: 24 }}>{request.title}</h1><p style={{ color: '#667085' }}>Prepared for {request.recipientName}. {request.message}</p>
-      <div style={{ height: 'min(62vh, 760px)', minHeight: 440, background: '#edf0f4', borderRadius: 12, overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
-        {renderingPdf || !pdfUrl ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#667085' }}><Loader2 className="animate-spin" size={18}/> Preparing PDF preview…</div> : <iframe src={`${pdfUrl}#toolbar=0&view=FitH`} title={`${request.title} PDF preview`} style={{ width: '100%', height: '100%', border: 0, background: 'white' }}/ >}
-      </div>
-      {request.documentUrl && <a href={request.documentUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', marginTop: 12, color: '#344054' }}>Open original uploaded document</a>}
-      <h2 style={{ fontSize: 17, marginTop: 24 }}>Choose how to sign</h2>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{(['typed', 'drawn', 'uploaded'] as const).map((value) => <button key={value} onClick={() => setMode(value)} style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #d0d5dd', background: mode === value ? '#eef2ff' : 'white' }}>{value === 'typed' ? 'Type name' : value === 'drawn' ? 'Draw signature' : 'Upload image'}</button>)}</div>
-      {mode === 'typed' && <input value={name} maxLength={200} onChange={(event) => setName(event.target.value)} placeholder="Your full legal name" style={inputStyle}/>}
-      {mode === 'drawn' && <div style={{ marginTop: 12 }}><canvas ref={canvas} width={700} height={180} aria-label="Draw your signature" style={{ width: '100%', height: 140, border: '1px solid #d0d5dd', borderRadius: 8, touchAction: 'none', cursor: 'crosshair' }} onPointerDown={startDrawing} onPointerMove={continueDrawing} onPointerUp={stopDrawing} onPointerCancel={stopDrawing}/><div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 6 }}><button type="button" onClick={clearDrawing}>Clear drawing</button><span style={{ color: '#667085', fontSize: 12 }}>Sign with a mouse, trackpad, or finger.</span></div></div>}
-      {mode === 'uploaded' && <input type="file" accept="image/png,image/jpeg" style={{ display: 'block', marginTop: 12 }} onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 512000) { setError('Signature images must be 500 KB or smaller.'); return; } const reader = new FileReader(); reader.onload = () => setImage(typeof reader.result === 'string' ? reader.result : ''); reader.readAsDataURL(file); }}/ >}
-      <label style={{ display: 'flex', gap: 10, marginTop: 18 }}><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)}/>I reviewed the document and consent to sign electronically.</label>
-      <button disabled={busy || !consent || (mode === 'typed' ? !name.trim() : mode === 'uploaded' ? !image : !ready)} onClick={sign} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18, padding: '12px 20px', background: '#4f46e5', color: 'white', border: 0, borderRadius: 10, opacity: busy || !consent ? 0.5 : 1 }}>{busy ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>}Finish &amp; Sign</button>
-    </>}
-  </section></main>;
-}
+  const signatureReady = mode === 'typed' ? !!name.trim() : mode === 'uploaded' ? !!image : ready && !!drawnImage;
 
-const buttonStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 12px', border: '1px solid #d0d5dd', background: 'white', borderRadius: 8, color: '#344054', cursor: 'pointer' };
-const inputStyle: React.CSSProperties = { display: 'block', width: '100%', padding: 12, marginTop: 12, border: '1px solid #d0d5dd', borderRadius: 8 };
+  if (done) return <main className={styles.statusPage}><section className={styles.statusCard}><CheckCircle2 size={52} color="var(--success, #12a56a)"/><h1 className="text-2xl fw-800 text-1 mt-16">Document signed</h1><p className="text-sm text-4">Your signature has been recorded securely. You can close this page.</p></section></main>;
+  if (!request && !error) return <main className={styles.statusPage}><section className={styles.statusCard}><Loader2 size={24} className="animate-spin text-primary"/><p className="text-sm text-4 mt-12">Loading your secure document…</p></section></main>;
+  if (!request) return <main className={styles.statusPage}><section className={styles.statusCard}><Shield size={38} color="var(--error, #b42318)"/><h1 className="text-xl fw-800 text-1 mt-16">Unable to open this document</h1><p role="alert" className={styles.errorText}>{error}</p></section></main>;
+
+  return <main className={styles.shell}>
+    <header className={styles.header}>
+      <div className={styles.documentIdentity}>
+        <div className={styles.identityMark}>{request.logoUrl ? <img src={request.logoUrl} alt=""/> : <Shield size={21}/>}</div>
+        <div className={styles.identityCopy}><div className={styles.companyName}>{request.companyName || 'Secure signing'}</div><div className={styles.secureLine}><Shield size={12} color="var(--success, #12a56a)"/>Protected external signature link</div></div>
+        <div className={styles.docTitle}>{request.title}</div>
+      </div>
+      <div className={styles.headerActions}>
+        <button type="button" className="btn-neutral btn-sm" disabled={!pdfUrl} onClick={() => pdfUrl && openPdfUrl(pdfUrl, true)}><Printer size={14}/>Print PDF</button>
+        <button type="button" className="btn-neutral btn-sm" disabled={!pdfUrl} onClick={() => pdfUrl && downloadPdfUrl(pdfUrl, pdfFilename)}><Download size={14}/>Download PDF</button>
+      </div>
+    </header>
+
+    {error && <div role="alert" className="p-12" style={{ background: '#fff1f0', color: 'var(--error, #b42318)' }}>{error}</div>}
+    <div className={styles.workspace}>
+      <section className={styles.previewStage} aria-label="Document preview">
+        {renderingPdf || !pdfUrl ? <div className={styles.previewState}><Loader2 className="animate-spin" size={19}/>Preparing PDF preview…</div> : <iframe className={styles.pdfFrame} src={`${pdfUrl}#toolbar=0&view=FitH`} title={`${request.title} PDF preview`}/>}
+      </section>
+
+      <aside className={styles.panel} aria-label="Signing details and controls">
+        <div className={styles.panelContent}>
+          <h2 className={styles.panelHeading}>Document details</h2>
+          <div className={styles.detailGroup}>
+            <div><span className={styles.fieldLabel}>Signing as</span><div className={styles.recipientRow}><span className={styles.recipientAvatar}>{request.recipientName.trim().charAt(0).toUpperCase() || <UserRound size={16}/>}</span><span className={styles.recipientName}>{request.recipientName}</span></div></div>
+            {request.message && <div><span className={styles.fieldLabel}>Message from sender</span><div className={styles.senderMessage}>“{request.message}”</div></div>}
+          </div>
+
+          <div className={styles.sectionDivider}/>
+
+          <div className={styles.detailGroup}>
+            <div><h2 className={styles.panelHeading}>Your signature</h2><p className={styles.helpText} style={{ margin: '5px 0 0' }}>Choose how you’d like to sign this document.</p></div>
+            <div className={styles.modeGroup} role="group" aria-label="Signature method">
+              {(['typed', 'drawn', 'uploaded'] as const).map((value) => <button type="button" key={value} className={`${styles.modeButton} ${mode === value ? styles.modeButtonActive : ''}`} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'typed' ? 'Type' : value === 'drawn' ? 'Draw' : 'Upload'}</button>)}
+            </div>
+            {mode === 'typed' && <div><label className={styles.fieldLabel} htmlFor="signer-full-name">Full legal name</label><input id="signer-full-name" className={styles.fieldInput} value={name} maxLength={200} autoComplete="name" onChange={(event) => setName(event.target.value)} placeholder="Enter your full legal name"/></div>}
+            {mode === 'drawn' && <div className={styles.detailGroup}><canvas ref={canvas} width={700} height={180} aria-label="Draw your signature" className={styles.drawCanvas} onPointerDown={startDrawing} onPointerMove={continueDrawing} onPointerUp={stopDrawing} onPointerCancel={stopDrawing}/><div className={styles.recipientRow}><button type="button" className="btn-neutral btn-sm" onClick={clearDrawing}>Clear signature</button><span className={styles.helpText}>Use your mouse, trackpad, or finger.</span></div></div>}
+            {mode === 'uploaded' && <div className={styles.uploadArea}><label className={styles.fieldLabel} htmlFor="signature-image" style={{ marginBottom: 0 }}>Upload a signature image</label><input id="signature-image" type="file" accept="image/png,image/jpeg" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 512000) { setError('Signature images must be 500 KB or smaller.'); event.target.value = ''; return; } const reader = new FileReader(); reader.onload = () => setImage(typeof reader.result === 'string' ? reader.result : ''); reader.readAsDataURL(file); }}/>{image && <img className={styles.uploadedPreview} src={image} alt="Uploaded signature preview"/>}</div>}
+          </div>
+
+          {request.documentUrl && <a className="btn-neutral btn-sm row gap-8" href={request.documentUrl} target="_blank" rel="noreferrer"><FileText size={14}/>Open uploaded document<ExternalLink size={13}/></a>}
+          <label className={styles.consent}><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)}/><span>I have reviewed this document and consent to sign it electronically.</span></label>
+        </div>
+        <div className={styles.panelActions}>
+          <button type="button" className={styles.finishButton} disabled={busy || !consent || !signatureReady} onClick={sign}>{busy ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>} {busy ? 'Signing…' : 'Finish & Sign'}</button>
+          <span className={styles.helpText} style={{ textAlign: 'center' }}><Shield size={11} style={{ verticalAlign: '-2px', marginRight: 4 }}/>Your signature will be submitted securely.</span>
+        </div>
+      </aside>
+    </div>
+  </main>;
+}
