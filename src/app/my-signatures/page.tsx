@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from '@/components/ui/Toast';
 import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
+import { downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
 
 interface MySignatureDoc {
   id: string;
@@ -58,6 +59,8 @@ export default function MySignaturesPage() {
   const [signatureImage, setSignatureImage] = useState('');
   const [hasDrawnSignature, setHasDrawnSignature] = useState(false);
   const [drawnSignatureImage, setDrawnSignatureImage] = useState('');
+  const [signingPdfUrl, setSigningPdfUrl] = useState('');
+  const [isRenderingSigningPdf, setIsRenderingSigningPdf] = useState(false);
   const [consentToSign, setConsentToSign] = useState(false);
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
@@ -154,24 +157,14 @@ export default function MySignaturesPage() {
 
   const printSigningDocument = () => {
     if (!signingDoc) return;
-    const signature = signatureMode === 'typed' ? `<span style="font:italic 24px cursive">${escapeHtml(typedSignature)}</span>` : `<img src="${signatureMode === 'drawn' ? drawnSignatureImage : signatureImage}" alt="Signature"/>`;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) { toast.error('Print window blocked', 'Allow pop-ups to print or save this document.'); return; }
-    printWindow.document.write(signingDocumentHtml(signingDoc, signature));
-    printWindow.document.close();
-    printWindow.onload = () => printWindow.print();
+    if (!signingPdfUrl) { toast.info('Preparing PDF', 'The PDF preview is still being generated.'); return; }
+    openPdfUrl(signingPdfUrl, true);
   };
 
   const downloadSigningDocument = () => {
     if (!signingDoc) return;
-    const signature = signatureMode === 'typed' ? `<span style="font:italic 24px cursive">${escapeHtml(typedSignature)}</span>` : `<img src="${signatureMode === 'drawn' ? drawnSignatureImage : signatureImage}" alt="Signature"/>`;
-    const blob = new Blob([signingDocumentHtml(signingDoc, signature)], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${signingDoc.documentName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.html`;
-    link.click();
-    URL.revokeObjectURL(url);
+    if (!signingPdfUrl) { toast.info('Preparing PDF', 'The PDF preview is still being generated.'); return; }
+    downloadPdfUrl(signingPdfUrl, `${signingDoc.documentName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`);
   };
 
   // Handle Sign
@@ -222,6 +215,23 @@ export default function MySignaturesPage() {
     : signatureMode === 'drawn'
       ? (drawnSignatureImage ? `<img src="${drawnSignatureImage}" alt="Recipient signature"/>` : '')
       : (signatureImage ? `<img src="${signatureImage}" alt="Recipient signature"/>` : '');
+
+  useEffect(() => {
+    if (!signingDoc) {
+      setSigningPdfUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return ''; });
+      return;
+    }
+    let current = true;
+    setIsRenderingSigningPdf(true);
+    renderPdfDocument(signingDocumentHtml(signingDoc, activeSignaturePreview)).then((blob) => {
+      if (!current) return;
+      const nextUrl = URL.createObjectURL(blob);
+      setSigningPdfUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return nextUrl; });
+    }).catch((error) => {
+      if (current) toast.error('PDF preview unavailable', error instanceof Error ? error.message : 'Could not render this document as a PDF.');
+    }).finally(() => { if (current) setIsRenderingSigningPdf(false); });
+    return () => { current = false; };
+  }, [signingDoc, activeSignaturePreview]);
 
   // Handle Decline
   const handleDecline = async () => {
@@ -283,8 +293,8 @@ export default function MySignaturesPage() {
             style={{ background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}
           >
             <div className="row gap-8">
-              <button type="button" className="btn-neutral btn-sm" onClick={printSigningDocument}><Printer size={14}/> Print</button>
-              <button type="button" className="btn-neutral btn-sm" onClick={downloadSigningDocument}><Download size={14}/> Download</button>
+              <button type="button" className="btn-neutral btn-sm" onClick={printSigningDocument} disabled={!signingPdfUrl}><Printer size={14}/> Print PDF</button>
+              <button type="button" className="btn-neutral btn-sm" onClick={downloadSigningDocument} disabled={!signingPdfUrl}><Download size={14}/> Download PDF</button>
               <button
                 className="btn-circle"
                 style={{ background: 'var(--bg-page)' }}
@@ -330,7 +340,7 @@ export default function MySignaturesPage() {
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             {/* Document Preview (Left) */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 32, display: 'flex', justifyContent: 'center' }}>
-              <iframe title={`${signingDoc.documentName} signing preview`} srcDoc={signingDocumentHtml(signingDoc, activeSignaturePreview)} sandbox="" style={{ width: 'min(100%, 900px)', minHeight: 'calc(100vh - 190px)', height: '100%', border: 0, background: 'transparent' }} />
+              {isRenderingSigningPdf || !signingPdfUrl ? <div className="text-sm text-4"><Loader2 size={18} className="animate-spin"/> Preparing PDF preview…</div> : <iframe title={`${signingDoc.documentName} PDF signing preview`} src={`${signingPdfUrl}#toolbar=0&view=FitH`} style={{ width: 'min(100%, 900px)', minHeight: 'calc(100vh - 190px)', height: '100%', border: 0, background: 'transparent' }} />}
             </div>
 
             {/* Tools Panel (Right) */}

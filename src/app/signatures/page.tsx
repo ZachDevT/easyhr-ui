@@ -39,6 +39,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { RichTextEditor, RichTextRenderer } from '@/components/ui/RichTextEditor';
+import { downloadPdfBlob, openPdfBlob, renderPdfDocument } from '@/lib/pdfDocument';
 
 interface SignatureRecipient {
   id: string;
@@ -105,6 +106,8 @@ export default function SignaturesAdminPage() {
   const [editingTemplateId,setEditingTemplateId]=useState('');
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [templateView, setTemplateView] = useState<'edit' | 'preview'>('edit');
+  const [templatePdfUrl, setTemplatePdfUrl] = useState('');
+  const [isRenderingTemplatePdf, setIsRenderingTemplatePdf] = useState(false);
   const [templateCategory, setTemplateCategory] = useState('General');
   const [templateBody, setTemplateBody] = useState('');
   const [templateHeader,setTemplateHeader]=useState('');
@@ -270,20 +273,41 @@ export default function SignaturesAdminPage() {
     return `<!doctype html><html><head><meta charset="utf-8"><title>${name || 'HR document'}</title><style>body{font:15px/1.65 Arial,sans-serif;color:#202124;margin:0;background:#f3f4f6}.paper{box-sizing:border-box;width:210mm;min-height:297mm;margin:32px auto;padding:22mm;background:white;box-shadow:0 8px 30px #10182822}.brand{height:7px;background:${brand};margin:-22mm -22mm 24px}.header,.footer{white-space:pre-wrap;color:#596273;font-size:12px}.content{margin:32px 0;min-height:500px}.footer{border-top:1px solid #e5e7eb;padding-top:16px}@media print{body{background:white}.paper{margin:0;box-shadow:none;width:auto;min-height:0}}</style></head><body><article class="paper"><div class="brand"></div>${logo}<header class="header">${replace(headerDraft)}</header><main class="content">${replace(bodyDraft || '<p>Your document content will appear here.</p>')}</main><footer class="footer">${replace(footerDraft)}</footer></article></body></html>`;
   };
   const previewTemplate = (saved?: SignatureTemplate) => {
-    const preview = window.open('', '_blank', 'noopener,noreferrer');
-    if (!preview) { toast.error('Preview blocked', 'Allow pop-ups to preview this document.'); return; }
-    preview.document.write(templateHtml(saved));
-    preview.document.close();
+    if (saved) {
+      setEditingTemplateId(saved.id);
+      setTemplateName(saved.name);
+      setTemplateCategory(saved.category);
+      setTemplateBody(saved.body);
+      setTemplateHeader(saved.headerText || '');
+      setTemplateFooter(saved.footerText || '');
+      setTemplateDays(saved.expiresInDays);
+    }
+    setTemplateView('preview');
+    setShowTemplateEditor(true);
   };
-  const downloadTemplate = () => {
-    const blob = new Blob([templateHtml()], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${(templateName || 'hr-template').trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.html`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const templatePdfFilename = () => `${(templateName || 'hr-template').trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
+  const downloadTemplate = async () => {
+    try { downloadPdfBlob(await renderPdfDocument(templateHtml()), templatePdfFilename()); }
+    catch (error) { toast.error('PDF unavailable', error instanceof Error ? error.message : 'Could not create PDF.'); }
   };
+  const printTemplate = async () => {
+    try { openPdfBlob(await renderPdfDocument(templateHtml()), templatePdfFilename(), true); }
+    catch (error) { toast.error('PDF unavailable', error instanceof Error ? error.message : 'Could not create PDF.'); }
+  };
+
+  useEffect(() => {
+    if (!showTemplateEditor || templateView !== 'preview') return;
+    let current = true;
+    setIsRenderingTemplatePdf(true);
+    renderPdfDocument(templateHtml()).then((blob) => {
+      if (!current) return;
+      const nextUrl = URL.createObjectURL(blob);
+      setTemplatePdfUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return nextUrl; });
+    }).catch((error) => {
+      if (current) toast.error('Preview unavailable', error instanceof Error ? error.message : 'Could not generate PDF preview.');
+    }).finally(() => { if (current) setIsRenderingTemplatePdf(false); });
+    return () => { current = false; };
+  }, [showTemplateEditor, templateView, templateName, templateBody, templateHeader, templateFooter, templateBranding]);
   const saveTemplate = async () => { setIsSavingTemplate(true); try { const token=await getToken(); if(!token)throw new Error('Not authenticated'); const res=await fetch(`${API_BASE_URL}/api/v1/signatures/templates${editingTemplateId?`/${editingTemplateId}`:''}`,{method:editingTemplateId?'PUT':'POST',headers:{...getAuthHeaders(token),'Content-Type':'application/json'},body:JSON.stringify({name:templateName,category:templateCategory,body:templateBody,headerText:templateHeader,footerText:templateFooter,expiresInDays:templateDays})}); if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Could not save template')}toast.success('Template saved','Your organization template is ready to use.');setShowTemplateEditor(false);setTemplateName('');setTemplateBody('');setEditingTemplateId('');await loadData();}catch(e){toast.error('Template not saved',e instanceof Error?e.message:'Could not save template')}finally{setIsSavingTemplate(false)} };
 
   // Filtered requests
@@ -697,7 +721,7 @@ export default function SignaturesAdminPage() {
           <section role="dialog" aria-modal="true" aria-label={editingTemplateId ? 'Edit document template' : 'Create document template'} style={{ position: 'absolute', inset: '0 0 0 auto', width: 'min(1120px, 94vw)', height: '100%', background: '#f5f6f8', display: 'flex', flexDirection: 'column', boxShadow: '-16px 0 48px rgba(16,24,40,.18)' }}>
             <header className="row-between gap-16 p-16" style={{ background: '#fff', borderBottom: '1px solid var(--border)' }}>
               <div className="row gap-12 align-center"><button type="button" className="btn-neutral btn-sm" onClick={() => setShowTemplateEditor(false)} aria-label="Close editor"><ChevronLeft size={16}/></button><div><div className="text-base fw-800 text-1">{editingTemplateId ? 'Edit template' : 'Create a template'}</div><div className="text-xs text-5 mt-4">Professional document workspace · saved to your organization</div></div></div>
-              <div className="row gap-8"><button type="button" className="btn-neutral btn-sm" onClick={() => setTemplateView(templateView === 'edit' ? 'preview' : 'edit')}><Eye size={15}/>{templateView === 'edit' ? 'Preview' : 'Back to editor'}</button><button type="button" className="btn-neutral btn-sm" onClick={() => { const w = window.open('', '_blank'); if(w){w.document.write(templateHtml());w.document.close();w.focus();w.print();} }}><Printer size={15}/> Print</button><button type="button" className="btn-neutral btn-sm" onClick={downloadTemplate}><FileDown size={15}/> Download</button><button type="button" className="btn-primary btn-sm" disabled={isSavingTemplate||!templateName.trim()||!templateBody.trim()} onClick={saveTemplate}>{isSavingTemplate?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>} {editingTemplateId ? 'Save changes' : 'Save template'}</button><button type="button" className="btn-neutral btn-sm" onClick={() => setShowTemplateEditor(false)} aria-label="Close"><X size={16}/></button></div>
+              <div className="row gap-8"><button type="button" className="btn-neutral btn-sm" onClick={() => setTemplateView(templateView === 'edit' ? 'preview' : 'edit')}><Eye size={15}/>{templateView === 'edit' ? 'Preview' : 'Back to editor'}</button><button type="button" className="btn-neutral btn-sm" onClick={printTemplate}><Printer size={15}/> Print</button><button type="button" className="btn-neutral btn-sm" onClick={downloadTemplate}><FileDown size={15}/> Download</button><button type="button" className="btn-primary btn-sm" disabled={isSavingTemplate||!templateName.trim()||!templateBody.trim()} onClick={saveTemplate}>{isSavingTemplate?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>} {editingTemplateId ? 'Save changes' : 'Save template'}</button><button type="button" className="btn-neutral btn-sm" onClick={() => setShowTemplateEditor(false)} aria-label="Close"><X size={16}/></button></div>
             </header>
             <div className="row gap-8 p-12" style={{ background: '#fff', borderBottom: '1px solid var(--border)' }}><span className="text-xs fw-700 text-4">DOCUMENT</span><span className="text-xs text-5">›</span><span className="text-xs fw-700" style={{color:'var(--primary)'}}>{templateName || 'Untitled template'}</span><span className="text-xs text-5" style={{marginLeft:'auto'}}>Changes save when you select Save template</span></div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 28 }}>
@@ -716,7 +740,7 @@ export default function SignaturesAdminPage() {
                 </div>
                 <div className="row-between mt-16 p-16" style={{background:'#fff',border:'1px solid var(--border)',borderRadius:12}}><div><div className="text-sm fw-700 text-1">Signing link expiry</div><div className="text-xs text-5 mt-4">How many days recipients have to sign.</div></div><Input type="number" min={1} max={365} value={templateDays} onChange={e=>setTemplateDays(Number(e.target.value))} style={{maxWidth:120}}/></div>
                 <div className="text-xs text-5 mt-12">Merge fields: <code>{'{{employee_name}}'}</code> · <code>{'{{company_name}}'}</code> · <code>{'{{job_title}}'}</code> · <code>{'{{effective_date}}'}</code> · <code>{'{{today}}'}</code></div>
-              </div> : <div style={{maxWidth:850,margin:'0 auto'}}><div className="row-between mb-12"><div><div className="text-base fw-800 text-1">Print preview</div><div className="text-xs text-5 mt-4">Sample merge fields are filled in to show the finished document.</div></div><button type="button" className="btn-neutral btn-sm" onClick={() => {const w=window.open('', '_blank');if(w){w.document.write(templateHtml());w.document.close();w.focus();w.print();}}}><Printer size={15}/> Print document</button></div><iframe title="Document template preview" srcDoc={templateHtml()} style={{width:'100%',height:'min(900px, calc(100vh - 220px))',border:'1px solid var(--border)',borderRadius:10,background:'#fff'}}/></div>}
+              </div> : <div style={{maxWidth:850,margin:'0 auto'}}><div className="row-between mb-12"><div><div className="text-base fw-800 text-1">PDF preview</div><div className="text-xs text-5 mt-4">This is the same A4 PDF that Download saves.</div></div><button type="button" className="btn-neutral btn-sm" onClick={printTemplate}><Printer size={15}/> Print PDF</button></div>{isRenderingTemplatePdf || !templatePdfUrl ? <div className="p-32 text-center"><Loader2 size={24} className="animate-spin"/> Preparing PDF preview…</div> : <iframe title="PDF document template preview" src={`${templatePdfUrl}#toolbar=0&view=FitH`} style={{width:'100%',height:'min(900px, calc(100vh - 220px))',border:'1px solid var(--border)',borderRadius:10,background:'#fff'}}/>}</div>}
             </div>
           </section>
         </div>
