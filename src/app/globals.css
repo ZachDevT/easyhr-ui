@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Questrial&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,700&family=Inter:wght@400;500;600;700;800&family=Questrial&display=swap');
 
 @font-face {
   font-family: 'Enzyme';
@@ -35,21 +35,30 @@
   --gradient: linear-gradient(135deg, #A238FF 0%, #FF3EA5 100%);
   --gradient-pink: linear-gradient(135deg, #FF3EA5 0%, #A238FF 100%);
 
-  --page-bg: #F7F7F5;
+  /* BambooHR-inspired warm canvas & crisp elevated containers */
+  --page-bg: #F5F7F5;
   --card-bg: #FFFFFF;
-  --card-border: #EAEAE4;
-  --divider: #EAEAE4;
+  --card-border: #E8ECE8;
+  --divider: #E8ECE8;
+  --dark-banner: #2A2523;
 
-  --text-1: #1E1D19;
-  --text-2: #3A3932;
-  --text-3: #6B6B63;
-  --text-4: #66655A;
-  --text-5: #9A998F;
-  --text-placeholder: #B0AFA4;
+  --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  --card-shadow-hover: 0 10px 28px -4px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.03);
+
+  --text-1: #1B1E1C;
+  --text-2: #2E3330;
+  --text-3: #585F5B;
+  --text-4: #6E7571;
+  --text-5: #8C9490;
+  --text-placeholder: #B2B8B4;
 
   --sidebar-width: 224px;
   --topbar-height: 64px;
-  --card-radius: 16px;
+  --card-radius: 18px;
+
+  /* Typography tokens */
+  --font-title: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* ============================================================
@@ -59,14 +68,21 @@
 
 html, body, #root {
   height: 100%;
-  font-family: 'Questrial', system-ui, sans-serif;
+  font-family: var(--font-body);
   background-color: var(--page-bg);
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6, .card-header-title, .page-title, .modal-title, .kanban-col-title {
-  font-family: 'Enzyme', sans-serif;
+/* BambooHR-style soft serif headings for major page and section titles */
+h1, .page-title, .modal-title {
+  font-family: var(--font-title);
+  letter-spacing: -0.02em;
+}
+
+h2, h3, h4, h5, h6, .card-header-title, .kanban-col-title {
+  font-family: var(--font-title);
+  letter-spacing: -0.01em;
 }
 
 button { font-family: inherit; cursor: pointer; }
@@ -332,9 +348,40 @@ img { display: block; }
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* Specific reference containers: dark-topped request cards */
+.reference-card-dark-header {
+  background: var(--dark-banner, #2A2523);
+  color: #FFFFFF;
+  padding: 14px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  border-top-left-radius: var(--card-radius);
+  border-top-right-radius: var(--card-radius);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.approval-chain-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--card-border);
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 /* Card header — icon + title in PRIMARY, with bottom border */
@@ -342,7 +389,7 @@ img { display: block; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 20px;
+  padding: 14px 22px;
   border-bottom: 1px solid var(--card-border);
 }
 
@@ -362,7 +409,7 @@ img { display: block; }
 }
 
 .card-body { 
-  padding: 18px 20px; 
+  padding: 20px 22px; 
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1211,4 +1258,77 @@ tr:hover td { background: #FAFAF8; }
   border-top: 1px solid var(--card-border) !important;
   margin: 18px 0 !important;
 }
+
+/* ============================================================
+   REFERENCE UI LOOK & FEEL EXTENSIONS (Helpware-style containers)
+   ============================================================ */
+.ref-container {
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--card-border, #E8ECE8);
+  border-radius: var(--card-radius, 18px);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.ref-banner-dark {
+  background: #252220;
+  color: #FFFFFF;
+  padding: 16px 24px;
+  font-weight: 700;
+  font-size: 15px;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+.ref-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--card-border, #E8ECE8);
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.ref-row-item:last-child {
+  border-bottom: none;
+}
+
+.ref-row-item:hover {
+  background: #F9FAF9;
+}
+
+.ref-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+}
+
+.ref-status-pending {
+  color: #555A57;
+}
+
+.ref-status-approved {
+  color: #166534;
+}
+
+.ref-status-denied {
+  color: #B91C1C;
+}
+
+.ref-approval-chain {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E6E2;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
 
