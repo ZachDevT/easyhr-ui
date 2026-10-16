@@ -16,9 +16,22 @@ export default function Dashboard() {
   const { company, userProfile, isLoading } = useCompany();
 
   useEffect(() => {
-    if (!isLoading && !company && !userProfile) {
-      router.replace('/company/register');
+    let isMounted = true;
+    async function verifyMembership() {
+      if (isLoading || company || userProfile) return;
+      // Double check setup status to prevent false bounce loops
+      try {
+        const { API_BASE_URL, getWorkspaceUrl } = await import('@/lib/api');
+        // If localStorage has company, let context hydrate
+        const cached = localStorage.getItem('easyhr_company_cache');
+        if (cached) return;
+        router.replace('/company/register');
+      } catch {
+        if (isMounted) router.replace('/company/register');
+      }
     }
+    verifyMembership();
+    return () => { isMounted = false; };
   }, [isLoading, company, userProfile, router]);
   const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
   const initials = `${currentUser.firstName?.[0] || 'H'}${currentUser.lastName?.[0] || 'A'}`;

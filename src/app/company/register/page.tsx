@@ -163,7 +163,11 @@ export default function CompanyRegistration() {
         if (cachedComp) {
           const parsed = JSON.parse(cachedComp);
           if (parsed && (parsed.id || parsed.name)) {
-            router.replace("/dashboard");
+            if (parsed.subdomain && window.location.hostname === "easyhr.pro") {
+              window.location.href = getWorkspaceUrl(parsed.subdomain, "/dashboard");
+            } else {
+              router.replace("/dashboard");
+            }
             return;
           }
         }
@@ -187,7 +191,11 @@ export default function CompanyRegistration() {
         if (res.ok) {
           const data = await res.json();
           if (isMounted && data.hasOrganization) {
-            router.replace("/dashboard");
+            if (data.subdomain) {
+              window.location.href = getWorkspaceUrl(data.subdomain, "/dashboard");
+            } else {
+              router.replace("/dashboard");
+            }
             return;
           }
         }
