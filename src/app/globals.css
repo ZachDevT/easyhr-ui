@@ -75,14 +75,14 @@ html, body, #root {
 }
 
 /* BambooHR-style soft serif headings for major page and section titles */
-h1, .page-title, .modal-title {
-  font-family: var(--font-title);
-  letter-spacing: -0.02em;
-}
-
-h2, h3, h4, h5, h6, .card-header-title, .kanban-col-title {
-  font-family: var(--font-title);
-  letter-spacing: -0.01em;
+h1, h2, h3, h4, h5, h6,
+.page-title,
+.modal-title,
+.card-header-title,
+.kanban-col-title,
+.profile-banner-name {
+  font-family: var(--font-title) !important;
+  letter-spacing: -0.015em;
 }
 
 button { font-family: inherit; cursor: pointer; }
@@ -881,10 +881,10 @@ tr:hover td { background: #FAFAF8; }
 .text-xl   { font-size: 20px; }
 .text-2xl  { font-size: 24px; }
 .text-3xl  { font-size: 30px; }
-.fw-500 { font-weight: 400; }
-.fw-600 { font-weight: 400; }
-.fw-700 { font-weight: 400; }
-.fw-800 { font-weight: 400; }
+.fw-500 { font-weight: 500; }
+.fw-600 { font-weight: 600; }
+.fw-700 { font-weight: 700; }
+.fw-800 { font-weight: 800; }
 .text-1 { color: var(--text-1); }
 .text-2 { color: var(--text-2); }
 .text-3 { color: var(--text-3); }
