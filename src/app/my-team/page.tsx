@@ -19,13 +19,15 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatRibbon } from "@/components/ui/StatRibbon";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
+import { ModulePageSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@clerk/nextjs";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 
 interface TeamMember {
   id: string;
   firstName: string;
   lastName: string;
+  name?: string;
   workEmail: string;
   jobTitle?: string;
   department: string;
@@ -49,7 +51,7 @@ export default function MyTeamPage() {
     try {
       const token = await getToken();
       if (!token) return;
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = getAuthHeaders(token);
 
       const [meRes, empRes, reqRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/employees/me`, { headers }),
@@ -83,11 +85,11 @@ export default function MyTeamPage() {
   // Determine direct reports or organization team
   const myDirectReports = useMemo(() => {
     if (!currentUser) return employees;
-    const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim().toLowerCase();
+    const fullName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim().toLowerCase();
     const reports = employees.filter((e) => {
       if (e.id === currentUser.id) return false;
       if (e.managerId && e.managerId === currentUser.id) return true;
-      if (e.manager && e.manager.trim().toLowerCase() === fullName) return true;
+      if (e.manager && fullName && e.manager.trim().toLowerCase() === fullName) return true;
       return false;
     });
 
@@ -100,7 +102,7 @@ export default function MyTeamPage() {
     const q = query.toLowerCase();
     return myDirectReports.filter(
       (e) =>
-        `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+        `${e.firstName || ""} ${e.lastName || ""} ${e.name || ""}`.toLowerCase().includes(q) ||
         (e.jobTitle || "").toLowerCase().includes(q) ||
         (e.department || "").toLowerCase().includes(q)
     );
@@ -118,11 +120,7 @@ export default function MyTeamPage() {
   const activeCount = myDirectReports.filter((e) => e.status === "active").length;
 
   if (isLoading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-        <Loader2 className="animate-spin text-primary" size={36} />
-      </div>
-    );
+    return <ModulePageSkeleton variant="split" />;
   }
 
   return (
@@ -317,27 +315,37 @@ export default function MyTeamPage() {
                 </div>
               ) : (
                 <div className="col gap-10">
-                  {teamRequests.map((r) => (
-                    <DataRow
-                      key={r.id}
-                      leading={<Avatar name={r.employeeName} size="sm" />}
-                      title={`${r.employeeName} · ${r.type}`}
-                      subtitle={`${r.startDate} → ${r.endDate}`}
-                      meta={
-                        <StatusPill
-                          tone={
-                            r.status === "approved" || r.status === "Approved"
-                              ? "success"
-                              : r.status === "rejected" || r.status === "Denied"
-                              ? "error"
-                              : "warning"
-                          }
-                        >
-                          {r.status}
-                        </StatusPill>
-                      }
-                    />
-                  ))}
+                  {teamRequests.map((r) => {
+                    const matchedEmp = employees.find((emp) => emp.id === r.employeeId);
+                    const empName =
+                      r.employeeName ||
+                      (matchedEmp
+                        ? `${matchedEmp.firstName || ""} ${matchedEmp.lastName || ""}`.trim() || matchedEmp.name
+                        : "") ||
+                      "Team Member";
+                    const leaveType = r.type || r.policyName || "Leave";
+                    return (
+                      <DataRow
+                        key={r.id}
+                        leading={<Avatar src={matchedEmp?.avatar} name={empName} size="sm" />}
+                        title={`${empName} · ${leaveType}`}
+                        subtitle={`${r.startDate} → ${r.endDate}`}
+                        meta={
+                          <StatusPill
+                            tone={
+                              r.status === "approved" || r.status === "Approved"
+                                ? "success"
+                                : r.status === "rejected" || r.status === "Denied"
+                                ? "error"
+                                : "warning"
+                            }
+                          >
+                            {r.status}
+                          </StatusPill>
+                        }
+                      />
+                    );
+                  })}
                 </div>
               )}
             </CardBody>
@@ -349,7 +357,7 @@ export default function MyTeamPage() {
 }
 
 function MemberCard({ employee: e, pending }: { employee: TeamMember; pending: number }) {
-  const fullName = `${e.firstName} ${e.lastName}`.trim();
+  const fullName = `${e.firstName || ""} ${e.lastName || ""}`.trim() || e.name || e.workEmail || "Team Member";
   return (
     <Link
       href={`/people/${e.id}`}

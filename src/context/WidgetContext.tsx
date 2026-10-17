@@ -21,18 +21,22 @@ const WidgetContext = createContext<WidgetContextType | undefined>(undefined);
 
 export function WidgetProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn } = useAuth();
-  const [activeWidgets, setActiveWidgetsState] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  const [activeWidgets, setActiveWidgetsState] = useState<string[]>(() =>
+    OPTIONAL_WIDGETS.filter((w) => w.default).map((w) => w.id)
+  );
+
+  // Hydrate saved widgets on client mount to avoid SSR hydration mismatch (#418)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setActiveWidgetsState(parsed);
         }
-      } catch {}
-    }
-    return OPTIONAL_WIDGETS.filter((w) => w.default).map((w) => w.id);
-  });
+      }
+    } catch {}
+  }, []);
 
   // Sync with backend preferences
   useEffect(() => {

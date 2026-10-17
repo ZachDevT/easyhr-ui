@@ -2,14 +2,15 @@ import React from 'react';
 
 interface AvatarProps {
   src?: string;
-  name: string;
+  name?: string;
   size?: 'xl' | 'lg' | 'md' | 'sm' | 'xs';
   className?: string;
   style?: React.CSSProperties;
 }
 
-function initials(name: string) {
-  return name
+function initials(name?: string) {
+  const safe = typeof name === 'string' && name.trim() ? name.trim() : 'U';
+  return safe
     .split(' ')
     .filter(Boolean)
     .map((n) => n[0])
@@ -18,7 +19,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export function Avatar({ src, name, size = 'md', className = '', style }: AvatarProps) {
+export function Avatar({ src, name = 'User', size = 'md', className = '', style }: AvatarProps) {
   return (
     <div
       className={`avatar avatar-${size} ${className}`}

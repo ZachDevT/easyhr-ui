@@ -368,19 +368,22 @@ export default function DepartmentsPage() {
                           <div>Reports To</div>
                           <div>Location</div>
                         </div>
-                        {members.map((p) => (
-                          <div key={p.id} className="grid-4 p-16 border-b border-border align-center hover-bg-neutral" style={{ cursor: "pointer" }}>
-                            <div className="row gap-12 align-center">
-                              <Avatar src={p.avatar} name={p.name} size="sm" />
-                              <span className="fw-600 text-1">{p.name}</span>
+                        {members.map((p: any) => {
+                          const memberName = p.name || `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Team Member";
+                          return (
+                            <div key={p.id} className="grid-4 p-16 border-b border-border align-center hover-bg-neutral" style={{ cursor: "pointer" }}>
+                              <div className="row gap-12 align-center">
+                                <Avatar src={p.avatar} name={memberName} size="sm" />
+                                <span className="fw-600 text-1">{memberName}</span>
+                              </div>
+                              <div className="text-sm fw-600 text-2">{p.role || p.jobTitle || "Team Member"}</div>
+                              <div className="text-sm text-5">{p.manager || "Direct"}</div>
+                              <div className="row gap-4 align-center text-sm text-5">
+                                <MapPin size={14} /> {p.location || "Headquarters"}
+                              </div>
                             </div>
-                            <div className="text-sm fw-600 text-2">{p.role}</div>
-                            <div className="text-sm text-5">{p.manager}</div>
-                            <div className="row gap-4 align-center text-sm text-5">
-                              <MapPin size={14} /> {p.location}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </CardBody>
                     </Card>
                   )}

@@ -81,16 +81,18 @@ const BACKEND_TO_STAGE: Record<string, string> = {
 export function HRProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn } = useAuth();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("easyhr_onboardings");
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return [];
-  });
+  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("easyhr_onboardings");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) setOnboardings(parsed);
+      }
+    } catch {}
+  }, []);
 
   const fetchCandidates = useCallback(async () => {
     if (!isSignedIn) {

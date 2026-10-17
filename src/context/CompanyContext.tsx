@@ -71,37 +71,10 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { user: clerkUser } = useUser();
 
-  const [company, setCompany] = useState<CompanyData | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(CACHE_KEYS.company);
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return null;
-  });
-
-  const [userProfile, setUserProfile] = useState<UserProfileData | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(CACHE_KEYS.user);
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return null;
-  });
-
-  const [locations, setLocations] = useState<LocationItem[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(CACHE_KEYS.locations);
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return [];
-  });
-
-  const [isLoading, setIsLoading] = useState(!company);
+  const [company, setCompany] = useState<CompanyData | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const applyBrandColor = useCallback((color: string) => {
     if (!color || typeof document === "undefined") return;
@@ -112,7 +85,34 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.style.setProperty("--primary-tint", `${cleanColor}18`);
   }, []);
 
-  // Immediate brand color injection on mount from cached company
+  // Hydrate cached company, userProfile, and locations on client mount (prevents SSR hydration mismatch #418)
+  useEffect(() => {
+    try {
+      const cachedComp = localStorage.getItem(CACHE_KEYS.company);
+      if (cachedComp) {
+        const parsedComp = JSON.parse(cachedComp);
+        setCompany((prev) => prev || parsedComp);
+        setIsLoading(false);
+        if (parsedComp?.brandColor) {
+          applyBrandColor(parsedComp.brandColor);
+        }
+      }
+      const cachedUser = localStorage.getItem(CACHE_KEYS.user);
+      if (cachedUser) {
+        const parsedUser = JSON.parse(cachedUser);
+        setUserProfile((prev) => prev || parsedUser);
+      }
+      const cachedLocs = localStorage.getItem(CACHE_KEYS.locations);
+      if (cachedLocs) {
+        const parsedLocs = JSON.parse(cachedLocs);
+        if (Array.isArray(parsedLocs)) {
+          setLocations((prev) => (prev.length > 0 ? prev : parsedLocs));
+        }
+      }
+    } catch {}
+  }, [applyBrandColor]);
+
+  // Immediate brand color injection when company brandColor changes
   useEffect(() => {
     if (company?.brandColor) {
       applyBrandColor(company.brandColor);
