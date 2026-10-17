@@ -587,61 +587,136 @@ function ProfileContent() {
     return <ProfileMeSkeleton />;
   }
 
+  const avatarSrc = employee?.avatarUrl || employee?.avatar || userProfile?.avatarUrl;
+
   return (
     <div style={{ height: "100%", overflowY: "auto", background: "var(--bg-page)", display: "flex", flexDirection: "column" }}>
-      {/* Hero Banner Header */}
-      <div style={{ margin: "0 0 20px 0" }}>
-        <PageHeader
-          variant="card"
-          title={displayFullName}
-          subtitle={`${displayRole} · ${displayCompany}`}
-          icon={
+      {/* Executive Employee Profile Header Card */}
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 16,
+          border: "1px solid var(--card-border, #E4E4E7)",
+          boxShadow: "0 2px 12px rgba(17, 17, 24, 0.04)",
+          overflow: "hidden",
+          marginBottom: 20,
+          flexShrink: 0,
+        }}
+      >
+        {/* Top Accent Strip */}
+        <div style={{ height: 4, background: "var(--gradient)" }} />
+
+        {/* Main Identity & Actions Row */}
+        <div
+          style={{
+            padding: "20px 24px 18px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Left: 1:1 Undistorted Avatar + Identity Details */}
+          <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0, flex: 1 }}>
             <div
-              className="avatar-hover-container"
+              onClick={() => fileInputRef.current?.click()}
+              title="Click to change profile photo"
               style={{
                 position: "relative",
-                width: 100,
-                height: 100,
-                borderRadius: "50%",
-                overflow: "hidden",
-                border: "4px solid rgba(255,255,255,0.25)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                width: 76,
+                height: 76,
+                minWidth: 76,
+                minHeight: 76,
+                flexShrink: 0,
                 cursor: "pointer",
               }}
-              onClick={() => fileInputRef.current?.click()}
-              title="Click to change photo"
             >
-              <Avatar
-                name={displayFullName}
-                src={employee?.avatarUrl || employee?.avatar || userProfile?.avatarUrl}
-                size="xl"
-                style={{ width: "100%", height: "100%", borderRadius: "50%" }}
-              />
               <div
-                className="avatar-hover-overlay"
+                className="avatar-hover-container"
                 style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(0, 0, 0, 0.65)",
+                  width: 76,
+                  height: 76,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  border: "3px solid #FFFFFF",
+                  boxShadow: "0 4px 14px rgba(17, 17, 24, 0.1), 0 0 0 1px var(--card-border, #E4E4E7)",
+                  background: "var(--primary-tint, #F5EBFF)",
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "white",
-                  opacity: 0,
-                  transition: "opacity 0.2s ease",
-                  userSelect: "none",
+                  position: "relative",
                 }}
               >
-                {isUploadingAvatar ? (
-                  <Loader2 size={24} className="animate-spin" />
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={displayFullName}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
                 ) : (
-                  <>
-                    <Camera size={22} />
-                    <span style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>Change Photo</span>
-                  </>
+                  <span
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 700,
+                      color: "var(--primary, #A238FF)",
+                    }}
+                  >
+                    {displayFirstName.slice(0, 1).toUpperCase()}
+                    {displayLastName.slice(0, 1).toUpperCase()}
+                  </span>
                 )}
+
+                <div
+                  className="avatar-hover-overlay"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(9, 9, 11, 0.6)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#FFFFFF",
+                    opacity: 0,
+                    transition: "opacity 0.18s ease",
+                    userSelect: "none",
+                  }}
+                >
+                  {isUploadingAvatar ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <Camera size={18} />
+                  )}
+                </div>
               </div>
+
+              {/* Small Camera Badge */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  right: 0,
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: "var(--primary, #A238FF)",
+                  color: "#FFFFFF",
+                  border: "2px solid #FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                }}
+              >
+                <Camera size={11} />
+              </div>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -650,50 +725,366 @@ function ProfileContent() {
                 onChange={handleAvatarFileChange}
               />
             </div>
-          }
-          tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+
+            {/* Name, Role, Badges & Vitals Strip */}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <h1
+                  style={{
+                    fontSize: 21,
+                    fontWeight: 700,
+                    color: "var(--text-1, #18181B)",
+                    margin: 0,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {displayFullName}
+                </h1>
+
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 9px",
+                    borderRadius: 999,
+                    background: employee?.status === "active" ? "#ECFDF5" : "#FEF3C7",
+                    color: employee?.status === "active" ? "#059669" : "#D97706",
+                    border:
+                      employee?.status === "active"
+                        ? "1px solid rgba(16, 185, 129, 0.25)"
+                        : "1px solid rgba(245, 158, 11, 0.25)",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: employee?.status === "active" ? "#10B981" : "#F59E0B",
+                    }}
+                  />
+                  {employee?.status ? employee.status.toUpperCase() : "ACTIVE"}
+                </span>
+
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    background: "#F4F4F5",
+                    color: "var(--text-2, #52525B)",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                  }}
+                >
+                  {employee?.employeeNumber || "EMP-0001"}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 13.5,
+                  color: "var(--text-2, #52525B)",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                {displayRole} <span style={{ color: "var(--text-3, #A1A1AA)" }}>·</span> {displayCompany}
+              </div>
+
+              {/* Compact Metadata Pills */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  flexWrap: "wrap",
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: "var(--text-3, #71717A)",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <Building size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <span>{employee?.department || "General"}</span>
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <MapPin size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <span>{displayLocation}</span>
+                </span>
+                {displayEmail && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <Mail size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                    <span>{displayEmail}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Header Quick Actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="btn-neutral btn-sm"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 13px",
+                borderRadius: 9,
+                fontSize: 12,
+              }}
+            >
+              <Camera size={13.5} />
+              <span>Change Photo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("Personal");
+                setIsEditingPersonal(true);
+              }}
+              className="btn-primary btn-sm"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                borderRadius: 9,
+                fontSize: 12,
+              }}
+            >
+              <Edit2 size={13} />
+              <span>Edit Profile</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Integrated Navigation Tabs */}
+        <div
+          className="hide-scrollbar"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "0 20px",
+            background: "#FAF9F7",
+            borderTop: "1px solid var(--card-border, #E4E4E7)",
+            overflowX: "auto",
+          }}
+        >
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "11px 14px",
+                  fontSize: 12.5,
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? "var(--primary, #A238FF)" : "var(--text-2, #52525B)",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: isActive
+                    ? "2.5px solid var(--primary, #A238FF)"
+                    : "2.5px solid transparent",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Grid Area */}
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 36, padding: "24px", position: "relative" }}>
-        {/* Left Column: Vitals & Status */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "270px 1fr", gap: 20, position: "relative", alignItems: "start" }}>
+        {/* Left Column: Structured Vitals & Employment Card */}
+        <div
+          style={{
+            background: "#FFFFFF",
+            borderRadius: 14,
+            border: "1px solid var(--card-border, #E4E4E7)",
+            padding: 20,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
           <div>
-            <h3 className="text-sm fw-600 text-2 mb-12">Official Vitals</h3>
+            <h3
+              style={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "var(--text-3, #71717A)",
+                margin: "0 0 14px 0",
+              }}
+            >
+              Official Vitals
+            </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div className="row gap-12 text-xs text-4 align-center">
-                <Phone size={14} /> <span className="text-1">{displayPhone}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: "#FAF9F7",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-2, #52525B)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Phone size={13} />
+                </div>
+                <span style={{ color: "var(--text-1, #18181B)" }}>{displayPhone}</span>
               </div>
-              <div className="row gap-12 text-xs text-4 align-center">
-                <Monitor size={14} /> <span className="text-1">{displayEmail}</span>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: "#FAF9F7",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-2, #52525B)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Monitor size={13} />
+                </div>
+                <span
+                  style={{
+                    color: "var(--text-1, #18181B)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {displayEmail}
+                </span>
               </div>
-              <div className="row gap-12 text-xs text-4 align-center">
-                <Clock size={14} /> <span className="text-1">{employee?.status === "active" ? "Active Now" : "Onboarding"}</span>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: "#FAF9F7",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-2, #52525B)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Clock size={13} />
+                </div>
+                <span style={{ color: "var(--text-1, #18181B)" }}>
+                  {employee?.status === "active" ? "Active Now" : "Onboarding"}
+                </span>
               </div>
-              <div className="row gap-12 text-xs text-4 align-center">
-                <MapPin size={14} /> <span className="text-1">{displayLocation}</span>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: "#FAF9F7",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-2, #52525B)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <MapPin size={13} />
+                </div>
+                <span style={{ color: "var(--text-1, #18181B)" }}>{displayLocation}</span>
               </div>
-              <div className="row gap-12 text-xs text-4 align-center">
-                <Building size={14} />
-                <div className="text-1">
-                  <div>{displayCompany}</div>
-                  <div className="text-5 mt-2">{employee?.department || "General"}</div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: "#FAF9F7",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-2, #52525B)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Building size={13} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: "var(--text-1, #18181B)", fontWeight: 600 }}>{displayCompany}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)" }}>
+                    {employee?.department || "General"}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="divider" />
+          <div style={{ height: 1, background: "var(--border-subtle, #F0F0F3)" }} />
 
           <div>
-            <h3 className="text-sm fw-600 text-2 mb-12">Employment Record</h3>
-            <div className="row gap-12 text-xs text-4">
-              <Calendar size={14} />
-              <div className="text-1">
-                <div className="row gap-8 align-center">
+            <h3
+              style={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "var(--text-3, #71717A)",
+                margin: "0 0 12px 0",
+              }}
+            >
+              Employment Record
+            </h3>
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                background: "#FAF9F7",
+                border: "1px solid var(--card-border, #E4E4E7)",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <Calendar size={15} style={{ color: "var(--primary, #A238FF)", flexShrink: 0 }} />
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Badge variant={employee?.status === "active" ? "success" : "warning"}>
                     {employee?.status ? employee.status.toUpperCase() : "ACTIVE"}
                   </Badge>
@@ -701,7 +1092,7 @@ function ProfileContent() {
                     {employee?.employeeNumber || "EMP-0001"}
                   </span>
                 </div>
-                <div className="text-5 mt-4">
+                <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)", marginTop: 4 }}>
                   {employee?.startDate ? `Hired on ${employee.startDate}` : "Active Member"}
                 </div>
               </div>
@@ -712,10 +1103,11 @@ function ProfileContent() {
         {/* Right Column: Tab Content */}
         <div
           style={{
-            background: "var(--card-bg)",
+            background: "var(--card-bg, #FFFFFF)",
             borderRadius: 14,
-            padding: 32,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            border: "1px solid var(--card-border, #E4E4E7)",
+            padding: 28,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
             minHeight: 520,
           }}
         >

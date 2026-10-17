@@ -232,72 +232,199 @@ export default function EmployeeProfile() {
     );
   }
 
+  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
+  const avatarSrc = employee.avatarUrl || employee.avatar;
+
   return (
     <>
-      <PageHeader
-        title={
-          <div className="row gap-16 align-center">
-            <Avatar src={employee.avatar} name={`${employee.firstName} ${employee.lastName}`} size="lg" />
-            <span>{employee.firstName} {employee.lastName}</span>
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 16,
+          border: "1px solid var(--card-border, #E4E4E7)",
+          boxShadow: "0 2px 12px rgba(17, 17, 24, 0.04)",
+          overflow: "hidden",
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ height: 4, background: "var(--gradient)" }} />
+        <div
+          style={{
+            padding: "20px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                minWidth: 72,
+                minHeight: 72,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: "3px solid #FFFFFF",
+                boxShadow: "0 4px 14px rgba(17, 17, 24, 0.1), 0 0 0 1px var(--card-border, #E4E4E7)",
+                background: "var(--primary-tint, #F5EBFF)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt={fullName}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #A238FF)" }}>
+                  {employee.firstName.slice(0, 1).toUpperCase()}
+                  {employee.lastName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <h1
+                  style={{
+                    fontSize: 21,
+                    fontWeight: 700,
+                    color: "var(--text-1, #18181B)",
+                    margin: 0,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {fullName}
+                </h1>
+
+                <StatusPill tone={employee.status === "active" ? "success" : "warning"}>
+                  {employee.status ? employee.status.toUpperCase() : "ACTIVE"}
+                </StatusPill>
+
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    background: "#F4F4F5",
+                    color: "var(--text-2, #52525B)",
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                  }}
+                >
+                  {employee.employeeNumber}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 13.5,
+                  color: "var(--text-2, #52525B)",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                {employee.jobTitle || "Team Member"} <span style={{ color: "var(--text-3, #A1A1AA)" }}>·</span>{" "}
+                {employee.department}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  flexWrap: "wrap",
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: "var(--text-3, #71717A)",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <Building2 size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <span>{employee.department}</span>
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <MapPin size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <span>{employee.location || "Headquarters"}</span>
+                </span>
+                {employee.workEmail && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <Mail size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                    <span>{employee.workEmail}</span>
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        }
-        subtitle={`${employee.jobTitle || "Team Member"} · ${employee.department}`}
-        actions={
-          <div className="row gap-12 align-center">
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {employee.status === "onboarding" && (
               <button
                 onClick={handleActivate}
                 disabled={isActivating}
-                className="btn-primary row gap-8 align-center"
+                className="btn-primary btn-sm"
                 style={{
-                  background: "var(--gradient)",
-                  border: "none",
-                  padding: "10px 20px",
-                  borderRadius: 20,
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: 9,
+                  fontSize: 12,
                 }}
               >
-                {isActivating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                <span>Activate as Active Employee</span>
+                {isActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                <span>Activate Employee</span>
               </button>
             )}
             <button
               onClick={() => setIsEditModalOpen(true)}
-              className="btn-secondary row gap-6 align-center"
+              className="btn-neutral btn-sm"
               style={{
-                background: "white",
-                color: "var(--text-1)",
-                padding: "10px 18px",
-                borderRadius: 20,
-                border: "1px solid var(--border)",
-                fontWeight: 650,
-                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                borderRadius: 9,
+                fontSize: 12,
               }}
             >
-              <Edit2 size={15} /> Edit Details
+              <Edit2 size={13.5} />
+              <span>Edit Details</span>
             </button>
             <Link
               href="/people"
-              className="btn-secondary row gap-6 align-center"
+              className="btn-neutral btn-sm"
               style={{
-                background: "white",
-                color: "var(--text-1)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                borderRadius: 9,
+                fontSize: 12,
                 textDecoration: "none",
-                padding: "10px 20px",
-                borderRadius: 20,
-                border: "1px solid var(--border)",
-                fontWeight: 600,
               }}
             >
-              <ArrowLeft size={15} /> Back
+              <ArrowLeft size={13.5} />
+              <span>Back</span>
             </Link>
           </div>
-        }
-      />
+        </div>
+      </div>
 
-      <main style={{ padding: "0 24px 32px" }}>
+      <main style={{ padding: "0 0 32px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) 340px", gap: 20 }}>
           {/* Main Column */}
           <div className="col gap-20">

@@ -116,9 +116,26 @@ export function CompulsoryMyTimeWidget() {
   const [isSavingManual, setIsSavingManual] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const hasInitializedRef = useRef(false);
+  const userSelectedActivityRef = useRef<ActivityItem | null>(null);
+  const activitiesRef = useRef<ActivityItem[]>(DEFAULT_ACTIVITIES);
+
+  useEffect(() => {
+    activitiesRef.current = activities;
+  }, [activities]);
 
   useEffect(() => {
     setManualDate(new Date().toISOString().slice(0, 10));
+    try {
+      const saved = localStorage.getItem('easyhr_selected_clock_activity');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.name) {
+          userSelectedActivityRef.current = parsed;
+          setSelectedActivity(parsed);
+        }
+      }
+    } catch {}
   }, []);
 
   // Close dropdown on outside click
@@ -137,7 +154,7 @@ export function CompulsoryMyTimeWidget() {
   }, [dropdownOpen]);
 
   // Fetch dynamic punches from backend to determine current active shift and hours
-  const loadPunches = useCallback(async () => {
+  const loadPunches = useCallback(async (restoreActivityFromLatest = false) => {
     if (!isSignedIn) return;
     try {
       const token = await getToken();
@@ -152,7 +169,6 @@ export function CompulsoryMyTimeWidget() {
 
         // Check latest punch to restore active session
         if (punchList.length > 0) {
-          // Sort descending
           const sorted = [...punchList].sort(
             (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
           );
@@ -160,7 +176,6 @@ export function CompulsoryMyTimeWidget() {
           const isLatestIn = latest.kind === 'clock_in' || latest.kind === 'in';
           if (isLatestIn) {
             const punchTime = new Date(latest.occurredAt);
-            // If occurred today, keep active
             const isToday = new Date().toISOString().slice(0, 10) === punchTime.toISOString().slice(0, 10);
             if (isToday) {
               setIsClocked(true);
@@ -168,8 +183,12 @@ export function CompulsoryMyTimeWidget() {
               setClockedAt(
                 new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(punchTime)
               );
-              if (latest.activity) {
-                const found = activities.find((a) => a.name === latest.activity);
+              if (
+                restoreActivityFromLatest &&
+                latest.activity &&
+                !userSelectedActivityRef.current
+              ) {
+                const found = activitiesRef.current.find((a) => a.name === latest.activity);
                 if (found) setSelectedActivity(found);
               }
             } else {
@@ -183,12 +202,14 @@ export function CompulsoryMyTimeWidget() {
     } catch {
       // Fallback
     }
-  }, [isSignedIn, getToken, activities]);
+  }, [isSignedIn, getToken]);
 
-  // Fetch dynamic activities from backend
+  // Fetch dynamic activities & initial punches once on sign-in
   useEffect(() => {
-    if (!isSignedIn) return;
-    async function loadActivities() {
+    if (!isSignedIn || hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    async function initAttendance() {
       try {
         const token = await getToken();
         if (!token) return;
@@ -197,17 +218,33 @@ export function CompulsoryMyTimeWidget() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
-            setActivities(data.data);
-            setSelectedActivity(data.data[0]);
+          const list = Array.isArray(data) ? data : data?.data;
+          if (Array.isArray(list) && list.length > 0) {
+            // Ensure default activities like Lunch, Break, Meeting are always present even if backend has fewer
+            const existingNames = new Set(list.map((a: ActivityItem) => a.name.toLowerCase()));
+            const merged = [
+              ...list,
+              ...DEFAULT_ACTIVITIES.filter((d) => !existingNames.has(d.name.toLowerCase())),
+            ];
+            setActivities(merged);
+            activitiesRef.current = merged;
+            if (!userSelectedActivityRef.current) {
+              setSelectedActivity(merged[0]);
+            } else {
+              const match = merged.find(
+                (a: ActivityItem) =>
+                  a.name.toLowerCase() === userSelectedActivityRef.current?.name.toLowerCase()
+              );
+              if (match) setSelectedActivity(match);
+            }
           }
         }
       } catch {
         // Fall back gracefully to DEFAULT_ACTIVITIES
       }
+      await loadPunches(true);
     }
-    loadActivities();
-    loadPunches();
+    initAttendance();
   }, [isSignedIn, getToken, loadPunches]);
 
   // Live timer tick when clocked in
@@ -433,41 +470,106 @@ export function CompulsoryMyTimeWidget() {
           {/* Punch action bar with isolated relative positioning */}
           <div
             ref={dropdownRef}
-            className="row gap-8 mt-20"
+            className="mt-16"
             style={{ position: 'relative', zIndex: 100 }}
           >
+            {/* Explicit Activity Selector Pill */}
             <button
-              className="btn-primary w-full"
-              style={{
-                flex: 1,
-                padding: '12px 20px',
-                fontSize: 14,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-              onClick={handleToggleClock}
-            >
-              <Clock size={16} strokeWidth={2} />
-              {isClocked ? 'Clock out' : `Clock in · ${selectedActivity.name}`}
-            </button>
-
-            <button
-              className="btn-circle"
-              style={{ width: 44, height: 44, flexShrink: 0 }}
-              title="Select punch activity"
+              type="button"
               onClick={() => setDropdownOpen((prev) => !prev)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 12px',
+                marginBottom: 10,
+                borderRadius: 10,
+                border: dropdownOpen
+                  ? '1px solid var(--primary, #7C3AED)'
+                  : '1px solid var(--card-border, #E4E4E7)',
+                background: '#FAF9F7',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Choose punch activity type"
             >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: selectedActivity.color || 'var(--primary, #7C3AED)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-4, #71717A)' }}>Activity:</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1, #18181B)' }}>
+                  {selectedActivity.name}
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    background: selectedActivity.isBillable ? '#ecfdf5' : '#f1f5f9',
+                    color: selectedActivity.isBillable ? '#059669' : '#64748b',
+                  }}
+                >
+                  {selectedActivity.isBillable ? 'Billable' : 'Non-billable'}
+                </span>
+              </span>
               <ChevronDown
-                size={16}
+                size={15}
                 strokeWidth={2.5}
                 style={{
+                  color: 'var(--text-3, #71717A)',
                   transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.15s ease',
                 }}
               />
             </button>
+
+            <div className="row gap-8">
+              <button
+                type="button"
+                className="btn-primary w-full"
+                style={{
+                  flex: 1,
+                  padding: '12px 20px',
+                  fontSize: 14,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+                onClick={handleToggleClock}
+              >
+                <Clock size={16} strokeWidth={2} />
+                {isClocked
+                  ? `Clock out · ${selectedActivity.name}`
+                  : `Clock in · ${selectedActivity.name}`}
+              </button>
+
+              <button
+                type="button"
+                className="btn-circle"
+                style={{ width: 44, height: 44, flexShrink: 0 }}
+                title="Select punch activity"
+                onClick={() => setDropdownOpen((prev) => !prev)}
+              >
+                <ChevronDown
+                  size={16}
+                  strokeWidth={2.5}
+                  style={{
+                    transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.15s ease',
+                  }}
+                />
+              </button>
+            </div>
 
             {/* Dropdown Menu with absolute positioning and high z-index */}
             {dropdownOpen && (
@@ -476,8 +578,7 @@ export function CompulsoryMyTimeWidget() {
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   right: 0,
-                  minWidth: 290,
-                  maxWidth: '100%',
+                  left: 0,
                   background: 'var(--card-bg, #ffffff)',
                   border: '1px solid var(--card-border)',
                   borderRadius: 12,
@@ -499,12 +600,13 @@ export function CompulsoryMyTimeWidget() {
                     borderBottom: '1px solid var(--card-border)',
                   }}
                 >
-                  Punch Activity
+                  Select Punch Activity
                 </div>
 
                 <div style={{ maxHeight: 240, overflowY: 'auto' }}>
                   {activities.map((act) => {
-                    const isSelected = selectedActivity.name === act.name;
+                    const isSelected =
+                      selectedActivity.name.toLowerCase() === act.name.toLowerCase();
                     return (
                       <button
                         key={act.name}
@@ -522,12 +624,60 @@ export function CompulsoryMyTimeWidget() {
                           textAlign: 'left',
                           transition: 'background 0.15s',
                         }}
-                        onClick={() => {
+                        onClick={async () => {
+                          userSelectedActivityRef.current = act;
                           setSelectedActivity(act);
                           setDropdownOpen(false);
+                          try {
+                            localStorage.setItem(
+                              'easyhr_selected_clock_activity',
+                              JSON.stringify(act)
+                            );
+                          } catch {}
+
+                          // If already clocked in and switching to a different activity (e.g. Lunch), update active session
+                          if (
+                            isClocked &&
+                            act.name.toLowerCase() !== selectedActivity.name.toLowerCase()
+                          ) {
+                            toast.success(
+                              `Switched to ${act.name}`,
+                              `Active session updated to ${act.name} (${
+                                act.isBillable ? 'Billable' : 'Non-billable'
+                              }).`
+                            );
+                            if (isSignedIn) {
+                              try {
+                                const token = await getToken();
+                                if (token) {
+                                  await fetch(`${API_BASE_URL}/api/v1/attendance/punches`, {
+                                    method: 'POST',
+                                    headers: getAuthHeaders(token),
+                                    body: JSON.stringify({
+                                      kind: 'clock_in',
+                                      activity: act.name,
+                                      isBillable: act.isBillable,
+                                      occurredAt: new Date().toISOString(),
+                                      source: 'web',
+                                    }),
+                                  });
+                                  loadPunches(false);
+                                }
+                              } catch {}
+                            }
+                          }
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: act.color || 'var(--primary)',
+                              flexShrink: 0,
+                            }}
+                          />
                           <span
                             style={{
                               fontSize: 13,
