@@ -413,8 +413,19 @@ img { display: block; }
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-.card-body-0 { padding: 0; flex: 1; display: flex; flex-direction: column; }
+.card-body-0 { 
+  padding: 0; 
+  flex: 1; 
+  display: flex; 
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
 
 /* ============================================================
    AVATAR
@@ -816,6 +827,42 @@ tr:hover td { background: #FAFAF8; }
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: stretch;
+}
+
+/* Dashboard Optional Widgets: Full available height & internal scroll */
+.dash-grid .card {
+  height: 100%;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-grid .card-body,
+.dash-grid .card-body-0 {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom sleek scrollbar for dashboard widget contents */
+.dash-grid .card-body::-webkit-scrollbar,
+.dash-grid .card-body-0::-webkit-scrollbar {
+  width: 5px;
+}
+.dash-grid .card-body::-webkit-scrollbar-track,
+.dash-grid .card-body-0::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dash-grid .card-body::-webkit-scrollbar-thumb,
+.dash-grid .card-body-0::-webkit-scrollbar-thumb {
+  background: #E4E4E7;
+  border-radius: 999px;
+}
+.dash-grid .card-body::-webkit-scrollbar-thumb:hover,
+.dash-grid .card-body-0::-webkit-scrollbar-thumb:hover {
+  background: #A1A1AA;
 }
 
 .col-stack { display: flex; flex-direction: column; gap: 24px; }

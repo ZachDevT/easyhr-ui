@@ -165,10 +165,13 @@ export default function Dashboard() {
                   cursor: isEditing ? 'grab' : 'default',
                   opacity: draggedIdx === index ? 0.4 : 1,
                   transition: 'opacity 0.2s',
-                  position: 'relative'
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
                 }}
               >
-                <div style={isEditing ? { pointerEvents: 'none' } : {}}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', ...(isEditing ? { pointerEvents: 'none' } : {}) }}>
                   <Comp onRemove={isEditing ? () => removeWidget(id) : undefined} />
                 </div>
                 {isEditing && (

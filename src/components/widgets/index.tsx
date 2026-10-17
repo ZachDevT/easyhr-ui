@@ -1027,7 +1027,7 @@ export function FeedWidget({ onRemove, preview }: { onRemove?: () => void; previ
   };
 
   return (
-    <Card className={preview ? '' : 'mb-16'}>
+    <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
       <div className="card-header">
         <div className="card-header-left">
           <div className="card-header-icon"><Megaphone size={16} strokeWidth={2.5} /></div>
@@ -1431,7 +1431,7 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
       )}
 
       {/* Main Celebrations Card */}
-      <Card className={preview ? '' : 'mb-16'}>
+      <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
         <div className="card-header">
           <div className="card-header-left">
             <div className="card-header-icon"><Gift size={16} strokeWidth={2.5} /></div>
@@ -2009,7 +2009,7 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
   };
 
   return (
-    <Card className={preview ? '' : 'mb-16'}>
+    <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
       <div className="card-header">
         <div className="card-header-left">
           <div className="card-header-icon" style={{ background: '#fdf2f8', color: '#db2777' }}>
@@ -2272,7 +2272,7 @@ export function HolidaysWidget({ onRemove, preview }: { onRemove?: () => void; p
   }, [isSignedIn, getToken]);
 
   return (
-    <Card className={preview ? '' : 'mb-16'}>
+    <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
       <div className="card-header">
         <div className="card-header-left">
           <div className="card-header-icon"><Sun size={16} strokeWidth={2.5} /></div>
@@ -2315,7 +2315,7 @@ export function OrgUpdatesWidget({ onRemove, preview }: { onRemove?: () => void;
     }).catch(() => setUpdates([]));
   }, [isSignedIn, getToken]);
   return (
-    <Card className={preview ? '' : 'mb-16'}>
+    <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
       <div className="card-header">
         <div className="card-header-left">
           <div className="card-header-icon"><Users size={16} strokeWidth={2.5} /></div>
@@ -2357,7 +2357,7 @@ export function SignaturesWidget({ onRemove, preview }: { onRemove?: () => void;
   }, [isSignedIn, getToken]);
 
   return (
-    <Card className={preview ? '' : 'mb-16'}>
+    <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
       <div className="card-header">
         <div className="card-header-left">
           <div className="card-header-icon"><FileSignature size={16} strokeWidth={2.5} /></div>
