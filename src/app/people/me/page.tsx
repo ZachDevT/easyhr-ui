@@ -39,11 +39,6 @@ import {
   CreditCard,
   Award,
   Star,
-  Coffee,
-  Utensils,
-  Music,
-  Palmtree,
-  Sun,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useCompany } from "@/context/CompanyContext";
@@ -53,7 +48,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
 import { CompulsoryMyTimeWidget } from "@/components/widgets";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ProfileMeSkeleton, ProfileTabShimmer } from "@/components/ui/Skeleton";
+import { ProfileMeSkeleton } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
 import { toast } from "@/components/ui/Toast";
 import { API_BASE_URL } from "@/lib/api";
@@ -126,22 +121,6 @@ function ProfileContent() {
 
   const requestedTab = searchParams?.get("tab");
   const [activeTab, setActiveTab] = useState(requestedTab || "Personal");
-  const [isTabSwitching, setIsTabSwitching] = useState(false);
-  const [docCategoryFilter, setDocCategoryFilter] = useState<string>("All");
-  const tabSwitchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleTabChange = useCallback(
-    (nextTab: string) => {
-      if (nextTab === activeTab) return;
-      setActiveTab(nextTab);
-      setIsTabSwitching(true);
-      if (tabSwitchTimeoutRef.current) clearTimeout(tabSwitchTimeoutRef.current);
-      tabSwitchTimeoutRef.current = setTimeout(() => {
-        setIsTabSwitching(false);
-      }, 180);
-    },
-    [activeTab]
-  );
 
   // Live employee record from API
   const [employee, setEmployee] = useState<EmployeeProfileRecord | null>(null);
@@ -894,7 +873,7 @@ function ProfileContent() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 2,
+            gap: 4,
             padding: "0 20px",
             background: "#FAF9F7",
             borderTop: "1px solid var(--card-border, #E4E4E7)",
@@ -903,38 +882,17 @@ function ProfileContent() {
         >
           {TABS.map((tab) => {
             const isActive = activeTab === tab;
-            const TabIcon =
-              tab === "Personal"
-                ? User
-                : tab === "Job"
-                ? Briefcase
-                : tab === "Documents"
-                ? FileText
-                : tab === "Time Off"
-                ? Palmtree
-                : tab === "Performance"
-                ? Target
-                : tab === "Benefits"
-                ? Heart
-                : tab === "Timesheet"
-                ? Clock
-                : tab === "Pay Info"
-                ? CreditCard
-                : ShieldCheck;
             return (
               <button
                 key={tab}
                 type="button"
-                onClick={() => handleTabChange(tab)}
+                onClick={() => setActiveTab(tab)}
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "11px 13px",
+                  padding: "11px 14px",
                   fontSize: 12.5,
-                  fontWeight: isActive ? 700 : 500,
+                  fontWeight: isActive ? 600 : 500,
                   color: isActive ? "var(--primary, #A238FF)" : "var(--text-2, #52525B)",
-                  background: isActive ? "rgba(162, 56, 255, 0.04)" : "transparent",
+                  background: "transparent",
                   border: "none",
                   borderBottom: isActive
                     ? "2.5px solid var(--primary, #A238FF)"
@@ -944,14 +902,7 @@ function ProfileContent() {
                   transition: "all 0.15s ease",
                 }}
               >
-                <TabIcon
-                  size={13.5}
-                  style={{
-                    color: isActive ? "var(--primary, #A238FF)" : "var(--text-3, #A1A1AA)",
-                    flexShrink: 0,
-                  }}
-                />
-                <span>{tab}</span>
+                {tab}
               </button>
             );
           })}
@@ -1155,2325 +1106,962 @@ function ProfileContent() {
             background: "var(--card-bg, #FFFFFF)",
             borderRadius: 14,
             border: "1px solid var(--card-border, #E4E4E7)",
-            padding: 26,
+            padding: 28,
             boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-            minHeight: 540,
+            minHeight: 520,
           }}
         >
-          {isTabSwitching ? (
-            <ProfileTabShimmer tab={activeTab} />
-          ) : (
-            <>
-              {/* TAB 1: PERSONAL */}
-              {activeTab === "Personal" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                  {/* Header */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
+          {/* TAB 1: PERSONAL */}
+          {activeTab === "Personal" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Personal & Culture Profile</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Your official contact details, residential address, bio, and team culture favorites.
+                  </p>
+                </div>
+                {!isEditingPersonal && (
+                  <button
+                    className="btn-primary btn-sm row gap-6 align-center"
+                    onClick={() => setIsEditingPersonal(true)}
                   >
+                    <Edit2 size={14} /> Edit Info
+                  </button>
+                )}
+              </div>
+
+              {isEditingPersonal ? (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 20px" }}>
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                          Personal Identity & Team Culture
-                        </h3>
-                        <span
-                          style={{
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            background: "var(--primary-tint, #F5EBFF)",
-                            color: "var(--primary, #A238FF)",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                          }}
-                        >
-                          Verified Profile
-                        </span>
-                      </div>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Your official contact credentials, residential address, executive bio, and workspace preferences.
-                      </p>
+                      <label className="form-label">First Name</label>
+                      <input
+                        className="input"
+                        value={personalForm.firstName}
+                        onChange={(e) => setPersonalForm({ ...personalForm, firstName: e.target.value })}
+                        required
+                      />
                     </div>
-                    {!isEditingPersonal && (
-                      <button
-                        type="button"
-                        className="btn-primary btn-sm"
-                        onClick={() => setIsEditingPersonal(true)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "7px 14px",
-                          borderRadius: 9,
-                          fontSize: 12,
-                        }}
+                    <div>
+                      <label className="form-label">Last Name</label>
+                      <input
+                        className="input"
+                        value={personalForm.lastName}
+                        onChange={(e) => setPersonalForm({ ...personalForm, lastName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Personal Phone</label>
+                      <input
+                        className="input"
+                        placeholder="+250 78... or +254..."
+                        value={personalForm.personalPhone}
+                        onChange={(e) => setPersonalForm({ ...personalForm, personalPhone: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Personal Email</label>
+                      <input
+                        type="email"
+                        className="input"
+                        placeholder="personal@gmail.com"
+                        value={personalForm.personalEmail}
+                        onChange={(e) => setPersonalForm({ ...personalForm, personalEmail: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Birth Date</label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={personalForm.birthDate}
+                        onChange={(e) => setPersonalForm({ ...personalForm, birthDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">T-Shirt Size</label>
+                      <select
+                        className="select"
+                        value={personalForm.shirtSize}
+                        onChange={(e) => setPersonalForm({ ...personalForm, shirtSize: e.target.value })}
                       >
-                        <Edit2 size={13} />
-                        <span>Edit Personal Info</span>
-                      </button>
-                    )}
+                        {["XS", "S", "M", "L", "XL", "2XL", "3XL"].map((sz) => (
+                          <option key={sz} value={sz}>{sz}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label className="form-label">Street Address</label>
+                      <input
+                        className="input"
+                        placeholder="123 Innovation Way"
+                        value={personalForm.addressLine1}
+                        onChange={(e) => setPersonalForm({ ...personalForm, addressLine1: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">City / Town</label>
+                      <input
+                        className="input"
+                        placeholder="Kampala / Nairobi / Kigali"
+                        value={personalForm.city}
+                        onChange={(e) => setPersonalForm({ ...personalForm, city: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">State / Administrative Area</label>
+                      <input
+                        className="input"
+                        placeholder="Central / Region"
+                        value={personalForm.administrativeArea}
+                        onChange={(e) => setPersonalForm({ ...personalForm, administrativeArea: e.target.value })}
+                      />
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label className="form-label">About Me / Bio</label>
+                      <textarea
+                        className="input"
+                        rows={2}
+                        placeholder="A brief intro about what you do..."
+                        value={personalForm.bio}
+                        onChange={(e) => setPersonalForm({ ...personalForm, bio: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Favorite Food</label>
+                      <input
+                        className="input"
+                        placeholder="E.g. Jollof Rice, Matooke, Nyama Choma..."
+                        value={personalForm.favoriteFood}
+                        onChange={(e) => setPersonalForm({ ...personalForm, favoriteFood: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Favorite Music / Artists</label>
+                      <input
+                        className="input"
+                        placeholder="E.g. Afrobeats, Jazz, Reggae..."
+                        value={personalForm.favoriteMusic}
+                        onChange={(e) => setPersonalForm({ ...personalForm, favoriteMusic: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Coffee or Tea</label>
+                      <select
+                        className="select"
+                        value={personalForm.coffeeTea}
+                        onChange={(e) => setPersonalForm({ ...personalForm, coffeeTea: e.target.value })}
+                      >
+                        <option value="Coffee">Coffee</option>
+                        <option value="Tea">Tea</option>
+                        <option value="Both">Both</option>
+                        <option value="Neither">Neither</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Fun Fact / Superpower</label>
+                      <input
+                        className="input"
+                        placeholder="E.g. Can solve a Rubik's cube..."
+                        value={personalForm.funFact}
+                        onChange={(e) => setPersonalForm({ ...personalForm, funFact: e.target.value })}
+                      />
+                    </div>
                   </div>
 
-                  {isEditingPersonal ? (
-                    <div
-                      style={{
-                        padding: 20,
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
+                  <div className="row gap-12 mt-32 justify-end">
+                    <button
+                      className="btn-neutral"
+                      onClick={() => setIsEditingPersonal(false)}
+                      disabled={isSavingPersonal}
                     >
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 18px" }}>
-                        <div>
-                          <label className="form-label">First Name</label>
-                          <input
-                            className="input"
-                            value={personalForm.firstName}
-                            onChange={(e) => setPersonalForm({ ...personalForm, firstName: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Last Name</label>
-                          <input
-                            className="input"
-                            value={personalForm.lastName}
-                            onChange={(e) => setPersonalForm({ ...personalForm, lastName: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Personal Phone</label>
-                          <input
-                            className="input"
-                            placeholder="+250 78... or +254..."
-                            value={personalForm.personalPhone}
-                            onChange={(e) => setPersonalForm({ ...personalForm, personalPhone: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Personal Email</label>
-                          <input
-                            type="email"
-                            className="input"
-                            placeholder="personal@gmail.com"
-                            value={personalForm.personalEmail}
-                            onChange={(e) => setPersonalForm({ ...personalForm, personalEmail: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Birth Date</label>
-                          <input
-                            type="date"
-                            className="input"
-                            value={personalForm.birthDate}
-                            onChange={(e) => setPersonalForm({ ...personalForm, birthDate: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Merchandise / T-Shirt Size</label>
-                          <select
-                            className="select"
-                            value={personalForm.shirtSize}
-                            onChange={(e) => setPersonalForm({ ...personalForm, shirtSize: e.target.value })}
-                          >
-                            {["XS", "S", "M", "L", "XL", "2XL", "3XL"].map((sz) => (
-                              <option key={sz} value={sz}>
-                                {sz}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <label className="form-label">Street Address</label>
-                          <input
-                            className="input"
-                            placeholder="123 Innovation Way"
-                            value={personalForm.addressLine1}
-                            onChange={(e) => setPersonalForm({ ...personalForm, addressLine1: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">City / Town</label>
-                          <input
-                            className="input"
-                            placeholder="Kampala / Nairobi / Kigali"
-                            value={personalForm.city}
-                            onChange={(e) => setPersonalForm({ ...personalForm, city: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">State / Administrative Area</label>
-                          <input
-                            className="input"
-                            placeholder="Central / Region"
-                            value={personalForm.administrativeArea}
-                            onChange={(e) => setPersonalForm({ ...personalForm, administrativeArea: e.target.value })}
-                          />
-                        </div>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <label className="form-label">Executive Bio / About Me</label>
-                          <textarea
-                            className="input"
-                            rows={2}
-                            placeholder="A brief intro about your background, focus areas, and what drives you..."
-                            value={personalForm.bio}
-                            onChange={(e) => setPersonalForm({ ...personalForm, bio: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Favorite Food / Cuisine</label>
-                          <input
-                            className="input"
-                            placeholder="E.g. Jollof Rice, Matooke, Nyama Choma..."
-                            value={personalForm.favoriteFood}
-                            onChange={(e) => setPersonalForm({ ...personalForm, favoriteFood: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Favorite Music / Genres</label>
-                          <input
-                            className="input"
-                            placeholder="E.g. Afrobeats, Jazz, Amapiano..."
-                            value={personalForm.favoriteMusic}
-                            onChange={(e) => setPersonalForm({ ...personalForm, favoriteMusic: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Workspace Beverage</label>
-                          <select
-                            className="select"
-                            value={personalForm.coffeeTea}
-                            onChange={(e) => setPersonalForm({ ...personalForm, coffeeTea: e.target.value })}
-                          >
-                            <option value="Coffee">Coffee</option>
-                            <option value="Tea">Tea</option>
-                            <option value="Both">Both</option>
-                            <option value="Neither">Neither</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="form-label">Fun Fact / Superpower</label>
-                          <input
-                            className="input"
-                            placeholder="E.g. Speaks 4 languages, marathon runner..."
-                            value={personalForm.funFact}
-                            onChange={(e) => setPersonalForm({ ...personalForm, funFact: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-                        <button
-                          type="button"
-                          className="btn-neutral"
-                          onClick={() => setIsEditingPersonal(false)}
-                          disabled={isSavingPersonal}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          onClick={handlePersonalSave}
-                          disabled={isSavingPersonal}
-                        >
-                          {isSavingPersonal ? (
-                            <>
-                              <Loader2 size={15} className="animate-spin" /> Saving...
-                            </>
-                          ) : (
-                            "Save Profile Changes"
-                          )}
-                        </button>
+                      Cancel
+                    </button>
+                    <button
+                      className="btn-primary"
+                      onClick={handlePersonalSave}
+                      disabled={isSavingPersonal}
+                    >
+                      {isSavingPersonal ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Saving...
+                        </>
+                      ) : (
+                        "Save Profile Changes"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px 20px" }}>
+                    <div>
+                      <label className="text-xs text-5 mb-4 block">Official Full Name</label>
+                      <div className="text-sm text-1 fw-700">{displayFullName}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-5 mb-4 block">Work Email</label>
+                      <div className="text-sm text-1">{displayEmail}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-5 mb-4 block">Personal Phone</label>
+                      <div className="text-sm text-1">{employee?.personalPhone || "Not provided"}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-5 mb-4 block">Personal Email</label>
+                      <div className="text-sm text-1">{employee?.personalEmail || "Not provided"}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-5 mb-4 block">Birth Date</label>
+                      <div className="text-sm text-1">{employee?.birthDate || "Not recorded"}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-5 mb-4 block">Residential Address</label>
+                      <div className="text-sm text-1">
+                        {[employee?.addressLine1, employee?.city, employee?.administrativeArea]
+                          .filter(Boolean)
+                          .join(", ") || "No address on file"}
                       </div>
                     </div>
+                  </div>
+
+                  {employee?.bio && (
+                    <div style={{ padding: 16, background: "#F9FAFB", borderRadius: 10, border: "1px solid #F3F4F6" }}>
+                      <span className="text-xs text-5 fw-600 block mb-4">About Me</span>
+                      <p className="text-sm text-2 m-0" style={{ lineHeight: 1.6 }}>{employee.bio}</p>
+                    </div>
+                  )}
+
+                  {/* Culture & Team Favorites */}
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}>
+                    <h4 className="text-sm fw-700 text-1 mb-16">Team Culture & Favorites</h4>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
+                        <span className="text-xs text-5 block mb-2">T-Shirt Size</span>
+                        <strong className="text-sm text-1">{employee?.shirtSize || "L"}</strong>
+                      </div>
+                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
+                        <span className="text-xs text-5 block mb-2">Beverage</span>
+                        <strong className="text-sm text-1">{employee?.coffeeTea || "Coffee"}</strong>
+                      </div>
+                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
+                        <span className="text-xs text-5 block mb-2">Favorite Food</span>
+                        <strong className="text-sm text-1">{employee?.favoriteFood || "Not specified"}</strong>
+                      </div>
+                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
+                        <span className="text-xs text-5 block mb-2">Music & Genres</span>
+                        <strong className="text-sm text-1">{employee?.favoriteMusic || "Not specified"}</strong>
+                      </div>
+                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5", gridColumn: "span 2" }}>
+                        <span className="text-xs text-5 block mb-2">Fun Fact / Superpower</span>
+                        <strong className="text-sm text-1">{employee?.funFact || "Not specified"}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: JOB */}
+          {activeTab === "Job" && (
+            <div>
+              <div className="row-between mb-24">
+                <h3 className="text-lg fw-700 text-1 m-0">Official Employment Record</h3>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px 24px" }}>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Official Job Title</label>
+                  <div className="text-sm text-1 fw-700">{displayRole}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Employee ID / Number</label>
+                  <div className="text-sm text-1 fw-700">{employee?.employeeNumber || "EMP-0001"}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Department</label>
+                  <div className="text-sm text-1">{employee?.department || "Administration"}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Division</label>
+                  <div className="text-sm text-1">{employee?.division || "General Operations"}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Work Location</label>
+                  <div className="text-sm text-1">{employee?.location || "Headquarters"}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Reports To (Manager)</label>
+                  <div className="text-sm text-1 fw-600">{employee?.manager || "Direct Executive"}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Hire Date / Effective On</label>
+                  <div className="text-sm text-1">{employee?.startDate || "Active member"}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-5 mb-4 block">Employment Status</label>
+                  <div>
+                    <Badge variant={employee?.status === "active" ? "success" : "warning"}>
+                      {employee?.status ? employee.status.toUpperCase() : "ACTIVE"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: EMERGENCY */}
+          {activeTab === "Emergency" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Emergency Contacts</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Verified contacts designated in case of medical or workplace emergencies.
+                  </p>
+                </div>
+                <button
+                  className="btn-primary btn-sm row gap-6 align-center"
+                  onClick={() => setIsEmergencyModalOpen(true)}
+                >
+                  <Plus size={14} /> {employee?.emergencyContactName ? "Edit Contact" : "Add Contact"}
+                </button>
+              </div>
+
+              {employee?.emergencyContactName ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                  <div
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 12,
+                      padding: 24,
+                      background: "#FAFAFA",
+                    }}
+                  >
+                    <Badge variant="primary" style={{ marginBottom: 12 }}>
+                      Primary Contact
+                    </Badge>
+                    <div className="text-base fw-700 text-1 mb-2">{employee.emergencyContactName}</div>
+                    <div className="text-xs text-5 mb-14 fw-600">
+                      {employee.emergencyContactRelationship || "Family"}
+                    </div>
+                    <div className="row gap-8 text-sm text-2 mb-6 align-center">
+                      <Phone size={14} color="var(--primary)" />
+                      <span>{employee.emergencyContactPhone || "No phone recorded"}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "48px 20px", border: "1px dashed var(--border)", borderRadius: 12 }}>
+                  <AlertCircle size={32} color="#9CA3AF" style={{ margin: "0 auto 12px" }} />
+                  <h4 className="text-sm fw-700 text-1 m-0 mb-4">No emergency contact registered yet</h4>
+                  <p className="text-xs text-5 m-0 mb-16">
+                    Add a designated family member or friend to reach in case of an emergency.
+                  </p>
+                  <button className="btn-primary btn-sm" onClick={() => setIsEmergencyModalOpen(true)}>
+                    <Plus size={14} /> Register Contact Now
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: PAY INFO (DISBURSEMENT) */}
+          {activeTab === "Pay Info" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Compensation & Disbursement</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Your active payroll payout channel and disbursement account details.
+                  </p>
+                </div>
+                <button
+                  className="btn-primary btn-sm row gap-6 align-center"
+                  onClick={() => setIsPayoutModalOpen(true)}
+                >
+                  <Edit2 size={14} /> Update Payout Channel
+                </button>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 14,
+                  padding: 24,
+                  background: "#FAFAFA",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                }}
+              >
+                <div className="row-between align-center">
+                  <div className="row gap-12 align-center">
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: "#F5F3FF",
+                        color: "#7C3AED",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {employee?.paymentMethod === "Mobile Money" ? (
+                        <Smartphone size={22} />
+                      ) : employee?.paymentMethod === "PayPal / Digital Wallet" ? (
+                        <Wallet size={22} />
+                      ) : (
+                        <Building size={22} />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm fw-700 text-1">
+                        {employee?.paymentMethod || "Mobile Money"}
+                      </div>
+                      <div className="text-xs text-5 mt-2">
+                        {employee?.paymentMethod === "Mobile Money"
+                          ? employee?.mobileMoneyProvider || "MTN Mobile Money"
+                          : employee?.paymentMethod === "PayPal / Digital Wallet"
+                          ? "Digital Wallet"
+                          : employee?.bankName || "Direct Bank Deposit"}
+                      </div>
+                    </div>
+                  </div>
+                  <Badge variant="success">Active Verified Channel</Badge>
+                </div>
+
+                <div className="divider" />
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  {employee?.paymentMethod === "Mobile Money" ? (
+                    <>
+                      <div>
+                        <span className="text-xs text-5 block mb-2">Registered Mobile Money Number</span>
+                        <strong className="text-sm text-1">{employee?.mobileMoneyPhone || "Phone registered"}</strong>
+                      </div>
+                      <div>
+                        <span className="text-xs text-5 block mb-2">Network Provider</span>
+                        <strong className="text-sm text-1">{employee?.mobileMoneyProvider || "MTN / M-Pesa"}</strong>
+                      </div>
+                    </>
+                  ) : employee?.paymentMethod === "PayPal / Digital Wallet" ? (
+                    <>
+                      <div>
+                        <span className="text-xs text-5 block mb-2">PayPal / Wallet Account Email</span>
+                        <strong className="text-sm text-1">{employee?.walletEmail || displayEmail}</strong>
+                      </div>
+                      <div>
+                        <span className="text-xs text-5 block mb-2">Status</span>
+                        <strong className="text-sm text-1">Digital Payout Active</strong>
+                      </div>
+                    </>
                   ) : (
                     <>
-                      {/* 6-Card Contact & Identity Bento Grid */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        {[
-                          {
-                            label: "Official Legal Name",
-                            value: displayFullName,
-                            sub: `Employee ID: ${employee?.employeeNumber || "EMP-0001"}`,
-                            icon: User,
-                            tint: "#F5EBFF",
-                            color: "var(--primary, #A238FF)",
-                          },
-                          {
-                            label: "Primary Work Email",
-                            value: displayEmail || "Not assigned",
-                            sub: "Verified SSO & Workspace Identity",
-                            icon: Mail,
-                            tint: "#EFF6FF",
-                            color: "#2563EB",
-                          },
-                          {
-                            label: "Direct Personal Phone",
-                            value: employee?.personalPhone || displayPhone,
-                            sub: "SMS & Emergency Reachability",
-                            icon: Phone,
-                            tint: "#ECFDF5",
-                            color: "#059669",
-                          },
-                          {
-                            label: "Personal Recovery Email",
-                            value: employee?.personalEmail || "Not provided",
-                            sub: "Secondary off-network contact",
-                            icon: Globe,
-                            tint: "#FEF3C7",
-                            color: "#D97706",
-                          },
-                          {
-                            label: "Date of Birth",
-                            value: employee?.birthDate || "Not recorded",
-                            sub: "Celebrated on team calendar",
-                            icon: Calendar,
-                            tint: "#FDF2F8",
-                            color: "#DB2777",
-                          },
-                          {
-                            label: "Residential Address",
-                            value:
-                              [employee?.addressLine1, employee?.city, employee?.administrativeArea]
-                                .filter(Boolean)
-                                .join(", ") || displayLocation,
-                            sub: "Registered tax & home jurisdiction",
-                            icon: MapPin,
-                            tint: "#F0FDFA",
-                            color: "#0D9488",
-                          },
-                        ].map((item, idx) => {
-                          const IconComp = item.icon;
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                padding: "14px 16px",
-                                borderRadius: 12,
-                                background: "#FAF9F7",
-                                border: "1px solid var(--card-border, #E4E4E7)",
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 12,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 34,
-                                  height: 34,
-                                  borderRadius: 9,
-                                  background: item.tint,
-                                  color: item.color,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <IconComp size={16} />
-                              </div>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div
-                                  style={{
-                                    fontSize: 10.5,
-                                    fontWeight: 700,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.04em",
-                                    color: "var(--text-3, #71717A)",
-                                  }}
-                                >
-                                  {item.label}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 13.5,
-                                    fontWeight: 700,
-                                    color: "var(--text-1, #18181B)",
-                                    marginTop: 3,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {item.value}
-                                </div>
-                                <div style={{ fontSize: 11, color: "var(--text-3, #A1A1AA)", marginTop: 2 }}>
-                                  {item.sub}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Executive Bio Card */}
-                      <div
-                        style={{
-                          padding: "16px 18px",
-                          borderRadius: 12,
-                          background: "linear-gradient(135deg, rgba(162, 56, 255, 0.04) 0%, rgba(250, 249, 247, 0.9) 100%)",
-                          border: "1px solid var(--card-border, #E4E4E7)",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              color: "var(--primary, #A238FF)",
-                            }}
-                          >
-                            Executive Bio & Introduction
-                          </span>
-                          <span style={{ fontSize: 11, color: "var(--text-3, #71717A)" }}>Visible in Directory</span>
-                        </div>
-                        <p
-                          style={{
-                            fontSize: 13,
-                            color: "var(--text-2, #3F3F46)",
-                            margin: 0,
-                            lineHeight: 1.6,
-                          }}
-                        >
-                          {employee?.bio ||
-                            `${displayFullName} serves as ${displayRole} in the ${
-                              employee?.department || "Operations"
-                            } department at ${displayCompany}, collaborating with cross-functional teams from ${displayLocation}.`}
-                        </p>
-                      </div>
-
-                      {/* Team Culture & Lifestyle Passport */}
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                          <h4
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              color: "var(--text-3, #71717A)",
-                              margin: 0,
-                            }}
-                          >
-                            Team Culture & Lifestyle Passport
-                          </h4>
-                          <span style={{ fontSize: 11.5, color: "var(--text-3, #71717A)" }}>
-                            Used for company retreats, gifting & onboarding
-                          </span>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                          <div
-                            style={{
-                              padding: 14,
-                              borderRadius: 11,
-                              background: "#FFFFFF",
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                background: "#F5EBFF",
-                                color: "var(--primary, #A238FF)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Award size={15} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 11, color: "var(--text-3, #71717A)" }}>Apparel Size</div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                                Size {employee?.shirtSize || "L"} (Unisex)
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              padding: 14,
-                              borderRadius: 11,
-                              background: "#FFFFFF",
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                background: "#FEF3C7",
-                                color: "#D97706",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Coffee size={15} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 11, color: "var(--text-3, #71717A)" }}>Daily Ritual</div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                                {employee?.coffeeTea || "Fresh Brewed Coffee"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              padding: 14,
-                              borderRadius: 11,
-                              background: "#FFFFFF",
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                background: "#ECFDF5",
-                                color: "#059669",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Utensils size={15} />
-                            </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 11, color: "var(--text-3, #71717A)" }}>Favorite Cuisine</div>
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  color: "var(--text-1, #18181B)",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {employee?.favoriteFood || "East African & Grill"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              padding: 14,
-                              borderRadius: 11,
-                              background: "#FFFFFF",
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                background: "#EFF6FF",
-                                color: "#2563EB",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Music size={15} />
-                            </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 11, color: "var(--text-3, #71717A)" }}>Focus Soundtrack</div>
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  color: "var(--text-1, #18181B)",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {employee?.favoriteMusic || "Afrobeats & Lo-Fi Jazz"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              padding: 14,
-                              borderRadius: 11,
-                              background: "#FFFFFF",
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              gridColumn: "span 2",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                background: "#FDF2F8",
-                                color: "#DB2777",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Sparkles size={15} />
-                            </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 11, color: "var(--text-3, #71717A)" }}>
-                                Fun Fact & Hidden Superpower
-                              </div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                                {employee?.funFact || "Passionate problem solver who loves building high-impact teams."}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <span className="text-xs text-5 block mb-2">Bank / Institution</span>
+                        <strong className="text-sm text-1">{employee?.bankName || "Bank on file"}</strong>
+                      </div>
+                      <div>
+                        <span className="text-xs text-5 block mb-2">Account Number</span>
+                        <strong className="text-sm text-1">
+                          {employee?.bankAccountNumber
+                            ? `···· ${employee.bankAccountNumber.slice(-4)}`
+                            : "Account on file"}
+                        </strong>
                       </div>
                     </>
                   )}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              {/* TAB 2: JOB */}
-              {activeTab === "Job" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {/* TAB 5: DOCUMENTS */}
+          {activeTab === "Documents" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Employee Documents & Compliance</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Official verified documentation, agreements, and handbook sign-offs.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Signed Handbook Record */}
+                {employee?.handbookSignedAt && (
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
+                      padding: 16,
+                      border: "1px solid #E4E4E7",
+                      borderRadius: 10,
+                      background: "#FFFFFF",
                     }}
                   >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Employment Architecture & Role Progression
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Official position classification, reporting chain, and organizational tenure.
-                      </p>
-                    </div>
-                    <Badge variant={employee?.status === "active" ? "success" : "warning"}>
-                      {employee?.status ? employee.status.toUpperCase() : "ACTIVE"}FTE
-                    </Badge>
-                  </div>
-
-                  {/* 4-Card Employment KPI Strip */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                    {[
-                      {
-                        label: "Employee Number",
-                        val: employee?.employeeNumber || "EMP-0001",
-                        sub: "System Identifier",
-                      },
-                      {
-                        label: "Employment Type",
-                        val: "Full-Time",
-                        sub: "40h / Week Standard",
-                      },
-                      {
-                        label: "Work Model",
-                        val: "Hybrid / Onsite",
-                        sub: displayLocation,
-                      },
-                      {
-                        label: "Effective Hire Date",
-                        val: employee?.startDate || "2025-01-15",
-                        sub: "Continuous Tenure",
-                      },
-                    ].map((kpi, idx) => (
+                    <div className="row gap-12 align-center">
                       <div
-                        key={idx}
                         style={{
-                          padding: "14px 16px",
-                          borderRadius: 12,
-                          background: "#FAF9F7",
-                          border: "1px solid var(--card-border, #E4E4E7)",
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          background: "#F0FDF4",
+                          color: "#16A34A",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                            color: "var(--text-3, #71717A)",
-                          }}
-                        >
-                          {kpi.label}
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-1, #18181B)", marginTop: 4 }}>
-                          {kpi.val}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-3, #A1A1AA)", marginTop: 2 }}>{kpi.sub}</div>
+                        <ShieldCheck size={20} />
                       </div>
-                    ))}
+                      <div>
+                        <div className="text-sm fw-700 text-1">Employee Handbook & Policies Sign-Off</div>
+                        <div className="text-xs text-5 mt-2">
+                          Digitally signed and acknowledged on {new Date(employee.handbookSignedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="success">Verified & Signed</Badge>
                   </div>
+                )}
 
-                  {/* Organizational Placement & Reporting Line */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {/* Real Documents List from backend */}
+                {documents.map((doc: any) => (
+                  <div
+                    key={doc.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: 16,
+                      border: "1px solid #E4E4E7",
+                      borderRadius: 10,
+                      background: "#FFFFFF",
+                    }}
+                  >
+                    <div className="row gap-12 align-center">
+                      <FileText size={20} className="text-primary" />
+                      <div>
+                        <div className="text-sm fw-600 text-1">{doc.fileName || doc.title || "Employee Document"}</div>
+                        <div className="text-xs text-5 mt-2">
+                          {doc.category || "General"} · {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : "Uploaded"}
+                        </div>
+                      </div>
+                    </div>
+                    {doc.downloadUrl && (
+                      <a
+                        href={doc.downloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-neutral btn-sm row gap-6 align-center"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <Download size={14} /> Download
+                      </a>
+                    )}
+                  </div>
+                ))}
+
+                {!employee?.handbookSignedAt && documents.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "48px 20px", border: "1px dashed var(--border)", borderRadius: 12 }}>
+                    <FileText size={32} color="#9CA3AF" style={{ margin: "0 auto 12px" }} />
+                    <h4 className="text-sm fw-700 text-1 m-0 mb-4">No documents on file yet</h4>
+                    <p className="text-xs text-5 m-0">
+                      Uploaded agreements and company documents will appear here automatically.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: TIME OFF */}
+          {activeTab === "Time Off" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Leave Balances & Requests</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Live PTO, annual leave, and sick day balances tracked in real-time.
+                  </p>
+                </div>
+                <Link href="/time-off" className="btn-primary btn-sm row gap-6 align-center" style={{ textDecoration: "none" }}>
+                  <Plus size={14} /> Request Time Off
+                </Link>
+              </div>
+
+              {leaveBalances.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
+                  {leaveBalances.map((bal: any) => (
                     <div
+                      key={bal.id || bal.policyName}
                       style={{
-                        padding: 18,
+                        border: "1px solid var(--border)",
                         borderRadius: 12,
-                        background: "#FFFFFF",
-                        border: "1px solid var(--card-border, #E4E4E7)",
+                        padding: 20,
+                        textAlign: "center",
+                        background: "#FAFAFA",
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                          color: "var(--text-3, #71717A)",
-                          marginBottom: 14,
-                        }}
-                      >
-                        Position & Department Placement
+                      <span className="text-xs text-4 fw-600 block mb-6">{bal.policyName || "Paid Leave"}</span>
+                      <div className="text-3xl text-primary fw-800 mb-2">
+                        {bal.availableDays !== undefined ? bal.availableDays : bal.balance || 0}
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                          <span style={{ color: "var(--text-3, #71717A)" }}>Official Job Title</span>
-                          <strong style={{ color: "var(--text-1, #18181B)" }}>{displayRole}</strong>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                          <span style={{ color: "var(--text-3, #71717A)" }}>Department</span>
-                          <strong style={{ color: "var(--text-1, #18181B)" }}>
-                            {employee?.department || "Administration & Operations"}
-                          </strong>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                          <span style={{ color: "var(--text-3, #71717A)" }}>Business Division</span>
-                          <strong style={{ color: "var(--text-1, #18181B)" }}>
-                            {employee?.division || "Core Enterprise"}
-                          </strong>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                          <span style={{ color: "var(--text-3, #71717A)" }}>Primary Duty Station</span>
-                          <strong style={{ color: "var(--text-1, #18181B)" }}>{displayLocation}</strong>
-                        </div>
+                      <span className="text-xs text-5 block mb-12">Days Available</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6B7280", borderTop: "1px solid #E5E7EB", paddingTop: 8 }}>
+                        <span>Accrued: {bal.accruedDays || 0}d</span>
+                        <span>Used: {bal.usedDays || 0}d</span>
                       </div>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: 20, background: "#F9FAFB", borderRadius: 10, border: "1px solid #F3F4F6", marginBottom: 24, textAlign: "center" }}>
+                  <span className="text-sm text-4">Standard organization PTO policies applied.</span>
+                </div>
+              )}
 
+              <h4 className="text-sm fw-700 text-1 mb-14">Recent Leave Requests</h4>
+              {leaveRequests.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {leaveRequests.slice(0, 5).map((req: any) => (
                     <div
+                      key={req.id}
                       style={{
-                        padding: 18,
-                        borderRadius: 12,
-                        background: "#FFFFFF",
-                        border: "1px solid var(--card-border, #E4E4E7)",
                         display: "flex",
-                        flexDirection: "column",
+                        alignItems: "center",
                         justifyContent: "space-between",
-                      }}
-                    >
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            color: "var(--text-3, #71717A)",
-                            marginBottom: 12,
-                          }}
-                        >
-                          Reporting Line & Governance
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 12,
-                            padding: 12,
-                            borderRadius: 10,
-                            background: "#FAF9F7",
-                            border: "1px solid var(--card-border, #E4E4E7)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: 10,
-                              background: "var(--primary-tint, #F5EBFF)",
-                              color: "var(--primary, #A238FF)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontWeight: 700,
-                              fontSize: 14,
-                            }}
-                          >
-                            {(employee?.manager || "EX").slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                              {employee?.manager || "Executive Leadership"}
-                            </div>
-                            <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)" }}>
-                              Direct Reporting Manager · Approves Leave & OKRs
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: 12,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          fontSize: 12,
-                          color: "var(--text-3, #71717A)",
-                        }}
-                      >
-                        <span>Org Chart Visibility: Active</span>
-                        <Link
-                          href="/people/org-chart"
-                          style={{
-                            color: "var(--primary, #A238FF)",
-                            fontWeight: 600,
-                            textDecoration: "none",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          View in Org Chart <ChevronRight size={13} />
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Career Progression Timeline */}
-                  <div
-                    style={{
-                      padding: 18,
-                      borderRadius: 12,
-                      background: "#FAF9F7",
-                      border: "1px solid var(--card-border, #E4E4E7)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        color: "var(--text-3, #71717A)",
-                        marginBottom: 14,
-                      }}
-                    >
-                      Role History & Career Milestones
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                        <div
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            background: "var(--primary, #A238FF)",
-                            marginTop: 4,
-                            boxShadow: "0 0 0 4px rgba(162, 56, 255, 0.15)",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <strong style={{ fontSize: 13, color: "var(--text-1, #18181B)" }}>
-                              Appointed as {displayRole}
-                            </strong>
-                            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--primary, #A238FF)" }}>
-                              Current Role
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                            {employee?.department || "Operations"} · {displayLocation} · Full-Time Assignment
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                        <div
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            background: "#10B981",
-                            marginTop: 4,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <strong style={{ fontSize: 13, color: "var(--text-1, #18181B)" }}>
-                              Completed Executive Onboarding & Compliance Sign-Off
-                            </strong>
-                            <span style={{ fontSize: 11.5, color: "var(--text-3, #71717A)" }}>
-                              {employee?.startDate || "Verified"}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                            Identity verification, tax registration, and company handbook acknowledgment completed.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: DOCUMENTS */}
-              {activeTab === "Documents" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Employee Document Vault & Compliance
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Digitally signed contracts, policy acknowledgments, and statutory dossiers.
-                      </p>
-                    </div>
-                    <Link
-                      href="/documents"
-                      className="btn-secondary btn-sm"
-                      style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      <FileText size={13.5} /> Open Document Center
-                    </Link>
-                  </div>
-
-                  {/* 3-Card Compliance Readiness Strip */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        background: "#F0FDF4",
-                        border: "1px solid rgba(22, 163, 74, 0.2)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <ShieldCheck size={20} style={{ color: "#16A34A", flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#15803D", textTransform: "uppercase" }}>
-                          Handbook & Ethics
-                        </div>
-                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#14532D" }}>100% Signed</div>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <FileText size={20} style={{ color: "var(--primary, #A238FF)", flexShrink: 0 }} />
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: "var(--text-3, #71717A)",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Dossier Files
-                        </div>
-                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--text-1, #18181B)" }}>
-                          {documents.length + 3} Official Records
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <CheckCircle2 size={20} style={{ color: "#2563EB", flexShrink: 0 }} />
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: "var(--text-3, #71717A)",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          KYC & Tax Status
-                        </div>
-                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--text-1, #18181B)" }}>
-                          Verified & Active
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Category Filter Pills */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    {["All", "Agreements", "Compliance", "Identity & Tax"].map((cat) => {
-                      const active = docCategoryFilter === cat;
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setDocCategoryFilter(cat)}
-                          style={{
-                            padding: "6px 13px",
-                            borderRadius: 999,
-                            fontSize: 12,
-                            fontWeight: active ? 700 : 500,
-                            background: active ? "var(--primary, #A238FF)" : "#FAF9F7",
-                            color: active ? "#FFFFFF" : "var(--text-2, #52525B)",
-                            border: active ? "1px solid var(--primary, #A238FF)" : "1px solid var(--card-border, #E4E4E7)",
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          {cat}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Structured Document Cards */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {[
-                      {
-                        id: "std-handbook",
-                        title: "Employee Handbook & Code of Conduct Sign-Off",
-                        category: "Compliance",
-                        date: employee?.handbookSignedAt
-                          ? new Date(employee.handbookSignedAt).toLocaleDateString()
-                          : employee?.startDate || "Verified",
-                        status: "Digitally Signed",
-                        tint: "#F0FDF4",
-                        color: "#16A34A",
-                      },
-                      {
-                        id: "std-contract",
-                        title: `Executive Employment Agreement — ${displayRole}`,
-                        category: "Agreements",
-                        date: employee?.startDate || "Active",
-                        status: "Countersigned",
-                        tint: "#F5EBFF",
-                        color: "var(--primary, #A238FF)",
-                      },
-                      {
-                        id: "std-nda",
-                        title: "Mutual Confidentiality & IP Assignment Deed",
-                        category: "Identity & Tax",
-                        date: employee?.startDate || "Active",
-                        status: "On File",
-                        tint: "#EFF6FF",
-                        color: "#2563EB",
-                      },
-                      ...documents.map((d: any) => ({
-                        id: d.id,
-                        title: d.fileName || d.title || "Employee Document",
-                        category: d.category || "Agreements",
-                        date: d.createdAt ? new Date(d.createdAt).toLocaleDateString() : "Uploaded",
-                        status: "Verified",
-                        tint: "#FAF9F7",
-                        color: "var(--primary, #A238FF)",
-                        downloadUrl: d.downloadUrl,
-                      })),
-                    ]
-                      .filter((item) => docCategoryFilter === "All" || item.category === docCategoryFilter)
-                      .map((docItem: any) => (
-                        <div
-                          key={docItem.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "14px 16px",
-                            borderRadius: 12,
-                            border: "1px solid var(--card-border, #E4E4E7)",
-                            background: "#FFFFFF",
-                            gap: 12,
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                            <div
-                              style={{
-                                width: 38,
-                                height: 38,
-                                borderRadius: 10,
-                                background: docItem.tint,
-                                color: docItem.color,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <FileText size={18} />
-                            </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div
-                                style={{
-                                  fontSize: 13.5,
-                                  fontWeight: 700,
-                                  color: "var(--text-1, #18181B)",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {docItem.title}
-                              </div>
-                              <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                                {docItem.category} · Effective {docItem.date}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                            <Badge variant="success">{docItem.status}</Badge>
-                            {docItem.downloadUrl && (
-                              <a
-                                href={docItem.downloadUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="btn-neutral btn-sm"
-                                style={{
-                                  textDecoration: "none",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                }}
-                              >
-                                <Download size={13} /> Download
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: TIME OFF */}
-              {activeTab === "Time Off" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Time Off Balances & Accrual Ledger
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Annual vacation, sick leave, and personal allowances tracked in real-time.
-                      </p>
-                    </div>
-                    <Link
-                      href="/time-off"
-                      className="btn-primary btn-sm"
-                      style={{
-                        textDecoration: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "7px 14px",
-                        borderRadius: 9,
-                      }}
-                    >
-                      <Plus size={14} /> Request Time Off
-                    </Link>
-                  </div>
-
-                  {/* 3-Column Leave Balance Bento Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                    {(leaveBalances.length > 0
-                      ? leaveBalances.slice(0, 3).map((b: any, i: number) => ({
-                          name: b.policyName || "Annual Leave",
-                          available: b.availableDays !== undefined ? b.availableDays : b.balance ?? 15,
-                          accrued: b.accruedDays ?? 21,
-                          used: b.usedDays ?? 0,
-                          tint: i === 0 ? "#F5EBFF" : i === 1 ? "#ECFDF5" : "#FEF3C7",
-                          color: i === 0 ? "var(--primary, #A238FF)" : i === 1 ? "#059669" : "#D97706",
-                        }))
-                      : [
-                          {
-                            name: "Annual Vacation",
-                            available: 15,
-                            accrued: 21,
-                            used: 6,
-                            tint: "#F5EBFF",
-                            color: "var(--primary, #A238FF)",
-                          },
-                          {
-                            name: "Medical & Sick Leave",
-                            available: 10,
-                            accrued: 12,
-                            used: 2,
-                            tint: "#ECFDF5",
-                            color: "#059669",
-                          },
-                          {
-                            name: "Personal & Study Days",
-                            available: 5,
-                            accrued: 5,
-                            used: 0,
-                            tint: "#FEF3C7",
-                            color: "#D97706",
-                          },
-                        ]
-                    ).map((card, idx) => {
-                      const pct = Math.min(100, Math.round((card.available / Math.max(1, card.accrued)) * 100));
-                      return (
-                        <div
-                          key={idx}
-                          style={{
-                            padding: 18,
-                            borderRadius: 12,
-                            background: "#FAF9F7",
-                            border: "1px solid var(--card-border, #E4E4E7)",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 10,
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2, #3F3F46)" }}>
-                              {card.name}
-                            </span>
-                            <div
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 8,
-                                background: card.tint,
-                                color: card.color,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              {idx === 0 ? <Palmtree size={14} /> : idx === 1 ? <Stethoscope size={14} /> : <Sun size={14} />}
-                            </div>
-                          </div>
-                          <div>
-                            <div
-                              style={{
-                                fontSize: 26,
-                                fontWeight: 800,
-                                color: "var(--text-1, #18181B)",
-                                lineHeight: 1.1,
-                                fontVariantNumeric: "tabular-nums",
-                              }}
-                            >
-                              {card.available} <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3, #71717A)" }}>days left</span>
-                            </div>
-                          </div>
-                          <div style={{ height: 5, borderRadius: 999, background: "#E4E4E7", overflow: "hidden" }}>
-                            <div
-                              style={{
-                                width: `${pct}%`,
-                                height: "100%",
-                                background: card.color,
-                                borderRadius: 999,
-                              }}
-                            />
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              fontSize: 11,
-                              color: "var(--text-3, #71717A)",
-                            }}
-                          >
-                            <span>Allowance: {card.accrued}d/yr</span>
-                            <span>Used: {card.used}d</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Leave Requests History */}
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <h4
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                          color: "var(--text-3, #71717A)",
-                          margin: 0,
-                        }}
-                      >
-                        Leave Request History & Approvals
-                      </h4>
-                      <span style={{ fontSize: 11.5, color: "var(--text-3, #71717A)" }}>
-                        Accrual Cycle: Jan 1 – Dec 31
-                      </span>
-                    </div>
-                    {leaveRequests.length > 0 ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {leaveRequests.slice(0, 6).map((req: any) => (
-                          <div
-                            key={req.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "14px 16px",
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              borderRadius: 12,
-                              background: "#FFFFFF",
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                              <div
-                                style={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: 9,
-                                  background: "#F5EBFF",
-                                  color: "var(--primary, #A238FF)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <Calendar size={16} />
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                                  {req.policyName || "Paid Leave"} · {req.startDate} → {req.endDate}
-                                </div>
-                                <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                                  {req.reason || "Scheduled personal time off"}
-                                </div>
-                              </div>
-                            </div>
-                            <Badge
-                              variant={
-                                req.status === "approved"
-                                  ? "success"
-                                  : req.status === "rejected"
-                                  ? "danger"
-                                  : "warning"
-                              }
-                            >
-                              {req.status ? req.status.toUpperCase() : "PENDING"}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          padding: "22px 20px",
-                          borderRadius: 12,
-                          border: "1px solid var(--card-border, #E4E4E7)",
-                          background: "#FAF9F7",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <div
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: 10,
-                              background: "#ECFDF5",
-                              color: "#059669",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <CheckCircle2 size={18} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                              100% Attendance Record — No Pending Leave Requests
-                            </div>
-                            <div style={{ fontSize: 12, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                              Your annual leave balance is accruing monthly and ready whenever you plan a break.
-                            </div>
-                          </div>
-                        </div>
-                        <Link
-                          href="/time-off"
-                          className="btn-neutral btn-sm"
-                          style={{ textDecoration: "none", flexShrink: 0 }}
-                        >
-                          Open Calendar
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 5: PERFORMANCE */}
-              {activeTab === "Performance" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Performance OKRs & Competency Scorecard
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Quarterly execution milestones, core competency ratings, and leadership reviews.
-                      </p>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        type="button"
-                        className="btn-primary btn-sm"
-                        onClick={() => setIsGoalModalOpen(true)}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                      >
-                        <Plus size={14} /> Add Career Goal
-                      </button>
-                      {(isHRAdmin || isManager) && (
-                        <Link href="/performance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
-                          Performance Hub
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 3-Card Performance KPI Strip */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
-                    >
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                        Overall Standing
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "var(--primary, #A238FF)", marginTop: 4 }}>
-                        Exceeds Expectations
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                        Top 15% Execution Tier
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
-                    >
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                        Active OKRs
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-1, #18181B)", marginTop: 4 }}>
-                        {performanceGoals.length || 2} Active Milestones
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                        On track for Q4 completion
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
-                    >
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                        Review Cycle
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "#059669", marginTop: 4 }}>
-                        4.8 / 5.0 Rating
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                        Verified by Reporting Manager
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Active Goals & OKRs */}
-                  <div>
-                    <h4
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        color: "var(--text-3, #71717A)",
-                        margin: "0 0 12px 0",
-                      }}
-                    >
-                      Active Career Goals & OKRs
-                    </h4>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                      {(performanceGoals.length > 0
-                        ? performanceGoals
-                        : [
-                            {
-                              id: "default-okr-1",
-                              title: `Elevate ${employee?.department || "Department"} Operational Velocity & SLA`,
-                              description: "Streamline cross-team workflows and achieve 99.5% on-time delivery across quarterly deliverables.",
-                              status: "in_progress",
-                              completionPercentage: 75,
-                              dueDate: "Q4 Target",
-                            },
-                            {
-                              id: "default-okr-2",
-                              title: "Leadership Mentorship & Domain Mastery",
-                              description: "Complete advanced professional certification and mentor incoming team members during onboarding.",
-                              status: "in_progress",
-                              completionPercentage: 60,
-                              dueDate: "Continuous",
-                            },
-                          ]
-                      ).map((g: any) => (
-                        <div
-                          key={g.id}
-                          style={{
-                            border: "1px solid var(--card-border, #E4E4E7)",
-                            borderRadius: 12,
-                            padding: 16,
-                            background: "#FFFFFF",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "space-between",
-                            gap: 12,
-                          }}
-                        >
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                              <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", lineHeight: 1.35 }}>
-                                {g.title}
-                              </strong>
-                              <Badge
-                                variant={
-                                  g.status === "achieved"
-                                    ? "success"
-                                    : g.status === "in_progress"
-                                    ? "primary"
-                                    : "neutral"
-                                }
-                              >
-                                {(g.status || "active").replace("_", " ").toUpperCase()}
-                              </Badge>
-                            </div>
-                            {g.description && (
-                              <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "6px 0 0 0", lineHeight: 1.5 }}>
-                                {g.description}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 5 }}>
-                              <span style={{ color: "var(--text-3, #71717A)" }}>Milestone Completion</span>
-                              <strong style={{ color: "var(--primary, #A238FF)" }}>{g.completionPercentage || 0}%</strong>
-                            </div>
-                            <div style={{ background: "#E4E4E7", height: 6, borderRadius: 999, overflow: "hidden" }}>
-                              <div
-                                style={{
-                                  background: "var(--primary, #A238FF)",
-                                  height: "100%",
-                                  width: `${Math.min(100, g.completionPercentage || 0)}%`,
-                                  borderRadius: 999,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Reviews Section */}
-                  <div>
-                    <h4
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        color: "var(--text-3, #71717A)",
-                        margin: "0 0 12px 0",
-                      }}
-                    >
-                      Evaluation Reviews & Manager Feedback
-                    </h4>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {(performanceReviews.length > 0
-                        ? performanceReviews
-                        : [
-                            {
-                              id: "default-rev-1",
-                              reviewCycle: "Annual Executive Performance Appraisal",
-                              reviewerName: employee?.manager || "Department Lead",
-                              overallScore: 4.8,
-                              status: "acknowledged",
-                              comments: `${displayFirstName} consistently demonstrates strong ownership, high technical standards, and collaborative leadership across ${displayCompany}.`,
-                            },
-                          ]
-                      ).map((r: any) => (
-                        <div
-                          key={r.id}
-                          style={{
-                            padding: 16,
-                            border: "1px solid var(--card-border, #E4E4E7)",
-                            borderRadius: 12,
-                            background: "#FAF9F7",
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                            <div>
-                              <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)" }}>
-                                {r.reviewCycle || "Evaluation"}
-                              </strong>
-                              <span style={{ fontSize: 12, color: "var(--text-3, #71717A)", marginLeft: 8 }}>
-                                · Reviewer: {r.reviewerName || "Manager"}
-                              </span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              {r.overallScore && (
-                                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                                  {[1, 2, 3, 4, 5].map((i) => (
-                                    <Star
-                                      key={i}
-                                      size={13}
-                                      style={{
-                                        fill: i <= Math.round(r.overallScore) ? "#F59E0B" : "transparent",
-                                        color: i <= Math.round(r.overallScore) ? "#F59E0B" : "#D4D4D8",
-                                      }}
-                                    />
-                                  ))}
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1, #18181B)", marginLeft: 4 }}>
-                                    {r.overallScore}
-                                  </span>
-                                </div>
-                              )}
-                              <Badge variant="success">{(r.status || "VERIFIED").toUpperCase()}</Badge>
-                            </div>
-                          </div>
-                          {r.comments && (
-                            <p style={{ fontSize: 12.5, color: "var(--text-2, #3F3F46)", margin: 0, lineHeight: 1.55 }}>
-                              “{r.comments}”
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: BENEFITS */}
-              {activeTab === "Benefits" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Total Rewards, Medical & Benefits Coverage
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Company-sponsored healthcare, retirement pension, and wellness allowances active for your role.
-                      </p>
-                    </div>
-                    {isHRAdmin && (
-                      <Link href="/benefits" className="btn-primary btn-sm" style={{ textDecoration: "none" }}>
-                        Benefits Administration
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* Active Coverage Cards */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
-                    {(benefitEnrollments.length > 0
-                      ? benefitEnrollments.map((enr: any) => ({
-                          id: enr.id,
-                          name: enr.planName || "Executive Health Coverage",
-                          tier: (enr.coverageTier || "Individual + Family").toUpperCase(),
-                          status: (enr.status || "ACTIVE").toUpperCase(),
-                          desc: "100% Employer-Sponsored Inpatient & Outpatient Coverage",
-                        }))
-                      : [
-                          {
-                            id: "ben-health",
-                            name: "Premier Medical, Dental & Optical Plan",
-                            tier: "COMPREHENSIVE TIER",
-                            status: "ACTIVE",
-                            desc: "Inpatient, outpatient, dental, and optical coverage across partner hospitals.",
-                          },
-                          {
-                            id: "ben-pension",
-                            name: "Statutory Pension & Retirement Match",
-                            tier: "EMPLOYER MATCHED",
-                            status: "ACTIVE",
-                            desc: "Monthly statutory social security and retirement savings contribution.",
-                          },
-                          {
-                            id: "ben-wellness",
-                            name: "Remote Work & Connectivity Stipend",
-                            tier: "MONTHLY ALLOWANCE",
-                            status: "ACTIVE",
-                            desc: "High-speed fiber internet and ergonomic workspace equipment allowance.",
-                          },
-                        ]
-                    ).map((item: any, idx: number) => (
-                      <div
-                        key={item.id}
-                        style={{
-                          padding: 18,
-                          borderRadius: 12,
-                          background: "#FAF9F7",
-                          border: "1px solid var(--card-border, #E4E4E7)",
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "space-between",
-                          gap: 12,
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                            <div
-                              style={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: 10,
-                                background: idx === 0 ? "#F5EBFF" : idx === 1 ? "#ECFDF5" : "#EFF6FF",
-                                color: idx === 0 ? "var(--primary, #A238FF)" : idx === 1 ? "#059669" : "#2563EB",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              {idx === 0 ? <Stethoscope size={18} /> : idx === 1 ? <ShieldCheck size={18} /> : <Heart size={18} />}
-                            </div>
-                            <Badge variant="success">{item.status}</Badge>
-                          </div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1, #18181B)", marginTop: 12 }}>
-                            {item.name}
-                          </div>
-                          <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0", lineHeight: 1.5 }}>
-                            {item.desc}
-                          </p>
-                        </div>
-                        <div
-                          style={{
-                            paddingTop: 10,
-                            borderTop: "1px solid var(--card-border, #E4E4E7)",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            fontSize: 11.5,
-                          }}
-                        >
-                          <span style={{ color: "var(--text-3, #71717A)" }}>Coverage Level</span>
-                          <strong style={{ color: "var(--text-1, #18181B)" }}>{item.tier}</strong>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Additional Catalog Plans if present */}
-                  {benefitPlans.length > 0 && (
-                    <div>
-                      <h4
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                          color: "var(--text-3, #71717A)",
-                          margin: "0 0 12px 0",
-                        }}
-                      >
-                        Organization Benefit Catalog
-                      </h4>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                        {benefitPlans.map((pl: any) => (
-                          <div
-                            key={pl.id}
-                            style={{
-                              border: "1px solid var(--card-border, #E4E4E7)",
-                              borderRadius: 12,
-                              padding: 16,
-                              background: "#FFFFFF",
-                            }}
-                          >
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                              <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)" }}>{pl.name}</strong>
-                              <Badge variant="neutral">{(pl.category || "PLAN").toUpperCase()}</Badge>
-                            </div>
-                            {pl.description && (
-                              <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "0 0 10px 0", lineHeight: 1.5 }}>
-                                {pl.description}
-                              </p>
-                            )}
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary, #A238FF)" }}>
-                              Company-sponsored · ${((pl.employerCostMinor || 15000) / 100).toFixed(0)}/mo value
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 7: TIMESHEET */}
-              {activeTab === "Timesheet" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Live Timesheet & Attendance Log
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Real-time clock-in/out punches and verified shift hours for the current pay period.
-                      </p>
-                    </div>
-                    <Link href="/attendance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
-                      Open Full Attendance
-                    </Link>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 310px", gap: 20, alignItems: "start" }}>
-                    <div
-                      style={{
-                        borderRadius: 12,
-                        border: "1px solid var(--card-border, #E4E4E7)",
+                        padding: 14,
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
                         background: "#FFFFFF",
-                        overflow: "hidden",
                       }}
                     >
-                      <div
-                        style={{
-                          padding: "12px 18px",
-                          background: "#FAF9F7",
-                          borderBottom: "1px solid var(--card-border, #E4E4E7)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span
+                      <div>
+                        <div className="text-sm fw-600 text-1">
+                          {req.policyName || "Leave"} · {req.startDate} to {req.endDate}
+                        </div>
+                        <div className="text-xs text-5 mt-2">{req.reason || "Time off request"}</div>
+                      </div>
+                      <Badge variant={req.status === "approved" ? "success" : req.status === "rejected" ? "danger" : "warning"}>
+                        {req.status ? req.status.toUpperCase() : "PENDING"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "32px 20px", border: "1px dashed var(--border)", borderRadius: 10 }}>
+                  <span className="text-xs text-5">No upcoming or past leave requests submitted.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 7: TIMESHEET */}
+          {activeTab === "Timesheet" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Live Timesheet & Punches</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Real-time punch records from work sessions and shift attendance.
+                  </p>
+                </div>
+                <Link href="/attendance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
+                  View Full Attendance
+                </Link>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 24 }}>
+                <Card>
+                  <CardBody style={{ padding: 0 }}>
+                    <div style={{ padding: "14px 20px", background: "#F9FAFB", borderBottom: "1px solid var(--border)" }}>
+                      <h4 className="text-xs fw-700 text-4 uppercase m-0">Current Pay Period Records</h4>
+                    </div>
+
+                    {groupedPunches.length > 0 ? (
+                      groupedPunches.map((entry, idx) => (
+                        <div
+                          key={entry.date}
                           style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            color: "var(--text-3, #71717A)",
+                            padding: "16px 20px",
+                            borderBottom: idx === groupedPunches.length - 1 ? "none" : "1px solid var(--border)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
                           }}
                         >
-                          Current Pay Period Punch Ledger
-                        </span>
-                        <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--primary, #A238FF)" }}>
-                          {punches.length} Verified Events
-                        </span>
-                      </div>
-
-                      {groupedPunches.length > 0 ? (
-                        groupedPunches.map((entry, idx) => (
-                          <div
-                            key={entry.date}
-                            style={{
-                              padding: "14px 18px",
-                              borderBottom:
-                                idx === groupedPunches.length - 1 ? "none" : "1px solid var(--border-subtle, #F0F0F3)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 12,
-                            }}
-                          >
-                            <div style={{ width: 95, flexShrink: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                                {entry.day}
-                              </div>
-                              <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)" }}>{entry.date}</div>
-                            </div>
-                            <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          <div style={{ width: 100 }}>
+                            <div className="text-sm fw-700 text-1">{entry.day}</div>
+                            <div className="text-xs text-5">{entry.date}</div>
+                          </div>
+                          <div style={{ flex: 1, paddingLeft: 16 }}>
+                            <div className="row gap-8 align-center">
                               {entry.punches.map((p, i) => (
                                 <Badge key={i} variant={p.punchType === "in" ? "success" : "neutral"}>
-                                  {p.punchType === "in" ? "In" : "Out"}:{" "}
-                                  {p.punchedAt
-                                    ? new Date(p.punchedAt).toLocaleTimeString([], {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })
-                                    : "--"}
+                                  {p.punchType === "in" ? "Clock In" : "Clock Out"}:{" "}
+                                  {p.punchedAt ? new Date(p.punchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
                                 </Badge>
                               ))}
                             </div>
                           </div>
-                        ))
-                      ) : (
-                        <div style={{ padding: "36px 24px", textAlign: "center" }}>
-                          <Clock size={26} style={{ color: "var(--primary, #A238FF)", margin: "0 auto 8px" }} />
-                          <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1, #18181B)" }}>
-                            Ready to Track Today&apos;s Session
-                          </div>
-                          <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                            Use the interactive Chrono Console on the right to clock into Production, Lunch, or Training.
-                          </p>
                         </div>
-                      )}
-                    </div>
-
-                    <div style={{ position: "sticky", top: 20 }}>
-                      <CompulsoryMyTimeWidget />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 8: PAY INFO (DISBURSEMENT) */}
-              {activeTab === "Pay Info" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Compensation & Disbursement Banking
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Your verified payroll payout channel, settlement currency, and direct deposit routing.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      onClick={() => setIsPayoutModalOpen(true)}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      <Edit2 size={13.5} /> Update Payout Channel
-                    </button>
-                  </div>
-
-                  {/* Executive Disbursement Card */}
-                  <div
-                    style={{
-                      border: "1px solid var(--card-border, #E4E4E7)",
-                      borderRadius: 14,
-                      padding: 22,
-                      background: "linear-gradient(135deg, #FAF9F7 0%, #FFFFFF 100%)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 18,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                        <div
-                          style={{
-                            width: 46,
-                            height: 46,
-                            borderRadius: 12,
-                            background: "var(--primary-tint, #F5EBFF)",
-                            color: "var(--primary, #A238FF)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          {employee?.paymentMethod === "Mobile Money" ? (
-                            <Smartphone size={22} />
-                          ) : employee?.paymentMethod === "PayPal / Digital Wallet" ? (
-                            <Wallet size={22} />
-                          ) : (
-                            <CreditCard size={22} />
-                          )}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-1, #18181B)" }}>
-                            {employee?.paymentMethod || "Mobile Money"}
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                            {employee?.paymentMethod === "Mobile Money"
-                              ? employee?.mobileMoneyProvider || "MTN Mobile Money · Instant Settlement"
-                              : employee?.paymentMethod === "PayPal / Digital Wallet"
-                              ? "Global Digital Wallet Settlement"
-                              : employee?.bankName || "Direct Clearing House Bank Deposit"}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant="success">Active Verified Channel</Badge>
-                    </div>
-
-                    <div style={{ height: 1, background: "var(--border-subtle, #F0F0F3)" }} />
-
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-                      {employee?.paymentMethod === "Mobile Money" ? (
-                        <>
-                          <div>
-                            <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                              Registered Mobile Number
-                            </span>
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                              {employee?.mobileMoneyPhone || displayPhone}
-                            </strong>
-                          </div>
-                          <div>
-                            <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                              Network Operator
-                            </span>
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                              {employee?.mobileMoneyProvider || "MTN / M-Pesa"}
-                            </strong>
-                          </div>
-                        </>
-                      ) : employee?.paymentMethod === "PayPal / Digital Wallet" ? (
-                        <>
-                          <div>
-                            <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                              Wallet Account Email
-                            </span>
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                              {employee?.walletEmail || displayEmail}
-                            </strong>
-                          </div>
-                          <div>
-                            <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                              Settlement Rail
-                            </span>
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                              Instant Digital Payout
-                            </strong>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                              Financial Institution
-                            </span>
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                              {employee?.bankName || "Primary Commercial Bank"}
-                            </strong>
-                          </div>
-                          <div>
-                            <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                              Account Number
-                            </span>
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                              {employee?.bankAccountNumber
-                                ? `···· ${employee.bankAccountNumber.slice(-4)}`
-                                : "Verified on File"}
-                            </strong>
-                          </div>
-                        </>
-                      )}
-                      <div>
-                        <span style={{ fontSize: 11, color: "var(--text-3, #71717A)", display: "block" }}>
-                          Pay Cycle & Split
+                      ))
+                    ) : (
+                      <div style={{ padding: 32, textAlign: "center" }}>
+                        <span className="text-xs text-5">
+                          No punch logs recorded yet this period. Use the punch clock to record hours.
                         </span>
-                        <strong style={{ fontSize: 13.5, color: "var(--text-1, #18181B)", marginTop: 3, display: "block" }}>
-                          100% Net Pay · Monthly (28th)
-                        </strong>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </CardBody>
+                </Card>
 
-                  {/* 3-Column Payroll Governance Strip */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                    <div
-                      style={{
-                        padding: 16,
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                        Tax & Statutory Compliance
-                      </div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1, #18181B)", marginTop: 4 }}>
-                        PAYE & Social Security Active
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                        Automatically withheld on monthly payroll runs
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: 16,
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                        Digital Payslips
-                      </div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1, #18181B)", marginTop: 4 }}>
-                        Encrypted PDF Statements
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                        Issued automatically upon payroll disbursement
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: 16,
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        border: "1px solid var(--card-border, #E4E4E7)",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                        Security & Verification
-                      </div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#059669", marginTop: 4 }}>
-                        2FA Protected Routing
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-3, #71717A)", marginTop: 2 }}>
-                        Audited in company payroll ledger
-                      </div>
-                    </div>
-                  </div>
+                <div style={{ position: "sticky", top: 24 }}>
+                  <CompulsoryMyTimeWidget />
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              {/* TAB 9: EMERGENCY */}
-              {activeTab === "Emergency" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--border-subtle, #F0F0F3)",
-                    }}
+          {/* TAB 8: PERFORMANCE */}
+          {activeTab === "Performance" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Performance & Reviews</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Growth goals, quarterly reviews, and milestones.
+                  </p>
+                </div>
+                <div className="row gap-10 align-center">
+                  <button
+                    className="btn-primary btn-sm row gap-6 align-center"
+                    onClick={() => setIsGoalModalOpen(true)}
                   >
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1, #18181B)", margin: 0 }}>
-                        Emergency Contacts & Duty of Care Protocol
-                      </h3>
-                      <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "4px 0 0 0" }}>
-                        Verified next-of-kin and workplace medical escalation contacts.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      onClick={() => setIsEmergencyModalOpen(true)}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      <Plus size={14} /> {employee?.emergencyContactName ? "Update Contact" : "Register Contact"}
-                    </button>
-                  </div>
-
-                  {employee?.emergencyContactName ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                      <div
-                        style={{
-                          border: "1px solid var(--card-border, #E4E4E7)",
-                          borderRadius: 12,
-                          padding: 20,
-                          background: "#FAF9F7",
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                          <Badge variant="primary">Primary Next-of-Kin</Badge>
-                          <span style={{ fontSize: 11, color: "#059669", fontWeight: 700 }}>Verified Priority #1</span>
-                        </div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-1, #18181B)" }}>
-                          {employee.emergencyContactName}
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--text-3, #71717A)", marginTop: 2, marginBottom: 14 }}>
-                          Relationship: <strong>{employee.emergencyContactRelationship || "Immediate Family"}</strong>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "10px 12px",
-                            borderRadius: 9,
-                            background: "#FFFFFF",
-                            border: "1px solid var(--card-border, #E4E4E7)",
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: "var(--text-1, #18181B)",
-                          }}
-                        >
-                          <Phone size={14} style={{ color: "var(--primary, #A238FF)" }} />
-                          <span>{employee.emergencyContactPhone || "No phone recorded"}</span>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          border: "1px solid var(--card-border, #E4E4E7)",
-                          borderRadius: 12,
-                          padding: 20,
-                          background: "#FFFFFF",
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3, #71717A)", textTransform: "uppercase" }}>
-                            Workplace Escalation Protocol
-                          </div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1, #18181B)", marginTop: 6 }}>
-                            24/7 HR & Medical Assistance Desk
-                          </div>
-                          <p style={{ fontSize: 12, color: "var(--text-3, #71717A)", margin: "6px 0 0 0", lineHeight: 1.55 }}>
-                            In the event of an urgent medical or field incident, HR Operations immediately notifies your primary contact and dispatches medical support.
-                          </p>
-                        </div>
-                        <div
-                          style={{
-                            marginTop: 14,
-                            paddingTop: 12,
-                            borderTop: "1px solid var(--border-subtle, #F0F0F3)",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            fontSize: 11.5,
-                            color: "var(--text-3, #71717A)",
-                          }}
-                        >
-                          <span>Confidentiality: HR Restricted</span>
-                          <strong style={{ color: "#059669" }}>Duty of Care Active</strong>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        padding: "36px 24px",
-                        border: "1px dashed var(--card-border, #E4E4E7)",
-                        borderRadius: 12,
-                        background: "#FAF9F7",
-                        textAlign: "center",
-                      }}
-                    >
-                      <ShieldCheck size={32} style={{ color: "var(--primary, #A238FF)", margin: "0 auto 10px" }} />
-                      <h4 style={{ fontSize: 14.5, fontWeight: 700, color: "var(--text-1, #18181B)", margin: "0 0 4px 0" }}>
-                        Designate Your Primary Emergency Contact
-                      </h4>
-                      <p style={{ fontSize: 12.5, color: "var(--text-3, #71717A)", margin: "0 auto 16px", maxWidth: 420 }}>
-                        Ensure your workplace safety dossier is complete by adding a trusted family member or next-of-kin.
-                      </p>
-                      <button
-                        type="button"
-                        className="btn-primary btn-sm"
-                        onClick={() => setIsEmergencyModalOpen(true)}
-                      >
-                        <Plus size={14} /> Register Emergency Contact
-                      </button>
-                    </div>
+                    <Plus size={14} /> Add Career Goal
+                  </button>
+                  {(isHRAdmin || isManager) && (
+                    <Link href="/performance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
+                      Performance Module
+                    </Link>
                   )}
                 </div>
+              </div>
+
+              {/* Goals Section */}
+              <h4 className="text-sm fw-700 text-1 mb-14">Active Career Goals & OKRs</h4>
+              {performanceGoals.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 28 }}>
+                  {performanceGoals.map((g: any) => (
+                    <div
+                      key={g.id}
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: 12,
+                        padding: 18,
+                        background: "#FAFAFA",
+                      }}
+                    >
+                      <div className="row-between align-start mb-8">
+                        <strong className="text-sm text-1">{g.title}</strong>
+                        <Badge variant={g.status === "achieved" ? "success" : g.status === "in_progress" ? "primary" : "neutral"}>
+                          {(g.status || "active").replace("_", " ").toUpperCase()}
+                        </Badge>
+                      </div>
+                      {g.description && (
+                        <p className="text-xs text-4 m-0 mb-12" style={{ lineHeight: 1.5 }}>
+                          {g.description}
+                        </p>
+                      )}
+                      <div className="col gap-4">
+                        <div className="row-between text-xs">
+                          <span className="text-5">Completion</span>
+                          <span className="text-1 fw-700">{g.completionPercentage || 0}%</span>
+                        </div>
+                        <div style={{ background: "var(--border)", height: 6, borderRadius: 3, overflow: "hidden" }}>
+                          <div
+                            style={{
+                              background: "var(--primary)",
+                              height: "100%",
+                              width: `${Math.min(100, g.completionPercentage || 0)}%`,
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                        {g.dueDate && (
+                          <span className="text-xs text-5 mt-4">Due: {g.dueDate}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "28px 20px", border: "1px dashed var(--border)", borderRadius: 10, marginBottom: 28 }}>
+                  <Target size={28} color="#9CA3AF" style={{ margin: "0 auto 8px" }} />
+                  <span className="text-xs text-5 block">No career goals created yet. Use "Add Career Goal" to set milestones.</span>
+                </div>
               )}
-            </>
+
+              {/* Reviews Section */}
+              <h4 className="text-sm fw-700 text-1 mb-14">Evaluation Reviews & Feedback</h4>
+              {performanceReviews.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {performanceReviews.map((r: any) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        padding: 16,
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        background: "#FFFFFF",
+                      }}
+                    >
+                      <div className="row-between align-center mb-8">
+                        <div>
+                          <strong className="text-sm text-1">{r.reviewCycle || "Evaluation"}</strong>
+                          <span className="text-xs text-5 ml-8">Reviewer: {r.reviewerName || "Manager"}</span>
+                        </div>
+                        <div className="row gap-8 align-center">
+                          {r.overallScore && (
+                            <div className="row gap-2 align-center">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <Star
+                                  key={i}
+                                  size={13}
+                                  style={{
+                                    fill: i <= Math.round(r.overallScore) ? "#F59E0B" : "transparent",
+                                    color: i <= Math.round(r.overallScore) ? "#F59E0B" : "var(--border)",
+                                  }}
+                                />
+                              ))}
+                              <span className="text-xs fw-700 text-1 ml-4">{r.overallScore}</span>
+                            </div>
+                          )}
+                          <Badge variant={r.status === "acknowledged" || r.status === "submitted" ? "success" : "warning"}>
+                            {(r.status || "SUBMITTED").toUpperCase()}
+                          </Badge>
+                        </div>
+                      </div>
+                      {r.comments && (
+                        <p className="text-xs text-3 m-0" style={{ lineHeight: 1.5 }}>
+                          "{r.comments}"
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "28px 20px", border: "1px dashed var(--border)", borderRadius: 10 }}>
+                  <span className="text-xs text-5">No formal performance reviews submitted yet.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 9: BENEFITS */}
+          {activeTab === "Benefits" && (
+            <div>
+              <div className="row-between mb-24">
+                <div>
+                  <h3 className="text-lg fw-700 text-1 m-0">Company Benefits & Coverage</h3>
+                  <p className="text-xs text-5 mt-2 m-0">
+                    Health insurance, retirement savings, and allowances active for your profile.
+                  </p>
+                </div>
+                {isHRAdmin && (
+                  <Link href="/benefits" className="btn-primary btn-sm" style={{ textDecoration: "none" }}>
+                    Benefits Administration
+                  </Link>
+                )}
+              </div>
+
+              {/* Active Enrollments */}
+              <h4 className="text-sm fw-700 text-1 mb-14">My Enrolled Policies</h4>
+              {benefitEnrollments.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 28 }}>
+                  {benefitEnrollments.map((enr: any) => (
+                    <div
+                      key={enr.id}
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: 12,
+                        padding: 20,
+                        background: "#FAFAFA",
+                      }}
+                    >
+                      <div className="row-between align-start mb-10">
+                        <div className="row gap-10 align-center">
+                          <Stethoscope size={20} color="var(--primary)" />
+                          <strong className="text-sm text-1">{enr.planName}</strong>
+                        </div>
+                        <Badge variant={enr.status === "active" ? "success" : "neutral"}>
+                          {(enr.status || "ACTIVE").toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="row-between text-xs text-4 mb-4">
+                        <span>Coverage Tier</span>
+                        <strong className="text-1">{(enr.coverageTier || "Individual").toUpperCase()}</strong>
+                      </div>
+                      <div className="row-between text-xs text-4">
+                        <span>Effective Date</span>
+                        <strong className="text-1">{enr.effectiveFrom || "Active"}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "28px 20px", border: "1px dashed var(--border)", borderRadius: 10, marginBottom: 28 }}>
+                  <Heart size={28} color="#9CA3AF" style={{ margin: "0 auto 8px" }} />
+                  <span className="text-xs text-5 block">
+                    No individual benefit policies enrolled yet. View company offerings below.
+                  </span>
+                </div>
+              )}
+
+              {/* Company Available Plans */}
+              <h4 className="text-sm fw-700 text-1 mb-14">Available Company Benefit Offerings</h4>
+              {benefitPlans.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                  {benefitPlans.map((pl: any) => (
+                    <div
+                      key={pl.id}
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: 12,
+                        padding: 18,
+                        background: "#FFFFFF",
+                      }}
+                    >
+                      <div className="row-between align-start mb-6">
+                        <strong className="text-sm text-1">{pl.name}</strong>
+                        <Badge variant="neutral">{(pl.category || "PLAN").toUpperCase()}</Badge>
+                      </div>
+                      {pl.description && (
+                        <p className="text-xs text-4 m-0 mb-10" style={{ lineHeight: 1.5 }}>
+                          {pl.description}
+                        </p>
+                      )}
+                      <div className="text-xs text-primary fw-700">
+                        Company-sponsored coverage · ${(pl.employerCostMinor / 100).toFixed(0)}/mo
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "24px 20px", border: "1px dashed var(--border)", borderRadius: 10 }}>
+                  <span className="text-xs text-5">Standard organization benefit plans applied.</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
