@@ -1,318 +1,385 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Smile, Search, Sparkles, X, Zap, Loader2 } from 'lucide-react';
+import { Smile, Search, Sparkles, X, Zap, Loader2, Plus } from 'lucide-react';
 
 export type PickerTab = 'emoji' | 'animated' | 'gif';
 
 interface EmojiGifPickerProps {
   onSelectEmoji: (emoji: string) => void;
-  onSelectGif: (gifUrl: string, title: string) => void;
+  onSelectAnimatedEmoji?: (code: string, url: string) => void;
+  onSelectGif: (gifUrl: string) => void;
   onClose: () => void;
   initialTab?: PickerTab;
 }
 
-interface EmojiEntry {
-  char: string;
-  name: string;
-  category: 'Smileys' | 'Gestures' | 'Work' | 'Celebration' | 'Symbols' | 'Food & Nature';
+type EmojiCategory =
+  | 'All'
+  | 'Smileys'
+  | 'Gestures'
+  | 'People'
+  | 'Work & Tech'
+  | 'Celebration'
+  | 'Symbols'
+  | 'Nature'
+  | 'Food'
+  | 'Travel & Sport';
+
+const EMOJI_CATEGORIES: EmojiCategory[] = [
+  'All',
+  'Smileys',
+  'Gestures',
+  'People',
+  'Work & Tech',
+  'Celebration',
+  'Symbols',
+  'Nature',
+  'Food',
+  'Travel & Sport',
+];
+
+// Compact high-stock emoji catalog (~520 emojis across all categories)
+const EMOJI_GROUPS: Record<Exclude<EmojiCategory, 'All'>, { chars: string[]; keywords: string }> = {
+  Smileys: {
+    keywords: 'smile happy laugh joy grin wink love heart cool star party mind blown cry sad angry sleep',
+    chars: [
+      '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','🫠','😉','😊','😇','🥰','😍','🤩','😘','😗','☺️',
+      '😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🫢','🫣','🤫','🤔','🫡','🤐','🤨','😐','😑',
+      '😶','🫥','😶‍🌫️','😏','😒','🙄','😬','😮‍💨','🤥','🫨','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮',
+      '🤧','🥵','🥶','🥴','😵','😵‍💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','🫤','😟','🙁','☹️','😮','😯',
+      '😲','😳','🥺','🥹','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤',
+      '😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼',
+      '😽','🙀','😿','😾',
+    ],
+  },
+  Gestures: {
+    keywords: 'hand thumb clap wave ok peace fingers fist pray muscle point eyes',
+    chars: [
+      '👋','🤚','🖐️','✋','🖖','🫱','🫲','🫳','🫴','🫷','🫸','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙',
+      '👈','👉','👆','🖕','👇','☝️','🫵','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏',
+      '✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄',
+      '🫦',
+    ],
+  },
+  People: {
+    keywords: 'person baby man woman doctor student teacher technologist artist astronaut',
+    chars: [
+      '👶','👧','🧒','👦','👩','🧑','👨','👩‍🦱','🧑‍🦱','👨‍🦱','👩‍🦰','🧑‍🦰','👨‍🦰','👱‍♀️','👱','👱‍♂️','👩‍🦳','🧑‍🦳','👨‍🦳','👩‍🦲',
+      '🧑‍🦲','👨‍🦲','🧔‍♀️','🧔','🧔‍♂️','👵','🧓','👴','👲','👳‍♀️','👳','👳‍♂️','🧕','👮‍♀️','👮','👮‍♂️','👷‍♀️','👷','👷‍♂️','💂‍♀️',
+      '💂','💂‍♂️','🕵️‍♀️','🕵️','🕵️‍♂️','👩‍⚕️','🧑‍⚕️','👨‍⚕️','👩‍🌾','🧑‍🌾','👨‍🌾','👩‍🍳','🧑‍🍳','👨‍🍳','👩‍🎓','🧑‍🎓','👨‍🎓','👩‍🎤','🧑‍🎤','👨‍🎤',
+      '👩‍🏫','🧑‍🏫','👨‍🏫','👩‍🏭','🧑‍🏭','👨‍🏭','👩‍💻','🧑‍💻','👨‍💻','👩‍💼','🧑‍💼','👨‍💼','👩‍🔧','🧑‍🔧','👨‍🔧','👩‍🔬','🧑‍🔬','👨‍🔬','👩‍🎨','🧑‍🎨',
+      '👨‍🎨','👩‍🚒','🧑‍🚒','👨‍🚒','👩‍✈️','🧑‍✈️','👨‍✈️','👩‍🚀','🧑‍🚀','👨‍🚀','👩‍⚖️','🧑‍⚖️','👨‍⚖️','🦸‍♀️','🦸','🦸‍♂️','🦹‍♀️','🦹','🦹‍♂️','🥷',
+    ],
+  },
+  'Work & Tech': {
+    keywords: 'laptop computer phone office chart folder file document calendar clock idea tool lock key mail',
+    chars: [
+      '💼','📁','📂','🗂️','📅','📆','🗒️','🗓️','📇','📈','📉','📊','📋','📌','📍','📎','🖇️','📏','📐','✂️',
+      '🗃️','🗄️','🗑️','🔒','🔓','🔏','🔐','🔑','🗝️','🔨','🪓','⛏️','⚒️','🛠️','🗡️','⚔️','🔫','🪃','🏹','🛡️',
+      '🪚','🔧','🪛','🔩','⚙️','🗜️','⚖️','🦯','🔗','⛓️','🪝','🧰','🧲','🪜','⚗️','🧪','🧫','🧬','🔬','🔭',
+      '📡','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','🎥','🎞️','📽️','📺','📷','📸','📹','📼',
+      '🔍','🔎','🕯️','💡','🔦','🏮','🪔','📔','📕','📖','📗','📘','📙','📚','📓','📒','📃','📜','📄','📰',
+      '🗞️','📑','🔖','🏷️','💰','🪙','💴','💵','💶','💷','💸','💳','🧾','💹','✉️','📧','📨','📩','📤','📥',
+      '📦','📫','📪','📬','📭','📮','🗳️','✏️','✒️','🖋️','🖊️','🖌️','🖍️','📝','📞','☎️','📟','📠','🔋','🪫',
+      '🔌','🔔','🔕','📣','📢','💬','💭','🗯️','⏱️','⏲️','⏰','🕰️','⌛','⏳',
+    ],
+  },
+  Celebration: {
+    keywords: 'party tada confetti balloon cake gift trophy medal star crown fire rocket',
+    chars: [
+      '🎉','🎊','🎈','🎂','🎀','🎁','🎗️','🎟️','🎫','🎖️','🏆','🏅','🥇','🥈','🥉','✨','🌟','⭐','💫','💥',
+      '🔥','🚀','⚡','🌈','👑','💎','🥂','🍾','🥳','🪩','🎭','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🎷','🎺',
+      '🪗','🎸','🪕','🎻','🎲','♟️','🎯','🎳','🎮','🎰','🧩','🪄','🪅','🪆','🧨','🎆','🎇','🎐','🎏','🎎',
+    ],
+  },
+  Symbols: {
+    keywords: 'heart check cross warning question exclamation arrow circle square hundred',
+    chars: [
+      '❤️','🩷','🧡','💛','💚','💙','🩵','💜','🖤','🩶','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘',
+      '💝','💟','☮️','✝️','☪️','🕉️','☸️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍',
+      '♎','♏','♐','♑','♒','♓','🆔','⚛️','🉑','☢️','☣️','📴','📳','🈶','🈚','🈸','🈺','🈷️','✴️','🆚',
+      '💮','🉐','㊙️','㊗️','🈴','🈵','🈹','🈲','🅰️','🅱️','🆎','🆑','🅾️','🆘','❌','⭕','🛑','⛔','📛','🚫',
+      '💯','💢','♨️','🚷','🚯','🚳','🚱','🔞','📵','🚭','❗','❕','❓','❔','‼️','⁉️','🔅','🔆','〽️','⚠️',
+      '🚸','🔱','⚜️','🔰','♻️','✅','🈯','💹','❇️','✳️','❎','🌐','💠','Ⓜ️','🌀','💤','🏧','🚾','♿','🅿️',
+      '🛗','🈳','🈂️','🛂','🛃','🛄','🛅','🚹','🚺','🚼','⚧️','🚻','🚮','🎦','📶','🈁','🔣','ℹ️','🔤','🔡',
+      '🔠','🆖','🆗','🆙','🆒','🆕','🆓','⬆️','↗️','➡️','↘️','⬇️','↙️','⬅️','↖️','↕️','↔️','↩️','↪️','⤴️','⤵️',
+      '🔃','🔄','🔙','🔚','🔛','🔜','🔝','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔺','🔻','🔸','🔹',
+      '🔶','🔷','🔳','🔲','▪️','▫️','◾','◽','◼️','◻️','🟥','🟧','🟨','🟩','🟦','🟪','⬛','⬜','🟫','🔈',
+      '🔇','🔉','🔊','♾️','☑️','✔️','✖️','➕','➖','➗','➰','➿','〽️','©️','®️','™️',
+    ],
+  },
+  Nature: {
+    keywords: 'dog cat lion tiger horse unicorn bird fish tree flower sun moon star earth fire water',
+    chars: [
+      '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊',
+      '🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌',
+      '🐞','🐜','🪰','🪲','🪳','🦟','🦗','🕷️','🕸️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀',
+      '🪼','🪸','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🦣','🐘','🦛','🦏','🐪',
+      '🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛',
+      '🪶','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔',
+      '🐾','🐉','🐲','🌵','🎄','🌲','🌳','🌴','🪵','🌱','🌿','☘️','🍀','🎍','🪴','🎋','🍃','🍂','🍁','🪺',
+      '🪹','🍄','🐚','🌾','💐','🌷','🌹','🥀','🪷','🌺','🌸','🌼','🌻','🌞','🌝','🌛','🌜','🌚','🌕','🌖',
+      '🌗','🌘','🌑','🌒','🌓','🌔','🌙','🌎','🌍','🌏','🪐','💫','⭐','🌟','✨','⚡','☄️','💥','🔥','🌪️',
+      '🌈','☀️','🌤️','⛅','🌥️','☁️','🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','🌬️','💨','💧','💦','🫧','☔',
+      '☂️','🌊','🌫️',
+    ],
+  },
+  Food: {
+    keywords: 'coffee tea pizza burger fries sushi cake fruit apple banana drink beer wine',
+    chars: [
+      '🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑',
+      '🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🥐','🥯','🍞','🥖','🥨','🧀','🥚','🍳',
+      '🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫓','🥪','🥙','🧆','🌮','🌯','🫔','🥗',
+      '🥘','🫕','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡',
+      '🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🫘','🍯','🥛','🍼',
+      '🫖','☕','🍵','🧃','🥤','🧋','🫙','🍶','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🧉','🍾','🧊','🥄','🍴',
+      '🍽️','🥣','🥡','🥢','🧂',
+    ],
+  },
+  'Travel & Sport': {
+    keywords: 'car plane train rocket bike house building soccer basketball tennis gym medal',
+    chars: [
+      '⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🪀','🏓','🏸','🏒','🏑','🥍','🏏','🪃','🥅','⛳',
+      '🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🥌','🎿','⛷️','🏂','🪂','🏋️‍♀️','🏋️','🏋️‍♂️','🤼‍♀️',
+      '🤼','🤼‍♂️','🤸‍♀️','🤸','🤸‍♂️','⛹️‍♀️','⛹️','⛹️‍♂️','🤺','🤾‍♀️','🤾','🤾‍♂️','🏌️‍♀️','🏌️','🏌️‍♂️','🏇','🧘‍♀️','🧘','🧘‍♂️','🏄‍♀️',
+      '🏄','🏄‍♂️','🏊‍♀️','🏊','🏊‍♂️','🤽‍♀️','🤽','🤽‍♂️','🚣‍♀️','🚣','🚣‍♂️','🧗‍♀️','🧗','🧗‍♂️','🚵‍♀️','🚵','🚵‍♂️','🚴‍♀️','🚴','🚴‍♂️',
+      '🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🦯','🦽','🦼','🛴','🚲','🛵',
+      '🏍️','🛺','🚨','🚔','🚍','🚘','🚖','🛞','🚡','🚠','🚟','🚃','🚋','🚞','🚝','🚄','🚅','🚈','🚂','🚆',
+      '🚇','🚊','🚉','✈️','🛫','🛬','🛩️','💺','🛰️','🚀','🛸','🚁','🛶','⛵','🚤','🛥️','🛳️','⛴️','🚢','⚓',
+      '🛟','⛽','🚧','🚦','🚥','🚏','🗺️','🗿','🗽','🗼','🏰','🏯','🏟️','🎡','🎢','🎠','⛲','⛱️','🏖️','🏝️',
+      '🏜️','🌋','⛰️','🏔️','🗻','🏕️','⛺','🛖','🏠','🏡','🏘️','🏚️','🏗️','🏭','🏢','🏬','🏣','🏤','🏥','🏦',
+      '🏨','🏪','🏫','🏩','💒','🏛️','⛪','🕌','🕍','🛕','🕋','⛩️',
+    ],
+  },
+};
+
+// Large catalog of 84 Google Noto Animated Emojis (codepoints on fonts.gstatic.com)
+export const ANIMATED_EMOJI_CODES: { code: string; keywords: string }[] = [
+  { code: '1f680', keywords: 'rocket launch ship deploy' },
+  { code: '1f525', keywords: 'fire hot lit flame' },
+  { code: '1f389', keywords: 'party popper tada celebrate' },
+  { code: '1f44f', keywords: 'clap applause bravo' },
+  { code: '2764_fe0f', keywords: 'heart red love' },
+  { code: '1f4af', keywords: '100 hundred perfect' },
+  { code: '2728', keywords: 'sparkles shine magic' },
+  { code: '1f92f', keywords: 'mind blown exploding' },
+  { code: '1f973', keywords: 'partying celebrate birthday' },
+  { code: '1f929', keywords: 'star struck excited' },
+  { code: '1f602', keywords: 'joy laughing tears' },
+  { code: '1f923', keywords: 'rofl rolling laughing' },
+  { code: '1f44d', keywords: 'thumbs up like approve' },
+  { code: '1f64c', keywords: 'raising hands hooray' },
+  { code: '1f440', keywords: 'eyes looking watching' },
+  { code: '1f3c6', keywords: 'trophy winner champion' },
+  { code: '26a1', keywords: 'zap lightning high voltage' },
+  { code: '1f60d', keywords: 'heart eyes love' },
+  { code: '1f970', keywords: 'smiling hearts love warm' },
+  { code: '1f60e', keywords: 'sunglasses cool' },
+  { code: '1f914', keywords: 'thinking hmm question' },
+  { code: '1f64f', keywords: 'pray thank you please' },
+  { code: '1f4aa', keywords: 'muscle strong biceps flex' },
+  { code: '1f3af', keywords: 'target bullseye goal' },
+  { code: '1f4a1', keywords: 'light bulb idea' },
+  { code: '1fae1', keywords: 'salute respect' },
+  { code: '1f91d', keywords: 'handshake deal team' },
+  { code: '1f44b', keywords: 'wave hello hi' },
+  { code: '2705', keywords: 'check mark done verified' },
+  { code: '1f38a', keywords: 'confetti ball party' },
+  { code: '1f451', keywords: 'crown king queen' },
+  { code: '1f48e', keywords: 'gem diamond crystal' },
+  { code: '1f31f', keywords: 'glowing star shine' },
+  { code: '1f4a5', keywords: 'boom collision explosion' },
+  { code: '1f600', keywords: 'grinning happy smile' },
+  { code: '1f604', keywords: 'smile happy joy' },
+  { code: '1f601', keywords: 'beaming grin' },
+  { code: '1f606', keywords: 'laughing squinting' },
+  { code: '1f605', keywords: 'sweat smile relief' },
+  { code: '1f609', keywords: 'wink' },
+  { code: '1f60a', keywords: 'blush smile' },
+  { code: '1f607', keywords: 'innocent angel halo' },
+  { code: '1f618', keywords: 'kissing heart' },
+  { code: '1f60b', keywords: 'yum delicious' },
+  { code: '1f61c', keywords: 'wink tongue playful' },
+  { code: '1f92a', keywords: 'zany crazy wild' },
+  { code: '1f911', keywords: 'money mouth rich' },
+  { code: '1f917', keywords: 'hugging warm' },
+  { code: '1f92d', keywords: 'giggle hand over mouth' },
+  { code: '1f92b', keywords: 'shushing quiet' },
+  { code: '1f913', keywords: 'nerd glasses smart' },
+  { code: '1f9d0', keywords: 'monocle inspect' },
+  { code: '1f631', keywords: 'scream shocked omg' },
+  { code: '1f62d', keywords: 'sob crying loud' },
+  { code: '1f624', keywords: 'triumph steam proud' },
+  { code: '1f621', keywords: 'angry rage mad' },
+  { code: '1f97a', keywords: 'pleading puppy eyes' },
+  { code: '1f972', keywords: 'smiling tear grateful' },
+  { code: '1fae0', keywords: 'melting face' },
+  { code: '1fae3', keywords: 'peeking eye' },
+  { code: '1fae2', keywords: 'open eyes hand over mouth' },
+  { code: '1f634', keywords: 'sleeping tired zzz' },
+  { code: '1f975', keywords: 'hot sweating' },
+  { code: '1f976', keywords: 'cold freezing' },
+  { code: '1f920', keywords: 'cowboy hat' },
+  { code: '1f978', keywords: 'disguised glasses' },
+  { code: '1f47b', keywords: 'ghost boo' },
+  { code: '1f916', keywords: 'robot ai bot' },
+  { code: '1f47d', keywords: 'alien ufo' },
+  { code: '1f44c', keywords: 'ok hand perfect' },
+  { code: '270c_fe0f', keywords: 'victory peace' },
+  { code: '1f91e', keywords: 'crossed fingers luck' },
+  { code: '1faf6', keywords: 'heart hands love' },
+  { code: '1f44a', keywords: 'fist bump' },
+  { code: '2615', keywords: 'coffee hot beverage morning' },
+  { code: '1f37b', keywords: 'cheers beers clinking' },
+  { code: '1f942', keywords: 'champagne glasses toast' },
+  { code: '1f382', keywords: 'birthday cake' },
+  { code: '1f388', keywords: 'balloon red' },
+  { code: '1f381', keywords: 'gift present wrapped' },
+  { code: '1f947', keywords: 'first place gold medal' },
+  { code: '1f4c8', keywords: 'chart increasing growth' },
+  { code: '1f4bb', keywords: 'laptop computer code' },
+  { code: '1f514', keywords: 'bell notification' },
+];
+
+export function getAnimatedEmojiUrl(code: string) {
+  return `https://fonts.gstatic.com/s/e/notoemoji/latest/${code}/512.gif`;
 }
 
-const EMOJI_LIBRARY: EmojiEntry[] = [
-  // Smileys
-  { char: '😀', name: 'grinning smile happy', category: 'Smileys' },
-  { char: '😃', name: 'smiley happy open mouth', category: 'Smileys' },
-  { char: '😄', name: 'smile happy joy', category: 'Smileys' },
-  { char: '😁', name: 'grin beaming', category: 'Smileys' },
-  { char: '😆', name: 'laughing satisfied', category: 'Smileys' },
-  { char: '😅', name: 'sweat smile relief', category: 'Smileys' },
-  { char: '🤣', name: 'rofl rolling laughing', category: 'Smileys' },
-  { char: '😂', name: 'joy tears laughing', category: 'Smileys' },
-  { char: '🙂', name: 'slightly smiling', category: 'Smileys' },
-  { char: '😉', name: 'wink', category: 'Smileys' },
-  { char: '😊', name: 'blush warm smile', category: 'Smileys' },
-  { char: '😇', name: 'innocent angel halo', category: 'Smileys' },
-  { char: '🥰', name: 'smiling hearts love', category: 'Smileys' },
-  { char: '😍', name: 'heart eyes love', category: 'Smileys' },
-  { char: '🤩', name: 'star struck excited', category: 'Smileys' },
-  { char: '😘', name: 'kissing heart', category: 'Smileys' },
-  { char: '😋', name: 'yum delicious', category: 'Smileys' },
-  { char: '😎', name: 'sunglasses cool', category: 'Smileys' },
-  { char: '🤓', name: 'nerd glasses smart', category: 'Smileys' },
-  { char: '🧐', name: 'monocle inspect curious', category: 'Smileys' },
-  { char: '🤔', name: 'thinking hmm question', category: 'Smileys' },
-  { char: '🫡', name: 'salute respect yes sir', category: 'Smileys' },
-  { char: '🤗', name: 'hugging warm', category: 'Smileys' },
-  { char: '🤭', name: 'giggle hand over mouth', category: 'Smileys' },
-  { char: '🤫', name: 'shushing quiet secret', category: 'Smileys' },
-  { char: '😌', name: 'relieved calm', category: 'Smileys' },
-  { char: '🥳', name: 'partying celebrate birthday', category: 'Smileys' },
-  { char: '🤯', name: 'mind blown exploding head', category: 'Smileys' },
-  { char: '😳', name: 'flushed surprised', category: 'Smileys' },
-  { char: '🥺', name: 'pleading puppy eyes', category: 'Smileys' },
-  { char: '😢', name: 'cry sad tear', category: 'Smileys' },
-  { char: '😭', name: 'sob crying loud', category: 'Smileys' },
-  { char: '😤', name: 'triumph steam proud', category: 'Smileys' },
-  { char: '😴', name: 'sleeping zzz tired', category: 'Smileys' },
-  { char: '🤒', name: 'sick thermometer ill', category: 'Smileys' },
-  { char: '🤠', name: 'cowboy hat', category: 'Smileys' },
-
-  // Gestures
-  { char: '👍', name: 'thumbs up like approve yes', category: 'Gestures' },
-  { char: '👎', name: 'thumbs down dislike', category: 'Gestures' },
-  { char: '👏', name: 'clap applause bravo', category: 'Gestures' },
-  { char: '🙌', name: 'raised hands hooray celebrate', category: 'Gestures' },
-  { char: '🤝', name: 'handshake deal agreement team', category: 'Gestures' },
-  { char: '🙏', name: 'pray thank you please', category: 'Gestures' },
-  { char: '💪', name: 'muscle strong biceps flex', category: 'Gestures' },
-  { char: '✌️', name: 'victory peace', category: 'Gestures' },
-  { char: '🤞', name: 'crossed fingers luck', category: 'Gestures' },
-  { char: '👌', name: 'ok hand perfect', category: 'Gestures' },
-  { char: '🫶', name: 'heart hands love', category: 'Gestures' },
-  { char: '👋', name: 'wave hello hi goodbye', category: 'Gestures' },
-  { char: '🤚', name: 'raised back of hand', category: 'Gestures' },
-  { char: '✋', name: 'raised hand high five', category: 'Gestures' },
-  { char: '👊', name: 'fist bump punch', category: 'Gestures' },
-  { char: '☝️', name: 'point up one', category: 'Gestures' },
-  { char: '👆', name: 'point up', category: 'Gestures' },
-  { char: '👇', name: 'point down', category: 'Gestures' },
-  { char: '👉', name: 'point right', category: 'Gestures' },
-  { char: '👈', name: 'point left', category: 'Gestures' },
-  { char: '👀', name: 'eyes looking watching review', category: 'Gestures' },
-  { char: '🧠', name: 'brain smart genius', category: 'Gestures' },
-  { char: '✍️', name: 'writing hand sign', category: 'Gestures' },
-  { char: '🫡', name: 'saluting', category: 'Gestures' },
-
-  // Work & Office
-  { char: '🚀', name: 'rocket launch ship deploy', category: 'Work' },
-  { char: '💼', name: 'briefcase business work', category: 'Work' },
-  { char: '💻', name: 'laptop computer code', category: 'Work' },
-  { char: '📈', name: 'chart increasing growth up', category: 'Work' },
-  { char: '📊', name: 'bar chart analytics metrics', category: 'Work' },
-  { char: '📌', name: 'pushpin pin important', category: 'Work' },
-  { char: '📍', name: 'round pin location', category: 'Work' },
-  { char: '📎', name: 'paperclip attachment', category: 'Work' },
-  { char: '📅', name: 'calendar schedule date', category: 'Work' },
-  { char: '📝', name: 'memo note document', category: 'Work' },
-  { char: '📁', name: 'folder file directory', category: 'Work' },
-  { char: '💡', name: 'light bulb idea insight', category: 'Work' },
-  { char: '🎯', name: 'bullseye target goal okr', category: 'Work' },
-  { char: '⚡', name: 'zap lightning fast energy', category: 'Work' },
-  { char: '🔥', name: 'fire hot lit awesome', category: 'Work' },
-  { char: '🛠️', name: 'tools hammer wrench fix', category: 'Work' },
-  { char: '⚙️', name: 'gear settings config', category: 'Work' },
-  { char: '🔒', name: 'locked security private', category: 'Work' },
-  { char: '🔑', name: 'key access', category: 'Work' },
-  { char: '📣', name: 'megaphone announcement', category: 'Work' },
-  { char: '🔔', name: 'bell notification reminder', category: 'Work' },
-  { char: '⏱️', name: 'stopwatch timer deadline', category: 'Work' },
-  { char: '💬', name: 'speech bubble comment chat', category: 'Work' },
-  { char: '🏛️', name: 'building headquarters office', category: 'Work' },
-
-  // Celebration
-  { char: '🎉', name: 'party popper tada congrats', category: 'Celebration' },
-  { char: '🎊', name: 'confetti ball celebrate', category: 'Celebration' },
-  { char: '🏆', name: 'trophy winner champion award', category: 'Celebration' },
-  { char: '🥇', name: 'first place gold medal', category: 'Celebration' },
-  { char: '🥈', name: 'second place silver medal', category: 'Celebration' },
-  { char: '🥉', name: 'third place bronze medal', category: 'Celebration' },
-  { char: '🎖️', name: 'medal honor', category: 'Celebration' },
-  { char: '🎈', name: 'balloon party birthday', category: 'Celebration' },
-  { char: '🎂', name: 'birthday cake', category: 'Celebration' },
-  { char: '🥂', name: 'clinking glasses cheers toast', category: 'Celebration' },
-  { char: '🎁', name: 'gift present box', category: 'Celebration' },
-  { char: '✨', name: 'sparkles magic shine new', category: 'Celebration' },
-  { char: '🌟', name: 'glowing star shine', category: 'Celebration' },
-  { char: '⭐', name: 'star favorite', category: 'Celebration' },
-  { char: '🌈', name: 'rainbow', category: 'Celebration' },
-  { char: '👑', name: 'crown king queen', category: 'Celebration' },
-
-  // Symbols & Hearts
-  { char: '❤️', name: 'red heart love', category: 'Symbols' },
-  { char: '🧡', name: 'orange heart', category: 'Symbols' },
-  { char: '💛', name: 'yellow heart', category: 'Symbols' },
-  { char: '💚', name: 'green heart', category: 'Symbols' },
-  { char: '💙', name: 'blue heart', category: 'Symbols' },
-  { char: '💜', name: 'purple heart', category: 'Symbols' },
-  { char: '🖤', name: 'black heart', category: 'Symbols' },
-  { char: '🤍', name: 'white heart', category: 'Symbols' },
-  { char: '💯', name: '100 hundred percent perfect', category: 'Symbols' },
-  { char: '✅', name: 'check mark done completed', category: 'Symbols' },
-  { char: '☑️', name: 'ballot check box', category: 'Symbols' },
-  { char: '❌', name: 'cross mark no cancel', category: 'Symbols' },
-  { char: '⚠️', name: 'warning alert caution', category: 'Symbols' },
-  { char: '❗', name: 'exclamation important', category: 'Symbols' },
-  { char: '❓', name: 'question mark', category: 'Symbols' },
-  { char: '♻️', name: 'recycle sync', category: 'Symbols' },
-  { char: '🟢', name: 'green circle online active', category: 'Symbols' },
-  { char: '🟡', name: 'yellow circle away', category: 'Symbols' },
-  { char: '🔴', name: 'red circle busy live', category: 'Symbols' },
-  { char: '🟣', name: 'purple circle brand', category: 'Symbols' },
-
-  // Food & Nature
-  { char: '☕', name: 'coffee tea morning break', category: 'Food & Nature' },
-  { char: '🍵', name: 'green tea', category: 'Food & Nature' },
-  { char: '🍕', name: 'pizza lunch', category: 'Food & Nature' },
-  { char: '🍔', name: 'burger lunch', category: 'Food & Nature' },
-  { char: '🥐', name: 'croissant breakfast', category: 'Food & Nature' },
-  { char: '🍩', name: 'donut sweet', category: 'Food & Nature' },
-  { char: '🍎', name: 'apple fruit', category: 'Food & Nature' },
-  { char: '🥑', name: 'avocado', category: 'Food & Nature' },
-  { char: '🌮', name: 'taco', category: 'Food & Nature' },
-  { char: '🍣', name: 'sushi', category: 'Food & Nature' },
-  { char: '🌞', name: 'sun morning bright', category: 'Food & Nature' },
-  { char: '🌙', name: 'moon night', category: 'Food & Nature' },
-  { char: '🌍', name: 'earth globe africa world', category: 'Food & Nature' },
-  { char: '🌿', name: 'herb plant growth', category: 'Food & Nature' },
-  { char: '🌸', name: 'cherry blossom flower', category: 'Food & Nature' },
-  { char: '🦁', name: 'lion brave', category: 'Food & Nature' },
-];
-
-const ANIMATED_EMOJIS = [
-  { label: 'Rocket Launch', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif' },
-  { label: 'Fire', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif' },
-  { label: 'Party Popper', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif' },
-  { label: 'Clapping Hands', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44f/512.gif' },
-  { label: 'Red Heart', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2764_fe0f/512.gif' },
-  { label: 'Hundred Points', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif' },
-  { label: 'Sparkles', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2728/512.gif' },
-  { label: 'Mind Blown', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f92f/512.gif' },
-  { label: 'Partying Face', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f973/512.gif' },
-  { label: 'Star Struck', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f929/512.gif' },
-  { label: 'Tears of Joy', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f602/512.gif' },
-  { label: 'Thumbs Up', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif' },
-  { label: 'Raising Hands', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f64c/512.gif' },
-  { label: 'Eyes Watching', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f440/512.gif' },
-  { label: 'Trophy', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3c6/512.gif' },
-  { label: 'High Voltage', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/26a1/512.gif' },
-  { label: 'Heart Eyes', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif' },
-  { label: 'Cool Sunglasses', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60e/512.gif' },
-  { label: 'Thinking Face', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f914/512.gif' },
-  { label: 'Thank You', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f64f/512.gif' },
-  { label: 'Flexed Biceps', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4aa/512.gif' },
-  { label: 'Target Bullseye', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3af/512.gif' },
-  { label: 'Light Bulb Idea', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4a1/512.gif' },
-  { label: 'Salute', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fae1/512.gif' },
-];
-
 const FALLBACK_GIFS = [
-  {
-    id: 'fb-1',
-    title: 'High Five Team',
-    url: 'https://media.giphy.com/media/3oEjHV0z8S7WM4MwnK/giphy.gif',
-    preview: 'https://media.giphy.com/media/3oEjHV0z8S7WM4MwnK/200w.gif',
-  },
-  {
-    id: 'fb-2',
-    title: 'Applause Great Job',
-    url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',
-    preview: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200w.gif',
-  },
-  {
-    id: 'fb-3',
-    title: 'Typing Fast Engineer',
-    url: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif',
-    preview: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/200w.gif',
-  },
-  {
-    id: 'fb-4',
-    title: 'Mind Blown',
-    url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif',
-    preview: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/200w.gif',
-  },
-  {
-    id: 'fb-5',
-    title: 'Party Celebration',
-    url: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif',
-    preview: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/200w.gif',
-  },
-  {
-    id: 'fb-6',
-    title: 'Ship It Rocket',
-    url: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif',
-    preview: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/200w.gif',
-  },
+  { id: 'fb-1', url: 'https://media.giphy.com/media/3oEjHV0z8S7WM4MwnK/giphy.gif', preview: 'https://media.giphy.com/media/3oEjHV0z8S7WM4MwnK/200w.gif' },
+  { id: 'fb-2', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif', preview: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200w.gif' },
+  { id: 'fb-3', url: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif', preview: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/200w.gif' },
+  { id: 'fb-4', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif', preview: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/200w.gif' },
+  { id: 'fb-5', url: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif', preview: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/200w.gif' },
+  { id: 'fb-6', url: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif', preview: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/200w.gif' },
+  { id: 'fb-7', url: 'https://media.giphy.com/media/hPTZgtzfRIB5Nfb5rL/giphy.gif', preview: 'https://media.giphy.com/media/hPTZgtzfRIB5Nfb5rL/200w.gif' },
+  { id: 'fb-8', url: 'https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif', preview: 'https://media.giphy.com/media/blSTtZehjAZ8I/200w.gif' },
+  { id: 'fb-9', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif', preview: 'https://media.giphy.com/media/111ebonMs90YLu/200w.gif' },
+  { id: 'fb-10', url: 'https://media.giphy.com/media/XreQmk7ETCak0/giphy.gif', preview: 'https://media.giphy.com/media/XreQmk7ETCak0/200w.gif' },
+  { id: 'fb-11', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', preview: 'https://media.giphy.com/media/g9582DNuQppxC/200w.gif' },
+  { id: 'fb-12', url: 'https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif', preview: 'https://media.giphy.com/media/5GoVLqeAOo6PK/200w.gif' },
 ];
 
-const EMOJI_CATEGORIES = ['All', 'Smileys', 'Gestures', 'Work', 'Celebration', 'Symbols', 'Food & Nature'] as const;
-const GIF_QUICK_TAGS = ['Trending', 'Celebrate', 'Applause', 'Thumbs Up', 'Launch', 'Mind Blown', 'Thank You', 'Coding'];
+const GIF_QUICK_TAGS = [
+  'Trending',
+  'Celebrate',
+  'Applause',
+  'Thumbs Up',
+  'Launch',
+  'Mind Blown',
+  'Thank You',
+  'Coding',
+  'High Five',
+  'Excited',
+  'Laughing',
+  'Coffee',
+];
 
 export function EmojiGifPicker({
   onSelectEmoji,
+  onSelectAnimatedEmoji,
   onSelectGif,
   onClose,
   initialTab = 'emoji',
 }: EmojiGifPickerProps) {
   const [activeTab, setActiveTab] = useState<PickerTab>(initialTab);
   const [emojiSearch, setEmojiSearch] = useState('');
-  const [emojiCategory, setEmojiCategory] = useState<(typeof EMOJI_CATEGORIES)[number]>('All');
+  const [emojiCategory, setEmojiCategory] = useState<EmojiCategory>('All');
+  const [animSearch, setAnimSearch] = useState('');
 
   const [gifSearch, setGifSearch] = useState('');
-  const [gifResults, setGifResults] = useState<{ id: string; title: string; url: string; preview: string }[]>(FALLBACK_GIFS);
+  const [gifResults, setGifResults] = useState<{ id: string; url: string; preview: string }[]>(FALLBACK_GIFS);
+  const [gifNextPos, setGifNextPos] = useState<string>('');
   const [isLoadingGifs, setIsLoadingGifs] = useState(false);
 
-  // Live Tenor GIF API search
+  // Sync tab when initialTab prop changes
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  // Fetch 48 GIFs from live Tenor API
+  const fetchTenorGifs = async (query: string, posCursor = '', append = false, signal?: AbortSignal) => {
+    setIsLoadingGifs(true);
+    try {
+      const trimmed = query.trim();
+      const base =
+        trimmed.length > 0 && trimmed.toLowerCase() !== 'trending'
+          ? `https://g.tenor.com/v1/search?q=${encodeURIComponent(trimmed)}&key=LIVDSRZULELA&limit=48&media_filter=minimal`
+          : `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=48&media_filter=minimal`;
+      const endpoint = posCursor ? `${base}&pos=${encodeURIComponent(posCursor)}` : base;
+
+      const res = await fetch(endpoint, { signal });
+      if (!res.ok) throw new Error('Tenor API error');
+      const data = await res.json();
+      if (Array.isArray(data?.results) && data.results.length > 0) {
+        const mapped = data.results
+          .map((item: any) => {
+            const media = item.media?.[0];
+            const fullGif = media?.gif?.url || media?.mediumgif?.url || media?.tinygif?.url;
+            const previewGif = media?.tinygif?.url || media?.nanogif?.url || fullGif;
+            if (!fullGif) return null;
+            return {
+              id: String(item.id),
+              url: fullGif,
+              preview: previewGif,
+            };
+          })
+          .filter(Boolean) as { id: string; url: string; preview: string }[];
+
+        if (mapped.length > 0) {
+          setGifResults((prev) => (append ? [...prev, ...mapped] : mapped));
+          setGifNextPos(data.next || '');
+        }
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        // Keep current or fallback GIFs
+      }
+    } finally {
+      setIsLoadingGifs(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== 'gif') return;
-    let isCancelled = false;
     const controller = new AbortController();
-
-    const fetchGifs = async () => {
-      setIsLoadingGifs(true);
-      try {
-        const trimmed = gifSearch.trim();
-        const endpoint =
-          trimmed.length > 0 && trimmed.toLowerCase() !== 'trending'
-            ? `https://g.tenor.com/v1/search?q=${encodeURIComponent(trimmed)}&key=LIVDSRZULELA&limit=24&media_filter=minimal`
-            : `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=24&media_filter=minimal`;
-
-        const res = await fetch(endpoint, { signal: controller.signal });
-        if (!res.ok) throw new Error('Tenor API error');
-        const data = await res.json();
-        if (!isCancelled && Array.isArray(data?.results) && data.results.length > 0) {
-          const mapped = data.results
-            .map((item: any) => {
-              const media = item.media?.[0];
-              const fullGif = media?.gif?.url || media?.mediumgif?.url || media?.tinygif?.url;
-              const previewGif = media?.tinygif?.url || media?.nanogif?.url || fullGif;
-              if (!fullGif) return null;
-              return {
-                id: String(item.id),
-                title: item.content_description || item.title || 'Animated GIF',
-                url: fullGif,
-                preview: previewGif,
-              };
-            })
-            .filter(Boolean);
-          if (mapped.length > 0) {
-            setGifResults(mapped);
-          }
-        }
-      } catch (err: any) {
-        if (err?.name !== 'AbortError' && !isCancelled) {
-          // Keep current or fallback GIFs if network blocked
-        }
-      } finally {
-        if (!isCancelled) setIsLoadingGifs(false);
-      }
-    };
-
-    const timer = setTimeout(fetchGifs, 220);
+    const timer = setTimeout(() => {
+      fetchTenorGifs(gifSearch, '', false, controller.signal);
+    }, 200);
     return () => {
-      isCancelled = true;
       controller.abort();
       clearTimeout(timer);
     };
   }, [activeTab, gifSearch]);
 
-  const filteredEmojis = EMOJI_LIBRARY.filter((item) => {
-    const matchesCategory = emojiCategory === 'All' || item.category === emojiCategory;
-    const matchesQuery =
-      !emojiSearch.trim() ||
-      item.name.toLowerCase().includes(emojiSearch.trim().toLowerCase()) ||
-      item.char.includes(emojiSearch.trim());
-    return matchesCategory && matchesQuery;
-  });
+  // Filtered Emojis
+  const displayedEmojis = React.useMemo(() => {
+    const q = emojiSearch.trim().toLowerCase();
+    const categoriesToScan =
+      emojiCategory === 'All'
+        ? (Object.keys(EMOJI_GROUPS) as Exclude<EmojiCategory, 'All'>[])
+        : [emojiCategory];
+
+    const list: string[] = [];
+    categoriesToScan.forEach((cat) => {
+      const group = EMOJI_GROUPS[cat];
+      if (!q || group.keywords.includes(q) || cat.toLowerCase().includes(q)) {
+        list.push(...group.chars);
+      } else {
+        group.chars.forEach((ch) => {
+          if (ch.includes(q)) list.push(ch);
+        });
+      }
+    });
+    return list;
+  }, [emojiCategory, emojiSearch]);
+
+  // Filtered Animated Emojis
+  const displayedAnimated = React.useMemo(() => {
+    const q = animSearch.trim().toLowerCase();
+    if (!q) return ANIMATED_EMOJI_CODES;
+    return ANIMATED_EMOJI_CODES.filter((a) => a.keywords.includes(q));
+  }, [animSearch]);
 
   return (
     <div
@@ -322,11 +389,11 @@ export function EmojiGifPicker({
         bottom: 'calc(100% + 10px)',
         right: 16,
         zIndex: 90,
-        width: 360,
+        width: 392,
         background: '#FFFFFF',
         borderRadius: 16,
         border: '1px solid var(--card-border, #E4E4E7)',
-        boxShadow: '0 20px 48px -12px rgba(17, 17, 24, 0.18), 0 4px 14px -2px rgba(17, 17, 24, 0.08)',
+        boxShadow: '0 20px 48px -12px rgba(17, 17, 24, 0.2), 0 4px 14px -2px rgba(17, 17, 24, 0.08)',
         overflow: 'hidden',
         color: 'var(--text-1, #18181B)',
       }}
@@ -363,7 +430,7 @@ export function EmojiGifPicker({
             }}
           >
             <Smile size={13.5} />
-            <span>Emojis</span>
+            <span>Emojis ({displayedEmojis.length})</span>
           </button>
 
           <button
@@ -386,7 +453,7 @@ export function EmojiGifPicker({
             }}
           >
             <Zap size={13.5} />
-            <span>Animated</span>
+            <span>Animated ({ANIMATED_EMOJI_CODES.length})</span>
           </button>
 
           <button
@@ -409,7 +476,7 @@ export function EmojiGifPicker({
             }}
           >
             <Sparkles size={13.5} />
-            <span>Live GIFs</span>
+            <span>GIFs</span>
           </button>
         </div>
 
@@ -434,10 +501,9 @@ export function EmojiGifPicker({
         </button>
       </div>
 
-      {/* TAB 1: FULL CATEGORIZED EMOJIS */}
+      {/* TAB 1: 500+ CATEGORIZED EMOJIS */}
       {activeTab === 'emoji' && (
         <div style={{ padding: 12 }}>
-          {/* Search Input */}
           <div style={{ position: 'relative', marginBottom: 8 }}>
             <Search
               size={13}
@@ -451,7 +517,7 @@ export function EmojiGifPicker({
             />
             <input
               type="text"
-              placeholder="Search all emojis (rocket, clap, heart, coffee...)"
+              placeholder="Search 500+ emojis..."
               value={emojiSearch}
               onChange={(e) => setEmojiSearch(e.target.value)}
               style={{
@@ -506,154 +572,144 @@ export function EmojiGifPicker({
             })}
           </div>
 
-          {/* Emoji Grid */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(8, 1fr)',
-              gap: 4,
-              maxHeight: 230,
+              gridTemplateColumns: 'repeat(9, 1fr)',
+              gap: 3,
+              maxHeight: 255,
               overflowY: 'auto',
               paddingRight: 2,
             }}
           >
-            {filteredEmojis.length > 0 ? (
-              filteredEmojis.map((item, idx) => (
-                <button
-                  key={`${item.char}-${idx}`}
-                  type="button"
-                  title={item.name}
-                  onClick={() => {
-                    onSelectEmoji(item.char);
-                    onClose();
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 19,
-                    borderRadius: 8,
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background 0.12s ease, transform 0.12s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#F4F4F5';
-                    e.currentTarget.style.transform = 'scale(1.18)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  {item.char}
-                </button>
-              ))
-            ) : (
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  textAlign: 'center',
-                  padding: '28px 8px',
-                  fontSize: 12,
-                  color: 'var(--text-3, #A1A1AA)',
-                }}
-              >
-                No matching emojis found.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: ANIMATED EMOJIS */}
-      {activeTab === 'animated' && (
-        <div style={{ padding: 12 }}>
-          <div
-            style={{
-              fontSize: 10.5,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--text-3, #A1A1AA)',
-              marginBottom: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>Animated Stickers & Reactions</span>
-            <span style={{ fontSize: 10, color: 'var(--primary)' }}>Click to send</span>
-          </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 8,
-              maxHeight: 260,
-              overflowY: 'auto',
-            }}
-          >
-            {ANIMATED_EMOJIS.map((anim) => (
+            {displayedEmojis.map((char, idx) => (
               <button
-                key={anim.label}
+                key={`${char}-${idx}`}
                 type="button"
                 onClick={() => {
-                  onSelectGif(anim.url, anim.label);
-                  onClose();
+                  onSelectEmoji(char);
                 }}
                 style={{
+                  width: 36,
+                  height: 36,
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 4,
-                  padding: '8px 4px',
-                  borderRadius: 10,
-                  border: '1px solid var(--card-border, #E4E4E7)',
-                  background: '#FAF9F7',
+                  fontSize: 19,
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'transparent',
                   cursor: 'pointer',
-                  transition: 'all 0.14s ease',
+                  transition: 'background 0.1s ease, transform 0.1s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary, #A238FF)';
-                  e.currentTarget.style.background = 'var(--primary-tint, #F5EBFF)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.background = '#F4F4F5';
+                  e.currentTarget.style.transform = 'scale(1.18)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--card-border, #E4E4E7)';
-                  e.currentTarget.style.background = '#FAF9F7';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                <img
-                  src={anim.url}
-                  alt={anim.label}
-                  style={{ width: 42, height: 42, objectFit: 'contain', display: 'block' }}
-                  loading="lazy"
-                />
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--text-2, #52525B)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: '100%',
-                  }}
-                >
-                  {anim.label}
-                </span>
+                {char}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* TAB 3: LIVE TENOR GIF SEARCH */}
+      {/* TAB 2: 84 ANIMATED EMOJIS (Inserted Inline After Text — No Labels!) */}
+      {activeTab === 'animated' && (
+        <div style={{ padding: 12 }}>
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <Search
+              size={13}
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search animated emojis (fire, rocket, clap, heart...)"
+              value={animSearch}
+              onChange={(e) => setAnimSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 10px 7px 30px',
+                fontSize: 12,
+                background: '#FAF9F7',
+                border: '1px solid var(--card-border, #E4E4E7)',
+                borderRadius: 8,
+                outline: 'none',
+                color: 'var(--text-1, #18181B)',
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: 6,
+              maxHeight: 265,
+              overflowY: 'auto',
+              padding: 2,
+            }}
+          >
+            {displayedAnimated.map((anim) => {
+              const url = getAnimatedEmojiUrl(anim.code);
+              return (
+                <button
+                  key={anim.code}
+                  type="button"
+                  onClick={() => {
+                    if (onSelectAnimatedEmoji) {
+                      onSelectAnimatedEmoji(anim.code, url);
+                    } else {
+                      onSelectEmoji(`[:anim:${anim.code}:]`);
+                    }
+                  }}
+                  style={{
+                    height: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 10,
+                    border: '1px solid transparent',
+                    background: '#FAF9F7',
+                    cursor: 'pointer',
+                    padding: 4,
+                    transition: 'all 0.12s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--primary, #A238FF)';
+                    e.currentTarget.style.background = 'var(--primary-tint, #F5EBFF)';
+                    e.currentTarget.style.transform = 'scale(1.14)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.background = '#FAF9F7';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    style={{ width: 32, height: 32, objectFit: 'contain', display: 'block' }}
+                    loading="lazy"
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: LIVE TENOR GIF SEARCH (Large Stock + Load More + Clean Visual Grid) */}
       {activeTab === 'gif' && (
         <div style={{ padding: 12 }}>
           <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -669,7 +725,7 @@ export function EmojiGifPicker({
             />
             <input
               type="text"
-              placeholder="Search any GIF via Tenor..."
+              placeholder="Search any GIF..."
               value={gifSearch}
               onChange={(e) => setGifSearch(e.target.value)}
               autoFocus
@@ -739,72 +795,68 @@ export function EmojiGifPicker({
             })}
           </div>
 
-          {/* GIF Grid */}
+          {/* Clean Visual GIF Grid — No Title Overlays */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: 8,
-              maxHeight: 230,
+              gap: 6,
+              maxHeight: 255,
               overflowY: 'auto',
             }}
           >
-            {gifResults.length > 0 ? (
-              gifResults.map((gif) => (
-                <button
-                  key={gif.id + gif.url}
-                  type="button"
-                  onClick={() => {
-                    onSelectGif(gif.url, gif.title);
-                    onClose();
-                  }}
-                  style={{
-                    position: 'relative',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    border: '1px solid var(--card-border, #E4E4E7)',
-                    background: '#F4F4F5',
-                    padding: 0,
-                    height: 92,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <img
-                    src={gif.preview}
-                    alt={gif.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    loading="lazy"
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 'auto 0 0 0',
-                      padding: '4px 6px',
-                      background: 'linear-gradient(to top, rgba(0,0,0,0.72), transparent)',
-                      color: '#FFFFFF',
-                      fontSize: 10,
-                      textAlign: 'left',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {gif.title}
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div
+            {gifResults.map((gif, idx) => (
+              <button
+                key={`${gif.id}-${idx}`}
+                type="button"
+                onClick={() => {
+                  onSelectGif(gif.url);
+                  onClose();
+                }}
                 style={{
-                  gridColumn: '1 / -1',
-                  textAlign: 'center',
-                  padding: '24px 8px',
-                  fontSize: 12,
-                  color: 'var(--text-3, #A1A1AA)',
+                  position: 'relative',
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  border: '1px solid var(--card-border, #E4E4E7)',
+                  background: '#F4F4F5',
+                  padding: 0,
+                  height: 98,
+                  cursor: 'pointer',
                 }}
               >
-                No GIFs found for &ldquo;{gifSearch}&rdquo;.
-              </div>
+                <img
+                  src={gif.preview}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  loading="lazy"
+                />
+              </button>
+            ))}
+
+            {gifNextPos && (
+              <button
+                type="button"
+                onClick={() => fetchTenorGifs(gifSearch, gifNextPos, true)}
+                disabled={isLoadingGifs}
+                style={{
+                  gridColumn: '1 / -1',
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid var(--card-border, #E4E4E7)',
+                  background: '#FAF9F7',
+                  color: 'var(--text-1, #18181B)',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                {isLoadingGifs ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                <span>Load More GIFs</span>
+              </button>
             )}
           </div>
         </div>

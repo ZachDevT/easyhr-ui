@@ -21,6 +21,21 @@ export interface ChatAttachment {
   mimeType?: string;
 }
 
+export interface ChatPollOption {
+  id: string;
+  text: string;
+  voterIds: string[];
+}
+
+export interface ChatPoll {
+  id: string;
+  question: string;
+  options: ChatPollOption[];
+  allowMultiple: boolean;
+  anonymous: boolean;
+  closed?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   channelId: string;
@@ -31,6 +46,7 @@ export interface ChatMessage {
   content: string;
   createdAt: string; // ISO or formatted
   attachments?: ChatAttachment[];
+  poll?: ChatPoll;
   reactions?: Record<string, ChatReaction>; // emoji -> ChatReaction
   replyCount?: number;
   replies?: ChatMessage[];
@@ -63,7 +79,14 @@ interface ChatContextType {
   allMessages: ChatMessage[];
   activeThread: ChatMessage | null;
   setActiveThread: (msg: ChatMessage | null) => void;
-  sendMessage: (content: string, attachments?: ChatAttachment[], threadParentId?: string) => void;
+  sendMessage: (
+    content: string,
+    attachments?: ChatAttachment[],
+    threadParentId?: string,
+    poll?: ChatPoll
+  ) => void;
+  votePoll: (messageId: string, optionId: string) => void;
+  closePoll: (messageId: string) => void;
   deleteMessage: (messageId: string, threadParentId?: string) => void;
   togglePinMessage: (messageId: string) => void;
   toggleReaction: (messageId: string, emoji: string, threadParentId?: string) => void;
@@ -86,7 +109,7 @@ interface ChatContextType {
 }
 
 const STORAGE_KEY_CHANNELS = 'easyhr_chat_channels_v3';
-const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v4';
+const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v5';
 
 const DEFAULT_CHANNELS: ChatChannel[] = [
   {
@@ -263,7 +286,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Elena Rostova',
     senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
     senderRole: 'Lead Product Designer',
-    content: "Here is the updated workspace architecture & design system preview for the upcoming sprint.",
+    content: "Here is the updated workspace architecture & design system preview for the upcoming sprint [:anim:1f680:] [:anim:1f525:]",
     createdAt: '11:05 AM',
     attachments: [
       {
@@ -282,6 +305,31 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
       },
     ],
     reactions: { '❤️': { emoji: '❤️', count: 4, users: ['1', '2', 'user', '4'] } },
+    replyCount: 0,
+    replies: [],
+  },
+  {
+    id: 'msg-poll-1',
+    channelId: 'ch-general',
+    senderId: '1',
+    senderName: 'Sarah Johnson',
+    senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+    senderRole: 'HR Director',
+    content: 'Team, please cast your vote for our Q4 All-Hands & Engineering Offsite format [:anim:1f389:]',
+    createdAt: '11:22 AM',
+    poll: {
+      id: 'poll-101',
+      question: 'Preferred format & schedule for the Q4 Product & Culture Town Hall?',
+      allowMultiple: false,
+      anonymous: false,
+      closed: false,
+      options: [
+        { id: 'opt-1', text: 'Friday Afternoon — Hybrid HQ + Live Stream', voterIds: ['1', '2', '3', 'user'] },
+        { id: 'opt-2', text: 'Thursday Morning — Executive Keynote + Breakouts', voterIds: ['4', '5'] },
+        { id: 'opt-3', text: 'Wednesday Full-Day — Offsite Retreat & Demo Day', voterIds: ['6'] },
+      ],
+    },
+    reactions: { '🙌': { emoji: '🙌', count: 3, users: ['2', '3', 'user'] } },
     replyCount: 0,
     replies: [],
   },
@@ -442,10 +490,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [allMessages, activeChannelId]
   );
 
-  // Send message or reply
+  // Send message, reply, or poll
   const sendMessage = useCallback(
-    (content: string, attachments?: ChatAttachment[], threadParentId?: string) => {
-      if (!content.trim() && (!attachments || attachments.length === 0)) return;
+    (content: string, attachments?: ChatAttachment[], threadParentId?: string, poll?: ChatPoll) => {
+      if (!content.trim() && (!attachments || attachments.length === 0) && !poll) return;
 
       const myId = String(currentUser?.id || 'user');
       const myName = `${currentUser?.firstName || 'User'} ${currentUser?.lastName || ''}`.trim();
@@ -461,6 +509,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         content,
         createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         attachments: attachments || [],
+        poll,
         reactions: {},
         replyCount: 0,
         replies: [],
@@ -490,6 +539,57 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     },
     [activeChannelId, currentUser, activeThread]
   );
+
+  // Vote on a poll option
+  const votePoll = useCallback(
+    (messageId: string, optionId: string) => {
+      const myId = String(currentUser?.id || 'user');
+      setAllMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId || !m.poll || m.poll.closed) return m;
+          const allowMultiple = m.poll.allowMultiple;
+          const updatedOptions = m.poll.options.map((opt) => {
+            const hasVoted = opt.voterIds.includes(myId) || (myId !== 'user' && opt.voterIds.includes('user'));
+            if (opt.id === optionId) {
+              if (hasVoted) {
+                return {
+                  ...opt,
+                  voterIds: opt.voterIds.filter((v) => v !== myId && v !== 'user'),
+                };
+              }
+              return {
+                ...opt,
+                voterIds: [...opt.voterIds.filter((v) => v !== 'user'), myId],
+              };
+            } else if (!allowMultiple) {
+              return {
+                ...opt,
+                voterIds: opt.voterIds.filter((v) => v !== myId && v !== 'user'),
+              };
+            }
+            return opt;
+          });
+          return {
+            ...m,
+            poll: {
+              ...m.poll,
+              options: updatedOptions,
+            },
+          };
+        })
+      );
+    },
+    [currentUser]
+  );
+
+  // Close a poll
+  const closePoll = useCallback((messageId: string) => {
+    setAllMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.poll ? { ...m, poll: { ...m.poll, closed: !m.poll.closed } } : m
+      )
+    );
+  }, []);
 
   // Delete message
   const deleteMessage = useCallback(
@@ -738,6 +838,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         activeThread,
         setActiveThread,
         sendMessage,
+        votePoll,
+        closePoll,
         deleteMessage,
         togglePinMessage,
         toggleReaction,

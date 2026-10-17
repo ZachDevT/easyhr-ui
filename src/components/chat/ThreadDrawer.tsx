@@ -1,10 +1,31 @@
 "use client";
 
 import React, { useState, useRef } from 'react';
-import { X, Send, Smile, Paperclip, Trash2, Heart, Hash, MessageSquare, Maximize2, Play } from 'lucide-react';
+import {
+  X,
+  Send,
+  Smile,
+  Paperclip,
+  Trash2,
+  Heart,
+  Hash,
+  MessageSquare,
+  Maximize2,
+  Play,
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  List,
+  Quote,
+  Zap,
+  Sparkles,
+} from 'lucide-react';
 import { ChatMessage, useChat } from '@/context/ChatContext';
-import { EmojiGifPicker } from './EmojiGifPicker';
+import { EmojiGifPicker, PickerTab } from './EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from './MediaLightbox';
+import { RichMessageContent, PollCard } from './RichMessageContent';
+import { useRole } from '@/context/RoleContext';
 
 interface ThreadDrawerProps {
   parentMessage: ChatMessage;
@@ -12,39 +33,84 @@ interface ThreadDrawerProps {
 }
 
 export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
-  const { sendMessage, deleteMessage, toggleReaction, activeChannel } = useChat();
+  const { sendMessage, deleteMessage, toggleReaction, votePoll, closePoll, activeChannel, allEmployees } = useChat();
+  const { currentUser, isHRAdmin, role } = useRole();
+  const currentUserId = String(currentUser?.id || 'user');
+  const isChannelAdmin =
+    activeChannel?.adminIds.includes(currentUserId) ||
+    activeChannel?.adminIds.includes('user') ||
+    isHRAdmin ||
+    role === 'HR Admin';
+
   const [replyText, setReplyText] = useState('');
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerTab, setPickerTab] = useState<PickerTab>('emoji');
   const [hoveredReplyId, setHoveredReplyId] = useState<string | null>(null);
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMediaItem | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [stagedAttachments, setStagedAttachments] = useState<
+    {
+      id: string;
+      name: string;
+      url: string;
+      type: 'image' | 'video' | 'file';
+      size?: string;
+    }[]
+  >([]);
 
-  const handleSendReply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyText.trim()) return;
-    sendMessage(replyText.trim(), undefined, parentMessage.id);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const applyFormat = (prefix: string, suffix: string = prefix) => {
+    const el = replyInputRef.current;
+    if (!el) {
+      setReplyText((prev) => `${prev}${prefix}text${suffix}`);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = replyText.slice(start, end) || 'text';
+    const next = replyText.slice(0, start) + prefix + selected + suffix + replyText.slice(end);
+    setReplyText(next);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+    }, 0);
+  };
+
+  const handleSendReply = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!replyText.trim() && stagedAttachments.length === 0) return;
+    sendMessage(
+      replyText.trim(),
+      stagedAttachments.length > 0 ? stagedAttachments : undefined,
+      parentMessage.id
+    );
     setReplyText('');
+    setStagedAttachments([]);
   };
 
   const handleSelectEmoji = (emoji: string) => {
     setReplyText((prev) => prev + emoji);
-    setShowPicker(false);
   };
 
-  const handleSelectGif = (gifUrl: string, title: string) => {
-    sendMessage(
-      title || 'Shared a GIF',
-      [
-        {
-          id: `gif-${Date.now()}`,
-          name: title || 'animated.gif',
-          url: gifUrl,
-          type: 'image',
-        },
-      ],
-      parentMessage.id
-    );
+  const handleSelectAnimatedEmoji = (code: string) => {
+    setReplyText((prev) => `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}[:anim:${code}:] `);
     setShowPicker(false);
+    replyInputRef.current?.focus();
+  };
+
+  const handleSelectGif = (gifUrl: string) => {
+    setStagedAttachments((prev) => [
+      ...prev,
+      {
+        id: `gif-${Date.now()}-${Math.random()}`,
+        name: '',
+        url: gifUrl,
+        type: 'image',
+      },
+    ]);
+    setShowPicker(false);
+    replyInputRef.current?.focus();
   };
 
   const handleThreadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,27 +120,25 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
       const isImg = file.type.startsWith('image/');
       const isVideo = file.type.startsWith('video/');
       const fileUrl = URL.createObjectURL(file);
-      sendMessage(
-        replyText.trim() || `Shared ${file.name}`,
-        [
-          {
-            id: `file-${Date.now()}-${Math.random()}`,
-            name: file.name,
-            url: fileUrl,
-            type: isImg ? 'image' : isVideo ? 'video' : 'file',
-            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          },
-        ],
-        parentMessage.id
-      );
-      setReplyText('');
+      setStagedAttachments((prev) => [
+        ...prev,
+        {
+          id: `file-${Date.now()}-${Math.random()}`,
+          name: file.name,
+          url: fileUrl,
+          type: isImg ? 'image' : isVideo ? 'video' : 'file',
+          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        },
+      ]);
     });
   };
+
+  const hasAnimatedOrFormatting = /\[:anim:[a-z0-9_]+:\]|\*\*|_.*_|~~|`|^>|^•/m.test(replyText);
 
   return (
     <aside
       style={{
-        width: 330,
+        width: 345,
         flexShrink: 0,
         borderLeft: '1px solid var(--card-border, #E4E4E7)',
         background: '#FFFFFF',
@@ -185,7 +249,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-1, #18181B)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1, #18181B)' }}>
                   {parentMessage.senderName}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', flexShrink: 0 }}>
@@ -193,17 +257,34 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 </span>
               </div>
 
-              <div
-                style={{
-                  fontSize: 13,
-                  color: 'var(--text-2, #52525B)',
-                  marginTop: 5,
-                  lineHeight: 1.5,
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {parentMessage.content}
-              </div>
+              {parentMessage.content && (
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-2, #52525B)',
+                    marginTop: 5,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <RichMessageContent content={parentMessage.content} />
+                </div>
+              )}
+
+              {parentMessage.poll && (
+                <PollCard
+                  poll={parentMessage.poll}
+                  messageId={parentMessage.id}
+                  currentUserId={currentUserId}
+                  isCreatorOrAdmin={
+                    parentMessage.senderId === currentUserId ||
+                    parentMessage.senderId === 'user' ||
+                    !!isChannelAdmin
+                  }
+                  allEmployees={allEmployees}
+                  onVote={votePoll}
+                  onToggleClose={closePoll}
+                />
+              )}
 
               {parentMessage.attachments && parentMessage.attachments.length > 0 && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -232,7 +313,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                         >
                           <img
                             src={att.url}
-                            alt={att.name}
+                            alt=""
                             style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
                           />
                         </div>
@@ -310,7 +391,14 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
         {/* Replies Divider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ flex: 1, height: 1, background: 'var(--border-subtle, #F0F0F3)' }} />
-          <span style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span
+            style={{
+              fontSize: 11,
+              color: 'var(--text-3, #A1A1AA)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
             {parentMessage.replies?.length || 0}{' '}
             {parentMessage.replies?.length === 1 ? 'Reply' : 'Replies'}
           </span>
@@ -367,7 +455,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-1, #18181B)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1, #18181B)' }}>
                         {reply.senderName}
                       </span>
                       <span style={{ fontSize: 10, color: 'var(--text-3, #A1A1AA)' }}>
@@ -375,17 +463,18 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                       </span>
                     </div>
 
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        color: 'var(--text-2, #52525B)',
-                        marginTop: 4,
-                        lineHeight: 1.45,
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
-                      {reply.content}
-                    </div>
+                    {reply.content && (
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: 'var(--text-2, #52525B)',
+                          marginTop: 4,
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <RichMessageContent content={reply.content} />
+                      </div>
+                    )}
 
                     {reply.attachments && reply.attachments.length > 0 && (
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -402,7 +491,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                             {att.type === 'image' ? (
                               <img
                                 src={att.url}
-                                alt={att.name}
+                                alt=""
                                 onClick={() =>
                                   setLightboxMedia({
                                     url: att.url,
@@ -589,7 +678,9 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
       >
         {showPicker && (
           <EmojiGifPicker
+            initialTab={pickerTab}
             onSelectEmoji={handleSelectEmoji}
+            onSelectAnimatedEmoji={handleSelectAnimatedEmoji}
             onSelectGif={handleSelectGif}
             onClose={() => setShowPicker(false)}
           />
@@ -604,9 +695,135 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
             overflow: 'hidden',
           }}
         >
+          {/* Mini Formatting Bar */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              padding: '5px 8px',
+              borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+              background: '#FFFFFF',
+            }}
+          >
+            {[
+              { icon: <Bold size={12.5} />, title: 'Bold', fn: () => applyFormat('**') },
+              { icon: <Italic size={12.5} />, title: 'Italic', fn: () => applyFormat('_') },
+              { icon: <Strikethrough size={12.5} />, title: 'Strikethrough', fn: () => applyFormat('~~') },
+              { icon: <Code size={12.5} />, title: 'Inline Code', fn: () => applyFormat('`') },
+              { icon: <List size={12.5} />, title: 'Bullet List', fn: () => applyFormat('\n• ', '') },
+              { icon: <Quote size={12.5} />, title: 'Quote', fn: () => applyFormat('\n> ', '') },
+            ].map((btn, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={btn.fn}
+                title={btn.title}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 5,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-2, #52525B)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                {btn.icon}
+              </button>
+            ))}
+          </div>
+
+          {/* Staged GIF / File Attachments */}
+          {stagedAttachments.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                padding: '8px 10px 4px 10px',
+              }}
+            >
+              {stagedAttachments.map((att) => (
+                <div
+                  key={att.id}
+                  style={{
+                    position: 'relative',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    background: '#FFFFFF',
+                  }}
+                >
+                  {att.type === 'image' ? (
+                    <div style={{ position: 'relative', width: 64, height: 50 }}>
+                      <img
+                        src={att.url}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setStagedAttachments((prev) => prev.filter((a) => a.id !== att.id))
+                        }
+                        style={{
+                          position: 'absolute',
+                          top: 2,
+                          right: 2,
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          border: 'none',
+                          background: 'rgba(9,9,11,0.75)',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 8px',
+                        fontSize: 11,
+                      }}
+                    >
+                      <Paperclip size={11} />
+                      <span style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {att.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setStagedAttachments((prev) => prev.filter((a) => a.id !== att.id))
+                        }
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <textarea
+            ref={replyInputRef}
             rows={2}
-            placeholder="Reply in thread..."
+            placeholder="Reply in thread... (mix text, emojis & GIFs)"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             onKeyDown={(e) => {
@@ -617,7 +834,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
             }}
             style={{
               width: '100%',
-              padding: '10px 12px 6px 12px',
+              padding: '8px 12px 6px 12px',
               fontSize: 12.5,
               border: 'none',
               background: 'transparent',
@@ -626,6 +843,23 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
               color: 'var(--text-1, #18181B)',
             }}
           />
+
+          {/* Live Inline Preview for Animated Emojis & Rich Formatting */}
+          {hasAnimatedOrFormatting && (
+            <div
+              style={{
+                margin: '0 10px 8px 10px',
+                padding: '6px 10px',
+                borderRadius: 8,
+                background: '#FFFFFF',
+                border: '1px dashed var(--card-border, #E4E4E7)',
+                fontSize: 12,
+                color: 'var(--text-1, #18181B)',
+              }}
+            >
+              <RichMessageContent content={replyText} />
+            </div>
+          )}
 
           <div
             style={{
@@ -640,10 +874,13 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button
                 type="button"
-                onClick={() => setShowPicker(!showPicker)}
+                onClick={() => {
+                  setPickerTab('emoji');
+                  setShowPicker((prev) => (pickerTab === 'emoji' ? !prev : true));
+                }}
                 style={{
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   borderRadius: 6,
                   border: 'none',
                   background: 'transparent',
@@ -653,16 +890,60 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                   justifyContent: 'center',
                   cursor: 'pointer',
                 }}
-                title="Emojis & GIFs"
+                title="Emojis"
               >
-                <Smile size={15} />
+                <Smile size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerTab('animated');
+                  setShowPicker((prev) => (pickerTab === 'animated' ? !prev : true));
+                }}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--primary, #A238FF)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="Animated Emojis"
+              >
+                <Zap size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerTab('gif');
+                  setShowPicker((prev) => (pickerTab === 'gif' ? !prev : true));
+                }}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--primary, #A238FF)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="GIFs"
+              >
+                <Sparkles size={14} />
               </button>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   borderRadius: 6,
                   border: 'none',
                   background: 'transparent',
@@ -674,7 +955,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 }}
                 title="Attach file"
               >
-                <Paperclip size={15} />
+                <Paperclip size={14} />
               </button>
               <input
                 ref={fileInputRef}
@@ -687,7 +968,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
 
             <button
               type="submit"
-              disabled={!replyText.trim()}
+              disabled={!replyText.trim() && stagedAttachments.length === 0}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -695,10 +976,16 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 padding: '5px 12px',
                 borderRadius: 8,
                 border: 'none',
-                background: replyText.trim() ? 'var(--primary, #A238FF)' : '#E4E4E7',
-                color: replyText.trim() ? '#FFFFFF' : '#A1A1AA',
+                background:
+                  replyText.trim() || stagedAttachments.length > 0
+                    ? 'var(--primary, #A238FF)'
+                    : '#E4E4E7',
+                color:
+                  replyText.trim() || stagedAttachments.length > 0 ? '#FFFFFF' : '#A1A1AA',
                 fontSize: 12,
-                cursor: replyText.trim() ? 'pointer' : 'not-allowed',
+                fontWeight: 600,
+                cursor:
+                  replyText.trim() || stagedAttachments.length > 0 ? 'pointer' : 'not-allowed',
               }}
             >
               <span>Reply</span>

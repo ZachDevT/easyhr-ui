@@ -33,8 +33,18 @@ import {
   Maximize2,
   Play,
   Zap,
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  FileCode,
+  List,
+  ListOrdered,
+  Quote,
+  Link2,
+  BarChart2,
 } from 'lucide-react';
-import { useChat } from '@/context/ChatContext';
+import { useChat, ChatPoll } from '@/context/ChatContext';
 import { useRole } from '@/context/RoleContext';
 import { useCompany } from '@/context/CompanyContext';
 import { Employee } from '@/data/employees';
@@ -42,6 +52,7 @@ import { CreateChannelModal } from '@/components/chat/CreateChannelModal';
 import { ThreadDrawer } from '@/components/chat/ThreadDrawer';
 import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
+import { RichMessageContent, PollCard } from '@/components/chat/RichMessageContent';
 
 export default function GroupChatPage() {
   const {
@@ -55,6 +66,8 @@ export default function GroupChatPage() {
     deleteMessage,
     togglePinMessage,
     toggleReaction,
+    votePoll,
+    closePoll,
     requestToJoinChannel,
     approveJoinRequest,
     rejectJoinRequest,
@@ -84,6 +97,14 @@ export default function GroupChatPage() {
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [showThreadsPopover, setShowThreadsPopover] = useState(false);
+
+  // Poll Builder state
+  const [showPollBuilder, setShowPollBuilder] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
+  const [pollAnonymous, setPollAnonymous] = useState(false);
+  const [stagedPoll, setStagedPoll] = useState<ChatPoll | null>(null);
 
   // Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -228,18 +249,89 @@ export default function GroupChatPage() {
     textareaRef.current?.focus();
   };
 
+  const applyFormat = (prefix: string, suffix: string = prefix, placeholder: string = 'text') => {
+    const el = textareaRef.current;
+    if (!el) {
+      setInputText((prev) => `${prev}${prefix}${placeholder}${suffix}`);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = inputText.slice(start, end) || placeholder;
+    const next = inputText.slice(0, start) + prefix + selected + suffix + inputText.slice(end);
+    setInputText(next);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+    }, 0);
+  };
+
+  const buildPollObject = (): ChatPoll | null => {
+    const q = pollQuestion.trim();
+    const validOpts = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (!q || validOpts.length < 2) return null;
+    return {
+      id: `poll-${Date.now()}`,
+      question: q,
+      options: validOpts.map((text, idx) => ({
+        id: `opt-${Date.now()}-${idx}`,
+        text,
+        voterIds: [],
+      })),
+      allowMultiple: pollAllowMultiple,
+      anonymous: pollAnonymous,
+      closed: false,
+    };
+  };
+
+  const resetPollBuilder = () => {
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setPollAllowMultiple(false);
+    setPollAnonymous(false);
+    setShowPollBuilder(false);
+  };
+
+  const handleLaunchPollNow = () => {
+    const newPoll = buildPollObject();
+    if (!newPoll || !activeChannel) return;
+    sendMessage(
+      inputText.trim(),
+      uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+      undefined,
+      newPoll
+    );
+    setInputText('');
+    setUploadedAttachments([]);
+    setStagedPoll(null);
+    resetPollBuilder();
+    setTyping(false);
+    setMentionQuery(null);
+  };
+
+  const handleStagePollInComposer = () => {
+    const newPoll = buildPollObject();
+    if (!newPoll) return;
+    setStagedPoll(newPoll);
+    resetPollBuilder();
+    textareaRef.current?.focus();
+  };
+
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() && uploadedAttachments.length === 0) return;
+    if (!inputText.trim() && uploadedAttachments.length === 0 && !stagedPoll) return;
     if (!activeChannel) return;
 
     sendMessage(
       inputText.trim(),
-      uploadedAttachments.length > 0 ? uploadedAttachments : undefined
+      uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+      undefined,
+      stagedPoll || undefined
     );
 
     setInputText('');
     setUploadedAttachments([]);
+    setStagedPoll(null);
     setTyping(false);
     setMentionQuery(null);
   };
@@ -262,31 +354,6 @@ export default function GroupChatPage() {
           size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
         },
       ]);
-    });
-  };
-
-  // Format message content with highlighted @mentions
-  const renderFormattedContent = (text: string) => {
-    const parts = text.split(/(@[A-Za-z]+(?:\s[A-Za-z]+)?)/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith('@') && part.length > 1) {
-        return (
-          <span
-            key={idx}
-            style={{
-              display: 'inline-block',
-              padding: '1px 6px',
-              borderRadius: 6,
-              background: 'var(--primary-light, #F5EBFF)',
-              color: 'var(--primary, #A238FF)',
-              fontSize: 12.5,
-            }}
-          >
-            {part}
-          </span>
-        );
-      }
-      return <React.Fragment key={idx}>{part}</React.Fragment>;
     });
   };
 
@@ -1762,18 +1829,32 @@ export default function GroupChatPage() {
                             )}
                           </div>
 
-                          {/* Message Text */}
-                          <div
-                            style={{
-                              fontSize: 13.5,
-                              color: 'var(--text-1, #18181B)',
-                              marginTop: 4,
-                              lineHeight: 1.55,
-                              whiteSpace: 'pre-wrap',
-                            }}
-                          >
-                            {renderFormattedContent(msg.content)}
-                          </div>
+                          {/* Message Text (with inline Animated Emojis & Rich Text) */}
+                          {msg.content && (
+                            <div
+                              style={{
+                                fontSize: 13.5,
+                                color: 'var(--text-1, #18181B)',
+                                marginTop: 4,
+                                lineHeight: 1.55,
+                              }}
+                            >
+                              <RichMessageContent content={msg.content} />
+                            </div>
+                          )}
+
+                          {/* Interactive Poll Card */}
+                          {msg.poll && (
+                            <PollCard
+                              poll={msg.poll}
+                              messageId={msg.id}
+                              currentUserId={currentUserId}
+                              isCreatorOrAdmin={isMine || isChannelAdmin}
+                              allEmployees={allEmployees}
+                              onVote={votePoll}
+                              onToggleClose={closePoll}
+                            />
+                          )}
 
                           {/* Attachments */}
                           {msg.attachments && msg.attachments.length > 0 && (
@@ -1802,7 +1883,7 @@ export default function GroupChatPage() {
                                       onClick={() =>
                                         setLightboxMedia({
                                           url: att.url,
-                                          name: att.name,
+                                          name: att.name || 'Image',
                                           type: 'image',
                                           size: att.size,
                                         })
@@ -1812,7 +1893,7 @@ export default function GroupChatPage() {
                                     >
                                       <img
                                         src={att.url}
-                                        alt={att.name}
+                                        alt=""
                                         style={{
                                           display: 'block',
                                           maxWidth: '100%',
@@ -2236,37 +2317,397 @@ export default function GroupChatPage() {
               </div>
             )}
 
-            {/* Bottom Message Composer */}
+            {/* Bottom Slack-Style Rich Message Composer */}
             {isMember && (
               <div
                 style={{
-                  padding: '12px 22px 18px 22px',
+                  padding: '10px 22px 16px 22px',
                   background: '#FFFFFF',
                   borderTop: '1px solid var(--border-subtle, #F0F0F3)',
                   position: 'relative',
                 }}
               >
-                {/* Emoji / GIF Picker Popover */}
+                {/* Emoji / Animated Emoji / GIF Picker Popover */}
                 {showPicker && (
                   <EmojiGifPicker
                     initialTab={pickerTab}
                     onSelectEmoji={(emoji) => {
                       setInputText((prev) => prev + emoji);
-                      setShowPicker(false);
+                      textareaRef.current?.focus();
                     }}
-                    onSelectGif={(gifUrl, title) => {
-                      sendMessage(title || 'Shared a GIF', [
+                    onSelectAnimatedEmoji={(code) => {
+                      setInputText(
+                        (prev) => `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}[:anim:${code}:] `
+                      );
+                      setShowPicker(false);
+                      textareaRef.current?.focus();
+                    }}
+                    onSelectGif={(gifUrl) => {
+                      setUploadedAttachments((prev) => [
+                        ...prev,
                         {
-                          id: `gif-${Date.now()}`,
-                          name: title || 'animated.gif',
+                          id: `gif-${Date.now()}-${Math.random()}`,
+                          name: '',
                           url: gifUrl,
                           type: 'image',
                         },
                       ]);
                       setShowPicker(false);
+                      textareaRef.current?.focus();
                     }}
                     onClose={() => setShowPicker(false)}
                   />
+                )}
+
+                {/* Interactive Poll Builder Card Popover */}
+                {showPollBuilder && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 10px)',
+                      right: 22,
+                      width: 420,
+                      maxWidth: 'calc(100vw - 48px)',
+                      background: '#FFFFFF',
+                      borderRadius: 16,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      boxShadow: '0 20px 48px rgba(9, 9, 11, 0.16), 0 4px 12px rgba(9, 9, 11, 0.06)',
+                      zIndex: 85,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Poll Builder Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: '#FAF9F7',
+                        borderBottom: '1px solid var(--card-border, #E4E4E7)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 7,
+                            background: 'var(--primary-light, #F5EBFF)',
+                            color: 'var(--primary, #A238FF)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BarChart2 size={14} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1, #18181B)' }}>
+                            Create Poll in #{activeChannel.name}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)' }}>
+                            Real-time team voting with progress bars
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPollBuilder(false)}
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 7,
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--text-3, #A1A1AA)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+
+                    {/* Poll Builder Body */}
+                    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: 'var(--text-2, #52525B)',
+                            marginBottom: 5,
+                          }}
+                        >
+                          Poll Question *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Where should we host our Q4 Team Offsite?"
+                          value={pollQuestion}
+                          onChange={(e) => setPollQuestion(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '8px 11px',
+                            fontSize: 12.5,
+                            borderRadius: 9,
+                            border: '1px solid var(--card-border, #E4E4E7)',
+                            background: '#FAF9F7',
+                            outline: 'none',
+                            color: 'var(--text-1, #18181B)',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: 6,
+                          }}
+                        >
+                          <label
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: 'var(--text-2, #52525B)',
+                            }}
+                          >
+                            Answer Options ({pollOptions.length}/8)
+                          </label>
+                          {pollOptions.length < 8 && (
+                            <button
+                              type="button"
+                              onClick={() => setPollOptions((prev) => [...prev, ''])}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: 'var(--primary, #A238FF)',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              <Plus size={12} /> Add Option
+                            </button>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 6,
+                            maxHeight: 168,
+                            overflowY: 'auto',
+                          }}
+                        >
+                          {pollOptions.map((opt, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 6,
+                                  background: '#F4F4F5',
+                                  color: 'var(--text-3, #A1A1AA)',
+                                  fontSize: 10.5,
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {idx + 1}
+                              </span>
+                              <input
+                                type="text"
+                                placeholder={`Option ${idx + 1}`}
+                                value={opt}
+                                onChange={(e) => {
+                                  const next = [...pollOptions];
+                                  next[idx] = e.target.value;
+                                  setPollOptions(next);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '7px 10px',
+                                  fontSize: 12,
+                                  borderRadius: 8,
+                                  border: '1px solid var(--card-border, #E4E4E7)',
+                                  background: '#FFFFFF',
+                                  outline: 'none',
+                                  color: 'var(--text-1, #18181B)',
+                                }}
+                              />
+                              {pollOptions.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPollOptions((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 6,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: 'var(--text-3, #A1A1AA)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <X size={13} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Poll Settings Toggles */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 14,
+                          paddingTop: 4,
+                          borderTop: '1px solid var(--border-subtle, #F0F0F3)',
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 11.5,
+                            color: 'var(--text-2, #52525B)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={pollAllowMultiple}
+                            onChange={(e) => setPollAllowMultiple(e.target.checked)}
+                            style={{ accentColor: 'var(--primary, #A238FF)' }}
+                          />
+                          <span>Allow multiple choices</span>
+                        </label>
+
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 11.5,
+                            color: 'var(--text-2, #52525B)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={pollAnonymous}
+                            onChange={(e) => setPollAnonymous(e.target.checked)}
+                            style={{ accentColor: 'var(--primary, #A238FF)' }}
+                          />
+                          <span>Anonymous votes</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Poll Builder Footer */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        padding: '10px 16px',
+                        background: '#FAF9F7',
+                        borderTop: '1px solid var(--card-border, #E4E4E7)',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={handleStagePollInComposer}
+                        disabled={
+                          !pollQuestion.trim() ||
+                          pollOptions.filter((o) => o.trim()).length < 2
+                        }
+                        style={{
+                          padding: '7px 12px',
+                          borderRadius: 8,
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background: '#FFFFFF',
+                          color: 'var(--text-1, #18181B)',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor:
+                            pollQuestion.trim() &&
+                            pollOptions.filter((o) => o.trim()).length >= 2
+                              ? 'pointer'
+                              : 'not-allowed',
+                          opacity:
+                            pollQuestion.trim() &&
+                            pollOptions.filter((o) => o.trim()).length >= 2
+                              ? 1
+                              : 0.5,
+                        }}
+                      >
+                        Stage with Text
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleLaunchPollNow}
+                        disabled={
+                          !pollQuestion.trim() ||
+                          pollOptions.filter((o) => o.trim()).length < 2
+                        }
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '7px 14px',
+                          borderRadius: 8,
+                          border: 'none',
+                          background:
+                            pollQuestion.trim() &&
+                            pollOptions.filter((o) => o.trim()).length >= 2
+                              ? 'var(--primary, #A238FF)'
+                              : '#E4E4E7',
+                          color:
+                            pollQuestion.trim() &&
+                            pollOptions.filter((o) => o.trim()).length >= 2
+                              ? '#FFFFFF'
+                              : '#A1A1AA',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor:
+                            pollQuestion.trim() &&
+                            pollOptions.filter((o) => o.trim()).length >= 2
+                              ? 'pointer'
+                              : 'not-allowed',
+                        }}
+                      >
+                        <BarChart2 size={13} />
+                        <span>Launch Poll</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {/* @Mention Autocomplete Popover */}
@@ -2358,252 +2799,551 @@ export default function GroupChatPage() {
                   </div>
                 )}
 
-                {/* Staged Attachments Bar */}
-                {uploadedAttachments.length > 0 && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                      marginBottom: 8,
-                      padding: '8px 10px',
-                      borderRadius: 10,
-                      background: '#FAF9F7',
-                      border: '1px solid var(--card-border, #E4E4E7)',
-                    }}
-                  >
-                    {uploadedAttachments.map((att) => (
-                      <div
-                        key={att.id}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '4px 10px',
-                          borderRadius: 8,
-                          background: '#FFFFFF',
-                          border: '1px solid var(--card-border, #E4E4E7)',
-                          fontSize: 12,
-                        }}
-                      >
-                        <Paperclip size={12} style={{ color: 'var(--primary, #A238FF)' }} />
-                        <span>{att.name}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setUploadedAttachments((prev) => prev.filter((a) => a.id !== att.id))
-                          }
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--text-3, #A1A1AA)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Composer Box (Matches Reference Image) */}
+                {/* Slack-Inspired Rich Text & Media Composer Container */}
                 <form
                   onSubmit={handleSend}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 12px',
                     borderRadius: 14,
                     border: '1px solid var(--card-border, #E4E4E7)',
                     background: '#FAF9F7',
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                   }}
                 >
-                  {/* Left + Attachment Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                  {/* Top WYSIWYG / Rich Text Formatting Toolbar */}
+                  <div
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      border: '1px solid var(--card-border, #E4E4E7)',
-                      background: '#FFFFFF',
-                      color: 'var(--text-2, #52525B)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      flexShrink: 0,
+                      justifyContent: 'space-between',
+                      padding: '5px 10px',
+                      borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+                      background: '#FFFFFF',
                     }}
-                    title="Attach files or images"
                   >
-                    <Plus size={16} />
-                  </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                      {[
+                        {
+                          icon: <Bold size={13.5} />,
+                          title: 'Bold (**text**)',
+                          fn: () => applyFormat('**', '**', 'bold'),
+                        },
+                        {
+                          icon: <Italic size={13.5} />,
+                          title: 'Italic (_text_)',
+                          fn: () => applyFormat('_', '_', 'italic'),
+                        },
+                        {
+                          icon: <Strikethrough size={13.5} />,
+                          title: 'Strikethrough (~~text~~)',
+                          fn: () => applyFormat('~~', '~~', 'strikethrough'),
+                        },
+                        { divider: true },
+                        {
+                          icon: <Link2 size={13.5} />,
+                          title: 'Insert Link ([label](url))',
+                          fn: () => applyFormat('[', '](https://)', 'link text'),
+                        },
+                        {
+                          icon: <ListOrdered size={13.5} />,
+                          title: 'Numbered List',
+                          fn: () => applyFormat('\n1. ', '', 'List item'),
+                        },
+                        {
+                          icon: <List size={13.5} />,
+                          title: 'Bulleted List',
+                          fn: () => applyFormat('\n• ', '', 'List item'),
+                        },
+                        {
+                          icon: <Quote size={13.5} />,
+                          title: 'Blockquote (> quote)',
+                          fn: () => applyFormat('\n> ', '', 'Quote'),
+                        },
+                        { divider: true },
+                        {
+                          icon: <Code size={13.5} />,
+                          title: 'Inline Code (`code`)',
+                          fn: () => applyFormat('`', '`', 'code'),
+                        },
+                        {
+                          icon: <FileCode size={13.5} />,
+                          title: 'Code Block (```code```)',
+                          fn: () => applyFormat('\n```\n', '\n```\n', 'code snippet'),
+                        },
+                      ].map((item, idx) =>
+                        item.divider ? (
+                          <div
+                            key={idx}
+                            style={{
+                              width: 1,
+                              height: 15,
+                              background: 'var(--border-subtle, #F0F0F3)',
+                              margin: '0 4px',
+                            }}
+                          />
+                        ) : (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={item.fn}
+                            title={item.title}
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: 6,
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-2, #52525B)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#F4F4F5';
+                              e.currentTarget.style.color = 'var(--text-1, #18181B)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-2, #52525B)';
+                            }}
+                          >
+                            {item.icon}
+                          </button>
+                        )
+                      )}
+                    </div>
 
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
-                    multiple
-                    style={{ display: 'none' }}
-                    onChange={handleFileUpload}
-                  />
+                    <span style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)' }}>
+                      Mix text, animated emojis & GIFs · Shift+Enter for new line
+                    </span>
+                  </div>
 
-                  {/* Auto-sizing single/multi-line input */}
-                  <textarea
-                    ref={textareaRef}
-                    rows={1}
-                    placeholder={`Write a message to #${activeChannel.name}... (type @ to mention)`}
-                    value={inputText}
-                    onChange={handleInputChange}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
+                  {/* Staged Attachments (GIFs, Images, Videos, Files) & Staged Poll */}
+                  {(uploadedAttachments.length > 0 || stagedPoll) && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 12px 4px 12px',
+                      }}
+                    >
+                      {stagedPoll && (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '6px 10px',
+                            borderRadius: 9,
+                            background: 'var(--primary-light, #F5EBFF)',
+                            border: '1px solid rgba(162, 56, 255, 0.28)',
+                            color: 'var(--primary, #A238FF)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          <BarChart2 size={13} />
+                          <span>
+                            Poll: {stagedPoll.question} ({stagedPoll.options.length} options)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setStagedPoll(null)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--primary, #A238FF)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: 0,
+                            }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      )}
+
+                      {uploadedAttachments.map((att) =>
+                        att.type === 'image' ? (
+                          <div
+                            key={att.id}
+                            style={{
+                              position: 'relative',
+                              width: 72,
+                              height: 56,
+                              borderRadius: 9,
+                              overflow: 'hidden',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              background: '#FFFFFF',
+                            }}
+                          >
+                            <img
+                              src={att.url}
+                              alt=""
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadedAttachments((prev) =>
+                                  prev.filter((a) => a.id !== att.id)
+                                )
+                              }
+                              style={{
+                                position: 'absolute',
+                                top: 3,
+                                right: 3,
+                                width: 18,
+                                height: 18,
+                                borderRadius: '50%',
+                                border: 'none',
+                                background: 'rgba(9, 9, 11, 0.75)',
+                                color: '#FFFFFF',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                              }}
+                              title="Remove"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div
+                            key={att.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '5px 10px',
+                              borderRadius: 8,
+                              background: '#FFFFFF',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              fontSize: 12,
+                            }}
+                          >
+                            <Paperclip size={12} style={{ color: 'var(--primary, #A238FF)' }} />
+                            <span>{att.name}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUploadedAttachments((prev) =>
+                                  prev.filter((a) => a.id !== att.id)
+                                )
+                              }
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-3, #A1A1AA)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {/* Textarea Input */}
+                  <div style={{ padding: '8px 12px 6px 12px' }}>
+                    <textarea
+                      ref={textareaRef}
+                      rows={2}
+                      placeholder={`Write a message to #${activeChannel.name}... (type @ to mention, add animated emojis after text, or mix with a GIF)`}
+                      value={inputText}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        resize: 'none',
+                        fontSize: 13.5,
+                        color: 'var(--text-1, #18181B)',
+                        padding: 0,
+                        lineHeight: 1.45,
+                      }}
+                    />
+
+                    {/* Live Inline Preview when Animated Emojis or Rich Formatting are used */}
+                    {/\[:anim:[a-z0-9_]+:\]|\*\*|_.*_|~~|`|^>|^•|^\d+\./m.test(inputText) && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          background: '#FFFFFF',
+                          border: '1px dashed var(--card-border, #E4E4E7)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 13,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            color: 'var(--primary, #A238FF)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          Live Preview:
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <RichMessageContent content={inputText} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bottom Action Bar: Attach, Mention, Emojis, Animated Emojis, GIF, Poll, Send */}
+                  <div
                     style={{
-                      flex: 1,
-                      border: 'none',
-                      background: 'transparent',
-                      outline: 'none',
-                      resize: 'none',
-                      fontSize: 13.5,
-                      color: 'var(--text-1, #18181B)',
-                      padding: '4px 4px',
-                      lineHeight: 1.4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 10px',
+                      borderTop: '1px solid var(--border-subtle, #F0F0F3)',
+                      background: '#FFFFFF',
                     }}
-                  />
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                      {/* Left + Attachment Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 7,
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background: '#FAF9F7',
+                          color: 'var(--text-2, #52525B)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                        title="Attach files, images or videos"
+                      >
+                        <Plus size={15} />
+                      </button>
 
-                  {/* Right Actions: Mention, Emoji, Animated Emoji, Live GIF, Send */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputText((prev) => prev + '@');
-                        setMentionQuery('');
-                        setMentionAnchorIdx(inputText.length);
-                        textareaRef.current?.focus();
-                      }}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 8,
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--text-2, #52525B)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                      }}
-                      title="Mention colleague (@)"
-                    >
-                      <AtSign size={16} />
-                    </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={handleFileUpload}
+                      />
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickerTab('emoji');
-                        setShowPicker((prev) => (pickerTab === 'emoji' ? !prev : true));
-                      }}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 8,
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--text-2, #52525B)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                      }}
-                      title="All Emojis"
-                    >
-                      <Smile size={16} />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInputText((prev) => prev + '@');
+                          setMentionQuery('');
+                          setMentionAnchorIdx(inputText.length);
+                          textareaRef.current?.focus();
+                        }}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 7,
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--text-2, #52525B)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        title="Mention colleague (@)"
+                      >
+                        <AtSign size={15} />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickerTab('animated');
-                        setShowPicker((prev) => (pickerTab === 'animated' ? !prev : true));
-                      }}
-                      style={{
-                        height: 26,
-                        padding: '0 8px',
-                        borderRadius: 6,
-                        border: '1px solid var(--card-border, #E4E4E7)',
-                        background: '#FFFFFF',
-                        color: 'var(--text-2, #52525B)',
-                        fontSize: 10.5,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        cursor: 'pointer',
-                      }}
-                      title="Animated Emojis"
-                    >
-                      <Zap size={11} style={{ color: 'var(--primary)' }} />
-                      <span>Animated</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickerTab('emoji');
+                          setShowPicker((prev) => (pickerTab === 'emoji' ? !prev : true));
+                          setShowPollBuilder(false);
+                        }}
+                        style={{
+                          height: 26,
+                          padding: '0 8px',
+                          borderRadius: 6,
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background:
+                            showPicker && pickerTab === 'emoji'
+                              ? 'var(--primary-light, #F5EBFF)'
+                              : '#FFFFFF',
+                          color:
+                            showPicker && pickerTab === 'emoji'
+                              ? 'var(--primary, #A238FF)'
+                              : 'var(--text-2, #52525B)',
+                          fontSize: 11,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                        }}
+                        title="Standard Emojis (520+)"
+                      >
+                        <Smile size={12.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <span>Emojis</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickerTab('gif');
-                        setShowPicker((prev) => (pickerTab === 'gif' ? !prev : true));
-                      }}
-                      style={{
-                        height: 26,
-                        padding: '0 8px',
-                        borderRadius: 6,
-                        border: '1px solid var(--card-border, #E4E4E7)',
-                        background: '#FFFFFF',
-                        color: 'var(--text-2, #52525B)',
-                        fontSize: 10.5,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        cursor: 'pointer',
-                      }}
-                      title="Live GIF Search"
-                    >
-                      <Sparkles size={11} style={{ color: 'var(--primary)' }} />
-                      <span>GIF</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickerTab('animated');
+                          setShowPicker((prev) => (pickerTab === 'animated' ? !prev : true));
+                          setShowPollBuilder(false);
+                        }}
+                        style={{
+                          height: 26,
+                          padding: '0 8px',
+                          borderRadius: 6,
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background:
+                            showPicker && pickerTab === 'animated'
+                              ? 'var(--primary-light, #F5EBFF)'
+                              : '#FFFFFF',
+                          color:
+                            showPicker && pickerTab === 'animated'
+                              ? 'var(--primary, #A238FF)'
+                              : 'var(--text-2, #52525B)',
+                          fontSize: 11,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                        }}
+                        title="Inline Animated Emojis (added after text)"
+                      >
+                        <Zap size={11.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <span>Animated</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickerTab('gif');
+                          setShowPicker((prev) => (pickerTab === 'gif' ? !prev : true));
+                          setShowPollBuilder(false);
+                        }}
+                        style={{
+                          height: 26,
+                          padding: '0 8px',
+                          borderRadius: 6,
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background:
+                            showPicker && pickerTab === 'gif'
+                              ? 'var(--primary-light, #F5EBFF)'
+                              : '#FFFFFF',
+                          color:
+                            showPicker && pickerTab === 'gif'
+                              ? 'var(--primary, #A238FF)'
+                              : 'var(--text-2, #52525B)',
+                          fontSize: 11,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                        }}
+                        title="Live Tenor GIF Search (mix with text)"
+                      >
+                        <Sparkles size={11.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <span>GIF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPollBuilder((prev) => !prev);
+                          setShowPicker(false);
+                        }}
+                        style={{
+                          height: 26,
+                          padding: '0 9px',
+                          borderRadius: 6,
+                          border: showPollBuilder
+                            ? '1px solid var(--primary, #A238FF)'
+                            : '1px solid var(--card-border, #E4E4E7)',
+                          background: showPollBuilder
+                            ? 'var(--primary-light, #F5EBFF)'
+                            : '#FFFFFF',
+                          color: showPollBuilder
+                            ? 'var(--primary, #A238FF)'
+                            : 'var(--text-2, #52525B)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                        }}
+                        title="Create Interactive Poll"
+                      >
+                        <BarChart2 size={11.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <span>Poll</span>
+                      </button>
+                    </div>
 
                     <button
                       type="submit"
-                      disabled={!inputText.trim() && uploadedAttachments.length === 0}
+                      disabled={
+                        !inputText.trim() && uploadedAttachments.length === 0 && !stagedPoll
+                      }
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 6,
-                        height: 32,
+                        height: 30,
                         padding: '0 14px',
-                        borderRadius: 9,
+                        borderRadius: 8,
                         border: 'none',
                         background:
-                          inputText.trim() || uploadedAttachments.length > 0
+                          inputText.trim() || uploadedAttachments.length > 0 || stagedPoll
                             ? 'var(--primary, #A238FF)'
                             : '#E4E4E7',
                         color:
-                          inputText.trim() || uploadedAttachments.length > 0
+                          inputText.trim() || uploadedAttachments.length > 0 || stagedPoll
                             ? '#FFFFFF'
                             : '#A1A1AA',
-                        fontSize: 12.5,
+                        fontSize: 12,
+                        fontWeight: 600,
                         cursor:
-                          inputText.trim() || uploadedAttachments.length > 0
+                          inputText.trim() || uploadedAttachments.length > 0 || stagedPoll
                             ? 'pointer'
                             : 'not-allowed',
-                        marginLeft: 4,
                       }}
                     >
                       <span>Send</span>

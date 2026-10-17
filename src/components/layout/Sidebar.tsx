@@ -21,6 +21,33 @@ import {
   CornerDownLeft,
   MessageSquare,
   Hash,
+  Home,
+  MessagesSquare,
+  Megaphone,
+  Network,
+  FileSignature,
+  BookOpen,
+  CalendarClock,
+  Clock,
+  FileSpreadsheet,
+  Inbox,
+  BarChart3,
+  Mail,
+  UserPlus,
+  UserMinus,
+  Activity,
+  CalendarDays,
+  Building2,
+  TrendingUp,
+  CreditCard,
+  HeartHandshake,
+  Award,
+  FileText,
+  Workflow,
+  Sparkles,
+  ShieldCheck,
+  LifeBuoy,
+  ClipboardList,
 } from "lucide-react";
 import { useRole } from "../../context/RoleContext";
 import { useCompany } from "../../context/CompanyContext";
@@ -34,6 +61,7 @@ import { EasyHRMark } from "../marketing/EasyHRLogo";
 interface NavChild {
   label: string;
   href: string;
+  icon?: React.ReactNode;
   badge?: string | number;
 }
 
@@ -181,17 +209,18 @@ export function Sidebar() {
           icon: <LayoutGrid size={17} strokeWidth={2.2} />,
           badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
           children: [
-            { label: "Overview", href: "/dashboard" },
-            { label: "Group Chats", href: "/chat" },
-            { label: "Company News", href: "/announcements" },
-            { label: "Organization Chart", href: "/org-chart" },
-            { label: "People Directory", href: "/people" },
+            { label: "Overview", href: "/dashboard", icon: <Home size={14} strokeWidth={2} /> },
+            { label: "Group Chats", href: "/chat", icon: <MessagesSquare size={14} strokeWidth={2} /> },
+            { label: "Company News", href: "/announcements", icon: <Megaphone size={14} strokeWidth={2} /> },
+            { label: "Organization Chart", href: "/org-chart", icon: <Network size={14} strokeWidth={2} /> },
+            { label: "People Directory", href: "/people", icon: <Users size={14} strokeWidth={2} /> },
             { 
               label: "My Signatures & Docs", 
               href: "/my-signatures",
+              icon: <FileSignature size={14} strokeWidth={2} />,
               badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
             },
-            { label: "Company Handbook", href: "/policies" },
+            { label: "Company Handbook", href: "/policies", icon: <BookOpen size={14} strokeWidth={2} /> },
           ],
         },
         {
@@ -199,9 +228,9 @@ export function Sidebar() {
           label: "Time & Attendance",
           icon: <Palmtree size={17} strokeWidth={2.2} />,
           children: [
-            { label: "Leave Requests", href: "/time-off" },
-            { label: "Punch Clock & Attendance", href: "/attendance" },
-            { label: "My Timesheet", href: "/time" },
+            { label: "Leave Requests", href: "/time-off", icon: <Palmtree size={14} strokeWidth={2} /> },
+            { label: "Punch Clock & Attendance", href: "/attendance", icon: <Clock size={14} strokeWidth={2} /> },
+            { label: "My Timesheet", href: "/time", icon: <FileSpreadsheet size={14} strokeWidth={2} /> },
           ],
         },
       ];
@@ -217,14 +246,15 @@ export function Sidebar() {
           icon: <LayoutGrid size={17} strokeWidth={2.2} />,
           badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           children: [
-            { label: "Overview", href: "/dashboard" },
-            { label: "Group Chats", href: "/chat" },
+            { label: "Overview", href: "/dashboard", icon: <Home size={14} strokeWidth={2} /> },
+            { label: "Group Chats", href: "/chat", icon: <MessagesSquare size={14} strokeWidth={2} /> },
             { 
               label: "Approvals Inbox", 
               href: "/inbox",
+              icon: <Inbox size={14} strokeWidth={2} />,
               badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
             },
-            { label: "Company News", href: "/announcements" },
+            { label: "Company News", href: "/announcements", icon: <Megaphone size={14} strokeWidth={2} /> },
           ],
         },
         {
@@ -232,10 +262,10 @@ export function Sidebar() {
           label: "Time & Attendance",
           icon: <Palmtree size={17} strokeWidth={2.2} />,
           children: [
-            { label: "Leave Management", href: "/time-off" },
-            { label: "Live Attendance", href: "/attendance" },
-            { label: "Shift Scheduling", href: "/shift-scheduling" },
-            { label: "Time Tracking", href: "/time" },
+            { label: "Leave Management", href: "/time-off", icon: <Palmtree size={14} strokeWidth={2} /> },
+            { label: "Live Attendance", href: "/attendance", icon: <Clock size={14} strokeWidth={2} /> },
+            { label: "Shift Scheduling", href: "/shift-scheduling", icon: <CalendarClock size={14} strokeWidth={2} /> },
+            { label: "Time Tracking", href: "/time", icon: <FileSpreadsheet size={14} strokeWidth={2} /> },
           ],
         },
         {
@@ -244,14 +274,15 @@ export function Sidebar() {
           icon: <Users size={17} strokeWidth={2.2} />,
           badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           children: [
-            { label: "My Team", href: "/my-team" },
+            { label: "My Team", href: "/my-team", icon: <UserCheck size={14} strokeWidth={2} /> },
             { 
               label: "Team Requests", 
               href: "/team-requests",
+              icon: <ClipboardList size={14} strokeWidth={2} />,
               badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
             },
-            { label: "People Directory", href: "/people" },
-            { label: "Organization Chart", href: "/org-chart" },
+            { label: "People Directory", href: "/people", icon: <Users size={14} strokeWidth={2} /> },
+            { label: "Organization Chart", href: "/org-chart", icon: <Network size={14} strokeWidth={2} /> },
           ],
         },
         {
@@ -259,8 +290,8 @@ export function Sidebar() {
           label: "Documents & Policies",
           icon: <FolderOpen size={17} strokeWidth={2.2} />,
           children: [
-            { label: "Company Documents", href: "/documents" },
-            { label: "Policies & Handbook", href: "/policies" },
+            { label: "Company Documents", href: "/documents", icon: <FileText size={14} strokeWidth={2} /> },
+            { label: "Policies & Handbook", href: "/policies", icon: <BookOpen size={14} strokeWidth={2} /> },
           ],
         },
       ];
@@ -275,15 +306,16 @@ export function Sidebar() {
         icon: <LayoutGrid size={17} strokeWidth={2.2} />,
         badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
         children: [
-          { label: "Overview", href: "/dashboard" },
-          { label: "Group Chats", href: "/chat" },
+          { label: "Overview", href: "/dashboard", icon: <Home size={14} strokeWidth={2} /> },
+          { label: "Group Chats", href: "/chat", icon: <MessagesSquare size={14} strokeWidth={2} /> },
           { 
             label: "Approvals Inbox", 
             href: "/inbox",
+            icon: <Inbox size={14} strokeWidth={2} />,
             badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           },
-          { label: "Company News", href: "/announcements" },
-          { label: "Company Reports", href: "/reports" },
+          { label: "Company News", href: "/announcements", icon: <Megaphone size={14} strokeWidth={2} /> },
+          { label: "Company Reports", href: "/reports", icon: <BarChart3 size={14} strokeWidth={2} /> },
         ],
       },
       {
@@ -291,10 +323,10 @@ export function Sidebar() {
         label: "Talent & Jobs",
         icon: <Briefcase size={17} strokeWidth={2.2} />,
         children: [
-          { label: "Recruiting Pipeline", href: "/hiring" },
-          { label: "Email Macros", href: "/messaging/macros" },
-          { label: "New Hire Onboarding", href: "/onboarding" },
-          { label: "Offboarding", href: "/offboarding" },
+          { label: "Recruiting Pipeline", href: "/hiring", icon: <Briefcase size={14} strokeWidth={2} /> },
+          { label: "Email Macros", href: "/messaging/macros", icon: <Mail size={14} strokeWidth={2} /> },
+          { label: "New Hire Onboarding", href: "/onboarding", icon: <UserPlus size={14} strokeWidth={2} /> },
+          { label: "Offboarding", href: "/offboarding", icon: <UserMinus size={14} strokeWidth={2} /> },
         ],
       },
       {
@@ -302,11 +334,11 @@ export function Sidebar() {
         label: "Time & Leave",
         icon: <Palmtree size={17} strokeWidth={2.2} />,
         children: [
-          { label: "Leave Management", href: "/time-off" },
-          { label: "Live Attendance", href: "/attendance" },
-          { label: "Punch Activities", href: "/attendance?tab=activities" },
-          { label: "Shift Scheduling", href: "/shift-scheduling" },
-          { label: "Time Tracking", href: "/time" },
+          { label: "Leave Management", href: "/time-off", icon: <Palmtree size={14} strokeWidth={2} /> },
+          { label: "Live Attendance", href: "/attendance", icon: <Clock size={14} strokeWidth={2} /> },
+          { label: "Punch Activities", href: "/attendance?tab=activities", icon: <Activity size={14} strokeWidth={2} /> },
+          { label: "Shift Scheduling", href: "/shift-scheduling", icon: <CalendarClock size={14} strokeWidth={2} /> },
+          { label: "Time Tracking", href: "/time", icon: <FileSpreadsheet size={14} strokeWidth={2} /> },
         ],
       },
       {
@@ -314,11 +346,11 @@ export function Sidebar() {
         label: "People & Org",
         icon: <Users size={17} strokeWidth={2.2} />,
         children: [
-          { label: "People Directory", href: "/people" },
-          { label: "Organization Chart", href: "/org-chart" },
-          { label: "Departments", href: "/departments" },
-          { label: "My Team", href: "/my-team" },
-          { label: "Promotions", href: "/promotions" },
+          { label: "People Directory", href: "/people", icon: <Users size={14} strokeWidth={2} /> },
+          { label: "Organization Chart", href: "/org-chart", icon: <Network size={14} strokeWidth={2} /> },
+          { label: "Departments", href: "/departments", icon: <Building2 size={14} strokeWidth={2} /> },
+          { label: "My Team", href: "/my-team", icon: <UserCheck size={14} strokeWidth={2} /> },
+          { label: "Promotions", href: "/promotions", icon: <TrendingUp size={14} strokeWidth={2} /> },
         ],
       },
       {
@@ -326,9 +358,9 @@ export function Sidebar() {
         label: "Finance & Payroll",
         icon: <DollarSign size={17} strokeWidth={2.2} />,
         children: [
-          { label: "Payroll Management", href: "/payroll" },
-          { label: "Benefits Plans", href: "/benefits" },
-          { label: "Total Rewards", href: "/total-rewards" },
+          { label: "Payroll Management", href: "/payroll", icon: <CreditCard size={14} strokeWidth={2} /> },
+          { label: "Benefits Plans", href: "/benefits", icon: <HeartHandshake size={14} strokeWidth={2} /> },
+          { label: "Total Rewards", href: "/total-rewards", icon: <Award size={14} strokeWidth={2} /> },
         ],
       },
       {
@@ -337,13 +369,14 @@ export function Sidebar() {
         icon: <FolderOpen size={17} strokeWidth={2.2} />,
         badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
         children: [
-          { label: "Company Documents", href: "/documents" },
+          { label: "Company Documents", href: "/documents", icon: <FileText size={14} strokeWidth={2} /> },
           { 
             label: "E-Signatures", 
             href: "/signatures",
+            icon: <FileSignature size={14} strokeWidth={2} />,
             badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
           },
-          { label: "Policies & Handbook", href: "/policies" },
+          { label: "Policies & Handbook", href: "/policies", icon: <BookOpen size={14} strokeWidth={2} /> },
         ],
       },
       {
@@ -351,11 +384,11 @@ export function Sidebar() {
         label: "Administration",
         icon: <Settings size={17} strokeWidth={2.2} />,
         children: [
-          { label: "Automations & Workflows", href: "/workflows" },
-          { label: "Company Holidays", href: "/holidays" },
-          { label: "Company Settings", href: "/company-settings" },
-          { label: "Roles & Permissions", href: "/roles-permissions" },
-          { label: "Support Tickets", href: "/support" },
+          { label: "Automations & Workflows", href: "/workflows", icon: <Workflow size={14} strokeWidth={2} /> },
+          { label: "Company Holidays", href: "/holidays", icon: <CalendarDays size={14} strokeWidth={2} /> },
+          { label: "Company Settings", href: "/company-settings", icon: <Settings size={14} strokeWidth={2} /> },
+          { label: "Roles & Permissions", href: "/roles-permissions", icon: <ShieldCheck size={14} strokeWidth={2} /> },
+          { label: "Support Tickets", href: "/support", icon: <LifeBuoy size={14} strokeWidth={2} /> },
         ],
       },
     ];
@@ -413,7 +446,7 @@ export function Sidebar() {
       s.items.forEach((p) => {
         if (p.children) {
           p.children.forEach((c) =>
-            list.push({ parentLabel: p.label, label: c.label, href: c.href, icon: p.icon })
+            list.push({ parentLabel: p.label, label: c.label, href: c.href, icon: c.icon || p.icon })
           );
         } else if (p.href) {
           list.push({ parentLabel: s.sectionTitle, label: p.label, href: p.href, icon: p.icon });
@@ -1004,9 +1037,9 @@ export function Sidebar() {
                                 href={child.href}
                                 style={{
                                   flex: 1,
-                                  padding: "8px 14px",
+                                  padding: "7px 11px",
                                   borderRadius: 10,
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                   fontWeight: isChildActive ? 600 : 500,
                                   color: isChildActive ? "#18181B" : "#71717A",
                                   background: isChildActive ? "#F4F4F5" : "transparent",
@@ -1016,6 +1049,7 @@ export function Sidebar() {
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "space-between",
+                                  gap: 8,
                                   whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
@@ -1033,7 +1067,22 @@ export function Sidebar() {
                                   }
                                 }}
                               >
-                                <span>{child.label}</span>
+                                <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {child.icon && (
+                                    <span
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: isChildActive ? "var(--primary, #18181B)" : "#A1A1AA",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {child.icon}
+                                    </span>
+                                  )}
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{child.label}</span>
+                                </span>
                                 {child.badge !== undefined && (
                                   <span
                                     style={{
@@ -1283,7 +1332,7 @@ export function Sidebar() {
                     onClick={() => setFlyoutState(null)}
                     style={{
                       flex: 1,
-                      padding: "7px 12px",
+                      padding: "7px 11px",
                       borderRadius: 9,
                       fontSize: 12.5,
                       fontWeight: isChildActive ? 600 : 500,
@@ -1294,6 +1343,7 @@ export function Sidebar() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      gap: 8,
                       whiteSpace: "nowrap",
                     }}
                     onMouseEnter={(e) => {
@@ -1303,7 +1353,22 @@ export function Sidebar() {
                       if (!isChildActive) e.currentTarget.style.background = "transparent";
                     }}
                   >
-                    <span>{child.label}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {child.icon && (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: isChildActive ? "var(--primary, #18181B)" : "#A1A1AA",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {child.icon}
+                        </span>
+                      )}
+                      <span>{child.label}</span>
+                    </span>
                     {child.badge !== undefined && (
                       <span
                         style={{

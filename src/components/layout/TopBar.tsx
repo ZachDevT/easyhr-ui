@@ -224,20 +224,77 @@ export function TopBar() {
           <span>{userProfile?.role || role}</span>
         </div>
 
-        {/* 0. Group Chat Shortcut with Activity Badge */}
+        {/* 0. Group Chat Shortcut with Custom Dual-Bubble Icon & Live Activity Badge */}
         <Link
           href="/chat"
-          className="topbar-icon-btn"
           title="Group Chats & Channels"
           style={{
-            background: isChatActive ? 'var(--primary-tint)' : undefined,
-            color: isChatActive ? 'var(--primary)' : undefined,
-            borderColor: isChatActive ? 'var(--primary)' : undefined,
+            position: 'relative',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            height: 36,
+            padding: '0 12px',
+            borderRadius: 10,
+            background: isChatActive ? 'var(--primary)' : '#FAF9F7',
+            color: isChatActive ? '#FFFFFF' : 'var(--text-1)',
+            border: isChatActive ? '1px solid var(--primary)' : '1px solid var(--card-border, #E4E4E7)',
+            textDecoration: 'none',
+            fontSize: 12.5,
+            fontWeight: 600,
+            transition: 'all 0.16s ease',
+            boxShadow: isChatActive ? '0 4px 12px rgba(162, 56, 255, 0.22)' : '0 1px 2px rgba(0, 0, 0, 0.03)',
           }}
         >
-          <MessageSquare size={17} strokeWidth={2} />
+          {/* Custom Dual-Bubble Workspace Chat Icon */}
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ flexShrink: 0 }}
+          >
+            <path
+              d="M17.5 13.5C19.9853 13.5 22 11.6569 22 9.38333C22 7.10978 19.9853 5.26667 17.5 5.26667C17.1636 5.26667 16.8359 5.30056 16.5205 5.36478C15.6542 3.39411 13.5241 2 11 2C7.68629 2 5 4.46243 5 7.5C5 8.59822 5.35113 9.62133 5.95627 10.48C5.64761 11.4112 5.05882 12.4041 4.44262 13.0203C4.18359 13.2793 4.39128 13.7222 4.7561 13.6857C5.96191 13.5651 7.21311 13.1538 8.08197 12.6621C8.96197 12.9442 9.95541 13.1 11 13.1C11.3418 13.1 11.6772 13.0736 12.0033 13.0229"
+              stroke="currentColor"
+              strokeWidth="1.85"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+               opacity={isChatActive ? 0.85 : 0.55}
+            />
+            <path
+              d="M14.5 9.5C10.9101 9.5 8 11.9624 8 15C8 18.0376 10.9101 20.5 14.5 20.5C15.5071 20.5 16.4608 20.3061 17.3115 19.9601C18.1762 20.4912 19.373 20.9154 20.5246 21.0369C20.8878 21.0752 21.0954 20.6353 20.8387 20.376C20.2442 19.7755 19.6776 18.8199 19.3765 17.92C20.391 17.0085 21 15.7745 21 14.4167C21 11.7013 18.0899 9.5 14.5 9.5Z"
+              fill={isChatActive ? 'rgba(255,255,255,0.2)' : 'var(--primary-tint, #F5EBFF)'}
+              stroke={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'}
+              strokeWidth="1.85"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="12.3" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'} />
+            <circle cx="14.6" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'} />
+            <circle cx="16.9" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'} />
+          </svg>
+          <span>Chat</span>
           {chatActivityCount > 0 && (
-            <span className="topbar-badge">{chatActivityCount}</span>
+            <span
+              style={{
+                minWidth: 18,
+                height: 18,
+                padding: '0 5px',
+                borderRadius: 999,
+                background: isChatActive ? '#FFFFFF' : '#EF4444',
+                color: isChatActive ? 'var(--primary)' : '#FFFFFF',
+                fontSize: 10.5,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}
+            >
+              {chatActivityCount}
+            </span>
           )}
         </Link>
 
