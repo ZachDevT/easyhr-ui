@@ -119,6 +119,7 @@ export function Sidebar() {
           icon: <LayoutGrid size={17} strokeWidth={2.2} />,
           children: [
             { label: "Overview", href: "/dashboard" },
+            { label: "Company News", href: "/announcements" },
             { label: "Organization Chart", href: "/org-chart" },
             { label: "People Directory", href: "/people" },
             { label: "My Signatures & Docs", href: "/my-signatures" },
@@ -149,6 +150,7 @@ export function Sidebar() {
           children: [
             { label: "Overview", href: "/dashboard" },
             { label: "Approvals Inbox", href: "/inbox" },
+            { label: "Company News", href: "/announcements" },
           ],
         },
         {
@@ -195,6 +197,7 @@ export function Sidebar() {
         children: [
           { label: "Overview", href: "/dashboard" },
           { label: "Approvals Inbox", href: "/inbox" },
+          { label: "Company News", href: "/announcements" },
           { label: "Company Reports", href: "/reports" },
         ],
       },
@@ -216,6 +219,7 @@ export function Sidebar() {
         children: [
           { label: "Leave Management", href: "/time-off" },
           { label: "Live Attendance", href: "/attendance" },
+          { label: "Punch Activities", href: "/attendance?tab=activities" },
           { label: "Shift Scheduling", href: "/shift-scheduling" },
           { label: "Time Tracking", href: "/time" },
         ],

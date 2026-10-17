@@ -28,7 +28,8 @@ import {
   Plus,
   Trash2,
   Pin,
-  Maximize2
+  Maximize2,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
@@ -573,26 +574,22 @@ export function CompulsoryMyTimeWidget() {
                       borderTop: '1px solid var(--card-border)',
                     }}
                   >
-                    <button
-                      type="button"
+                    <Link
+                      href="/attendance?tab=activities"
                       style={{
+                        display: 'block',
                         width: '100%',
                         padding: '6px 0',
                         fontSize: 12,
                         fontWeight: 600,
                         color: 'var(--primary)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
                         textAlign: 'center',
+                        textDecoration: 'none',
                       }}
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        setManageActivitiesOpen(true);
-                      }}
+                      onClick={() => setDropdownOpen(false)}
                     >
-                      + Manage Punch Activities
-                    </button>
+                      Configure Activities in Settings &rarr;
+                    </Link>
                   </div>
                 )}
               </div>
@@ -1036,16 +1033,14 @@ export function FeedWidget({ onRemove, preview }: { onRemove?: () => void; previ
           <div className="card-header-icon"><Megaphone size={16} strokeWidth={2.5} /></div>
           <h2 className="card-header-title">What&apos;s happening at Your Co</h2>
         </div>
-        <div className="row gap-8">
-          {isHRAdmin && (
-            <button
-              className="btn-neutral btn-sm"
-              style={{ fontSize: 11, padding: '4px 10px' }}
-              onClick={() => setCreateModalOpen(true)}
-            >
-              <Plus size={12} /> Post
-            </button>
-          )}
+        <div className="row gap-8 align-center">
+          <Link
+            href="/announcements"
+            className="btn-neutral btn-sm"
+            style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}
+          >
+            View News &rarr;
+          </Link>
           {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
         </div>
       </div>
@@ -1918,9 +1913,28 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
 /* 5. New Hires Widget (Dynamic from employees directory)                     */
 /* -------------------------------------------------------------------------- */
 
+interface NewHireProfile {
+  id: string;
+  name: string;
+  firstName: string;
+  title: string;
+  department: string;
+  location?: string;
+  startDate?: string;
+  avatar?: string;
+  bio?: string;
+  funFact?: string;
+  favoriteFood?: string;
+  favoriteMovies?: string;
+  favoriteMusic?: string;
+  coffeeTea?: string;
+}
+
 export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
   const { getToken, isSignedIn } = useAuth();
-  const [newHires, setNewHires] = useState<Array<{ id: string; name: string; title: string; department: string; avatar?: string }>>([]);
+  const [newHires, setNewHires] = useState<NewHireProfile[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -1934,11 +1948,14 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
         if (res.ok) {
           const data = await res.json();
           if (data?.data && Array.isArray(data.data)) {
-            const mapped = data.data.slice(0, 5).map((e: any) => ({
+            const mapped: NewHireProfile[] = data.data.slice(0, 5).map((e: any) => ({
               id: e.id,
+              firstName: e.firstName || e.name?.split(' ')[0] || 'Teammate',
               name: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.name || 'Team Member',
               title: e.title || e.jobTitle || 'New Team Member',
               department: e.department || 'Operations',
+              location: e.location || 'Headquarters',
+              startDate: e.hiredOn || e.startDate,
               avatar: e.avatarUrl || e.avatar,
             }));
             setNewHires(mapped);
@@ -1949,15 +1966,63 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
     fetchNewHires();
   }, [isSignedIn]);
 
+  // Lazy-load rich onboarding details when a user clicks to expand a new hire
+  const toggleExpand = async (empId: string) => {
+    if (expandedId === empId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(empId);
+
+    const hire = newHires.find((h) => h.id === empId);
+    if (hire && hire.bio !== undefined) return; // already loaded
+
+    setLoadingDetails((prev) => ({ ...prev, [empId]: true }));
+    try {
+      const token = await getToken();
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/api/v1/employees/${empId}`, {
+          headers: getAuthHeaders(token),
+        });
+        if (res.ok) {
+          const prof = await res.json();
+          setNewHires((prev) =>
+            prev.map((h) =>
+              h.id === empId
+                ? {
+                    ...h,
+                    bio: prof.bio || '',
+                    funFact: prof.funFact || '',
+                    favoriteFood: prof.favoriteFood || '',
+                    favoriteMovies: prof.favoriteMovies || '',
+                    favoriteMusic: prof.favoriteMusic || '',
+                    coffeeTea: prof.coffeeTea || '',
+                  }
+                : h
+            )
+          );
+        }
+      }
+    } catch {} finally {
+      setLoadingDetails((prev) => ({ ...prev, [empId]: false }));
+    }
+  };
+
   return (
     <Card className={preview ? '' : 'mb-16'}>
       <div className="card-header">
         <div className="card-header-left">
-          <div className="card-header-icon"><UserPlus size={16} strokeWidth={2.5} /></div>
-          <h2 className="card-header-title">New Hires</h2>
+          <div className="card-header-icon" style={{ background: '#fdf2f8', color: '#db2777' }}>
+            <Sparkles size={16} strokeWidth={2.5} />
+          </div>
+          <h2 className="card-header-title">Welcome New Hires</h2>
         </div>
-        {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
+        <div className="row gap-8 align-center">
+          <span className="text-xs text-5" style={{ fontSize: 11 }}>Click to expand</span>
+          {onRemove && <button className="widget-remove-btn" onClick={onRemove}><X size={11} /></button>}
+        </div>
       </div>
+
       <CardBody style={{ padding: newHires.length === 0 ? '28px 20px' : 0, textAlign: newHires.length === 0 ? 'center' : 'left' }}>
         {newHires.length === 0 ? (
           <div>
@@ -1970,16 +2035,209 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
             </p>
           </div>
         ) : (
-          newHires.map((emp) => (
-            <div key={emp.id} className="list-row" style={{ padding: '12px 20px' }}>
-              <Avatar src={emp.avatar} name={emp.name} size="sm" />
-              <div style={{ flex: 1 }}>
-                <p className="text-sm text-1">{emp.name}</p>
-                <p className="text-xs text-5">{emp.title} · {emp.department}</p>
-              </div>
-              <Badge variant="success" style={{ fontSize: 11, padding: '2px 8px' }}>New</Badge>
-            </div>
-          ))
+          <div className="col">
+            {newHires.map((emp) => {
+              const isExpanded = expandedId === emp.id;
+              const hasOnboardingDetails = Boolean(
+                emp.bio || emp.funFact || emp.favoriteFood || emp.favoriteMovies || emp.favoriteMusic || emp.coffeeTea
+              );
+
+              return (
+                <div
+                  key={emp.id}
+                  style={{
+                    borderBottom: '1px solid var(--border)',
+                    background: isExpanded ? 'rgba(162, 56, 255, 0.02)' : 'transparent',
+                    transition: 'background 0.15s ease',
+                  }}
+                >
+                  {/* Summary Row */}
+                  <div
+                    onClick={() => toggleExpand(emp.id)}
+                    style={{
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <Avatar src={emp.avatar} name={emp.name} size="sm" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="row gap-8 align-center">
+                        <p className="text-sm fw-700 text-1 m-0 truncate">{emp.name}</p>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '1px 7px',
+                            borderRadius: 12,
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          New
+                        </span>
+                      </div>
+                      <p className="text-xs text-5 mt-2 m-0 truncate">
+                        {emp.title} · {emp.department}
+                      </p>
+                    </div>
+
+                    <div className="row gap-8 align-center">
+                      <span
+                        className="text-xs fw-600"
+                        style={{
+                          fontSize: 11,
+                          color: isExpanded ? 'var(--primary)' : 'var(--text-4)',
+                        }}
+                      >
+                        {isExpanded ? 'Less' : 'About'}
+                      </span>
+                      <ChevronDown
+                        size={15}
+                        style={{
+                          color: isExpanded ? 'var(--primary)' : 'var(--text-4)',
+                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Expanded Cute Profile Drawer */}
+                  {isExpanded && (
+                    <div
+                      style={{
+                        padding: '0 20px 18px 20px',
+                        animation: 'fadeIn 0.2s ease',
+                      }}
+                    >
+                      {loadingDetails[emp.id] ? (
+                        <div className="p-16 text-center text-xs text-5">
+                          <Loader2 size={16} className="animate-spin mr-6 inline" />
+                          Getting {emp.firstName}&apos;s profile...
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            background: '#FFFFFF',
+                            borderRadius: 14,
+                            padding: '16px 18px',
+                            border: '1px solid var(--border)',
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                          }}
+                          className="col gap-12"
+                        >
+                          {/* Cute Bio / Intro */}
+                          <div>
+                            <span className="text-xs fw-700 text-1" style={{ fontSize: 11 }}>
+                              👋 About {emp.firstName}
+                            </span>
+                            <p className="text-xs text-4 mt-4 m-0" style={{ lineHeight: 1.6 }}>
+                              {emp.bio || `${emp.firstName} recently joined the ${emp.department} team as ${emp.title}. Welcome aboard!`}
+                            </p>
+                          </div>
+
+                          {/* Quick Badges / Favorites */}
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                              gap: 8,
+                              paddingTop: 8,
+                              borderTop: '1px dashed var(--border)',
+                            }}
+                          >
+                            <div
+                              style={{
+                                background: '#FFFBEB',
+                                border: '1px solid #FEF3C7',
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                              }}
+                            >
+                              <div className="text-xs fw-700 text-amber-800" style={{ fontSize: 10 }}>
+                                ☕ Drink
+                              </div>
+                              <div className="text-xs text-1 fw-600 mt-2 truncate">
+                                {emp.coffeeTea || 'Coffee enthusiast'}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                background: '#F0FDF4',
+                                border: '1px solid #DCFCE7',
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                              }}
+                            >
+                              <div className="text-xs fw-700 text-emerald-800" style={{ fontSize: 10 }}>
+                                🍕 Favorite Food
+                              </div>
+                              <div className="text-xs text-1 fw-600 mt-2 truncate">
+                                {emp.favoriteFood || 'Foodie adventures'}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                background: '#F5F3FF',
+                                border: '1px solid #EDE9FE',
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                              }}
+                            >
+                              <div className="text-xs fw-700 text-purple-800" style={{ fontSize: 10 }}>
+                                🎧 Music & Hobbies
+                              </div>
+                              <div className="text-xs text-1 fw-600 mt-2 truncate">
+                                {emp.favoriteMusic || emp.funFact || 'Music & Reading'}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                background: '#EFF6FF',
+                                border: '1px solid #DBEAFE',
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                              }}
+                            >
+                              <div className="text-xs fw-700 text-blue-800" style={{ fontSize: 10 }}>
+                                📍 Office & Team
+                              </div>
+                              <div className="text-xs text-1 fw-600 mt-2 truncate">
+                                {emp.location || 'Headquarters'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Link to full employee profile */}
+                          <div className="row-between pt-6 align-center">
+                            <span className="text-xs text-5" style={{ fontSize: 11 }}>
+                              {emp.startDate ? `Joined ${emp.startDate}` : 'New team member'}
+                            </span>
+                            <Link
+                              href={`/people/${emp.id}`}
+                              className="text-xs fw-700 text-primary"
+                              style={{ textDecoration: 'none' }}
+                            >
+                              Full Profile &rarr;
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </CardBody>
     </Card>

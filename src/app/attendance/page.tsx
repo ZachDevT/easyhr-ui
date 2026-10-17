@@ -6,13 +6,15 @@ import { useAuth } from "@clerk/nextjs";
 import { 
   Search, Filter, Clock, MapPin, AlertTriangle, ChevronDown, 
   MonitorPlay, MonitorStop, RefreshCw, CalendarDays, Edit3, Send,
-  CheckCircle2, LogIn, LogOut, UserCheck, ShieldAlert
+  CheckCircle2, LogIn, LogOut, UserCheck, ShieldAlert, Trash2, Plus
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
 import { AttendanceSkeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { useRole } from "@/context/RoleContext";
@@ -31,17 +33,41 @@ export interface LiveAttendanceItem {
   lateMinutes?: number;
 }
 
-const TABS = ["Live Attendance", "Shift Management"];
+const TABS = ["Live Attendance", "Shift Management", "Punch Activities"];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-export default function AttendancePage() {
+interface ActivityItem {
+  id: string;
+  name: string;
+  code?: string;
+  isBillable: boolean;
+  color?: string;
+}
+
+const DEFAULT_ACTIVITIES: ActivityItem[] = [
+  { id: 'act-1', name: 'Production',  isBillable: true,  color: '#7c3aed' },
+  { id: 'act-2', name: 'Meeting',     isBillable: true,  color: '#2563eb' },
+  { id: 'act-3', name: 'Break',       isBillable: false, color: '#f59e0b' },
+  { id: 'act-4', name: 'Lunch',       isBillable: false, color: '#10b981' },
+  { id: 'act-5', name: 'Training',    isBillable: true,  color: '#8b5cf6' },
+  { id: 'act-6', name: 'Client Work', isBillable: true,  color: '#06b6d4' },
+];
+
+function AttendanceContent() {
   const { getToken, isSignedIn } = useAuth();
   const { isHRAdmin, isManager, currentUser } = useRole();
-  const [activeTab, setActiveTab] = useState("Live Attendance");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get("tab") === "activities" ? "Punch Activities" : "Live Attendance";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [records, setRecords] = useState<LiveAttendanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPunching, setIsPunching] = useState(false);
   const [punchMessage, setPunchMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Punch Activities state
+  const [activities, setActivities] = useState<ActivityItem[]>(DEFAULT_ACTIVITIES);
+  const [newActivityName, setNewActivityName] = useState('');
+  const [newActivityBillable, setNewActivityBillable] = useState(true);
 
   const myRecord = useMemo(() => {
     const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim().toLowerCase();
@@ -679,6 +705,161 @@ export default function AttendancePage() {
                 </Card>
               </div>
             )}
+
+            {activeTab === "Punch Activities" && (
+              <div>
+                <div className="row-between mb-24">
+                  <div>
+                    <h3 className="text-xl fw-800 text-1">Organization Punch Activities</h3>
+                    <p className="text-sm text-5 mt-4">
+                      Configure clock-in and break activity types. Designate which activities are billable to ensure accurate payroll and timesheet calculations.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(320px, 0.8fr)", gap: 24 }}>
+                  {/* Left: Activities List */}
+                  <Card style={{ borderRadius: 16 }}>
+                    <CardBody style={{ padding: "20px 24px" }}>
+                      <h4 className="text-base fw-700 text-1 mb-16">Active Clock-in Activities</h4>
+                      <div className="col gap-10">
+                        {activities.map((act) => (
+                          <div
+                            key={act.name}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "14px 18px",
+                              borderRadius: 12,
+                              background: "#FAF9F7",
+                              border: "1px solid var(--border)",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <span
+                                style={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  background: act.color || "#7c3aed",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <div>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{act.name}</span>
+                                <div className="text-xs text-5 mt-2">
+                                  {act.isBillable ? "Tracked as standard productive work hours" : "Recorded as non-working / break time"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="row gap-12 align-center">
+                              <Badge variant={act.isBillable ? "success" : "neutral"} style={{ fontSize: 11, padding: "3px 10px" }}>
+                                {act.isBillable ? "Billable" : "Non-billable"}
+                              </Badge>
+
+                              {isHRAdmin && activities.length > 2 && (
+                                <button
+                                  type="button"
+                                  className="btn-circle"
+                                  style={{ width: 30, height: 30, color: "#ef4444" }}
+                                  onClick={() => {
+                                    setActivities((prev) => prev.filter((a) => a.name !== act.name));
+                                    toast.info("Activity removed", `Removed ${act.name} from punch options.`);
+                                  }}
+                                  title="Remove activity"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardBody>
+                  </Card>
+
+                  {/* Right: Add Activity Card */}
+                  {isHRAdmin && (
+                    <Card style={{ borderRadius: 16, height: "fit-content" }}>
+                      <CardBody style={{ padding: "20px 24px" }}>
+                        <h4 className="text-base fw-700 text-1 mb-8">Add New Activity Type</h4>
+                        <p className="text-xs text-5 mb-16">
+                          Define a custom task category that team members can pick from their dashboard clock-in button.
+                        </p>
+
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!newActivityName.trim()) return;
+                            const colors = ["#7c3aed", "#2563eb", "#06b6d4", "#10b981", "#f59e0b", "#ec4899"];
+                            const color = colors[activities.length % colors.length];
+                            setActivities([
+                              ...activities,
+                              {
+                                id: `act-${Date.now()}`,
+                                name: newActivityName.trim(),
+                                isBillable: newActivityBillable,
+                                color,
+                              },
+                            ]);
+                            toast.success("Activity added", `"${newActivityName.trim()}" is now available for time tracking.`);
+                            setNewActivityName("");
+                            setNewActivityBillable(true);
+                          }}
+                          className="col gap-14"
+                        >
+                          <div>
+                            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+                              Activity Name *
+                            </label>
+                            <Input
+                              placeholder="e.g. Code Review, Field Visit..."
+                              value={newActivityName}
+                              onChange={(e) => setNewActivityName(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <label
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              fontSize: 13,
+                              cursor: "pointer",
+                              padding: "10px 14px",
+                              background: "#FAF9F7",
+                              borderRadius: 10,
+                              border: "1px solid var(--border)",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={newActivityBillable}
+                              onChange={(e) => setNewActivityBillable(e.target.checked)}
+                            />
+                            <span>
+                              Count as <strong>Billable</strong> working hours in Payroll
+                            </span>
+                          </label>
+
+                          <button
+                            type="submit"
+                            className="btn-primary"
+                            disabled={!newActivityName.trim()}
+                            style={{ justifyContent: "center", marginTop: 4 }}
+                          >
+                            <Plus size={16} className="mr-6" /> Add Punch Activity
+                          </button>
+                        </form>
+                      </CardBody>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
               </>
             )}
           </>
@@ -797,5 +978,13 @@ export default function AttendancePage() {
         )}
       </Modal>
     </div>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <React.Suspense fallback={<AttendanceSkeleton />}>
+      <AttendanceContent />
+    </React.Suspense>
   );
 }
