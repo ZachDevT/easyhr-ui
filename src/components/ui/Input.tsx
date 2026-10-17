@@ -1,4 +1,5 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useRef } from 'react';
+import { Calendar } from 'lucide-react';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   leftIcon?: React.ReactNode;
@@ -20,6 +21,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       containerStyle = {},
       className = '',
       style,
+      type,
       onFocus,
       onBlur,
       ...props
@@ -27,6 +29,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     ref
   ) => {
     const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const isDate = type === 'date' || type === 'datetime-local' || type === 'month';
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
@@ -82,7 +86,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
 
           <input
-            ref={ref}
+            ref={(node) => {
+              // Support both forwarded ref and internal ref for showPicker()
+              if (typeof ref === 'function') ref(node);
+              else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+              inputRef.current = node;
+            }}
+            type={type}
             onFocus={handleFocus}
             onBlur={handleBlur}
             style={{
@@ -95,16 +105,52 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               color: 'var(--text-1, #1E1D19)',
               paddingTop: '10px',
               paddingBottom: '10px',
-              paddingLeft: leftIcon ? '4px' : '14px',
-              paddingRight: rightIcon ? '4px' : '14px',
+              paddingLeft: leftIcon ? '4px' : isDate ? '6px' : '14px',
+              paddingRight: rightIcon ? '4px' : isDate ? '12px' : '14px',
               fontFamily: 'inherit',
+              cursor: isDate ? 'pointer' : 'text',
               ...style,
             }}
             className={className}
             {...props}
           />
 
-          {rightIcon && (
+          {isDate && (
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => {
+                if (inputRef.current) {
+                  try {
+                    // Modern browser showPicker()
+                    if ('showPicker' in HTMLInputElement.prototype) {
+                      (inputRef.current as any).showPicker();
+                    } else {
+                      inputRef.current.focus();
+                    }
+                  } catch {
+                    inputRef.current.focus();
+                  }
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0 12px',
+                color: isFocused ? 'var(--primary, #A238FF)' : 'var(--text-4, #66655A)',
+                transition: 'color 0.15s ease',
+              }}
+              title="Open calendar"
+            >
+              <Calendar size={17} />
+            </button>
+          )}
+
+          {rightIcon && !isDate && (
             <div
               style={{
                 display: 'flex',

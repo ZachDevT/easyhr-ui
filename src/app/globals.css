@@ -559,10 +559,40 @@ img { display: block; }
   color: var(--text-1);
   background: white;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.input:focus { border-color: var(--primary); }
+.input:focus { 
+  border-color: var(--primary); 
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
 .input::placeholder { color: var(--text-placeholder); }
+
+/* Global custom date input design */
+input[type="date"],
+input[type="datetime-local"] {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-1);
+  cursor: pointer;
+  position: relative;
+}
+
+/* Custom calendar picker indicator styling in WebKit */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px;
+  opacity: 0.75;
+  transition: all 0.15s ease;
+  filter: invert(38%) sepia(85%) saturate(2250%) hue-rotate(252deg) brightness(98%) contrast(102%);
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: var(--primary-tint);
+  transform: scale(1.08);
+}
 
 .select {
   width: 100%;
@@ -575,8 +605,12 @@ img { display: block; }
   background: white;
   outline: none;
   cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.select:focus { border-color: var(--primary); }
+.select:focus { 
+  border-color: var(--primary); 
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
 
 .textarea {
   width: 100%;
