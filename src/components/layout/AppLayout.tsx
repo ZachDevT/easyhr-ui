@@ -74,12 +74,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const isChatRoute = pathname === '/chat' || pathname.startsWith('/chat/');
+
   return (
     <div className="app-shell">
       <Sidebar />
       <div className="main-content">
         <TopBar />
-        <main className="page-body">
+        <main
+          className="page-body"
+          style={isChatRoute ? { padding: 0, overflow: 'hidden', gap: 0 } : undefined}
+        >
           {children}
         </main>
       </div>

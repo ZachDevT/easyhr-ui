@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Smile, Search, Sparkles } from 'lucide-react';
+import { Smile, Search, Sparkles, X } from 'lucide-react';
 
 interface EmojiGifPickerProps {
   onSelectEmoji: (emoji: string) => void;
   onSelectGif: (gifUrl: string, title: string) => void;
   onClose: () => void;
+  initialTab?: 'emoji' | 'gif';
 }
 
 const COMMON_EMOJIS = [
@@ -67,55 +68,141 @@ const CURATED_GIFS = [
   }
 ];
 
-export function EmojiGifPicker({ onSelectEmoji, onSelectGif, onClose }: EmojiGifPickerProps) {
-  const [activeTab, setActiveTab] = useState<'emoji' | 'gif'>('emoji');
+export function EmojiGifPicker({
+  onSelectEmoji,
+  onSelectGif,
+  onClose,
+  initialTab = 'emoji',
+}: EmojiGifPickerProps) {
+  const [activeTab, setActiveTab] = useState<'emoji' | 'gif'>(initialTab);
   const [gifSearch, setGifSearch] = useState('');
 
-  const filteredGifs = CURATED_GIFS.filter(g => 
-    g.title.toLowerCase().includes(gifSearch.toLowerCase()) || 
-    g.tag.toLowerCase().includes(gifSearch.toLowerCase())
+  const filteredGifs = CURATED_GIFS.filter(
+    (g) =>
+      g.title.toLowerCase().includes(gifSearch.toLowerCase()) ||
+      g.tag.toLowerCase().includes(gifSearch.toLowerCase())
   );
 
   return (
-    <div 
-      className="absolute bottom-full mb-2 left-4 z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden text-gray-800 animate-in fade-in zoom-in-95 duration-150"
+    <div
       onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        bottom: 'calc(100% + 10px)',
+        left: 16,
+        zIndex: 80,
+        width: 320,
+        background: '#FFFFFF',
+        borderRadius: 16,
+        border: '1px solid var(--card-border, #E4E4E7)',
+        boxShadow: '0 16px 40px -8px rgba(17, 17, 24, 0.14), 0 4px 12px -2px rgba(17, 17, 24, 0.06)',
+        overflow: 'hidden',
+        color: 'var(--text-1, #18181B)',
+      }}
     >
-      {/* Tabs */}
-      <div className="flex items-center border-b border-gray-100 bg-gray-50/80 px-2 pt-2">
+      {/* Top Tabs Bar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 10px 0 10px',
+          background: '#FAF9F7',
+          borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('emoji')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: '10px 10px 0 0',
+              border: activeTab === 'emoji' ? '1px solid var(--card-border, #E4E4E7)' : '1px solid transparent',
+              borderBottom: activeTab === 'emoji' ? '1px solid #FFFFFF' : 'none',
+              marginBottom: -1,
+              background: activeTab === 'emoji' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'emoji' ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+              cursor: 'pointer',
+            }}
+          >
+            <Smile size={14} />
+            <span>Emojis</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('gif')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: '10px 10px 0 0',
+              border: activeTab === 'gif' ? '1px solid var(--card-border, #E4E4E7)' : '1px solid transparent',
+              borderBottom: activeTab === 'gif' ? '1px solid #FFFFFF' : 'none',
+              marginBottom: -1,
+              background: activeTab === 'gif' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'gif' ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+              cursor: 'pointer',
+            }}
+          >
+            <Sparkles size={14} />
+            <span>GIFs</span>
+          </button>
+        </div>
+
         <button
           type="button"
-          onClick={() => setActiveTab('emoji')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-t-lg transition-colors ${
-            activeTab === 'emoji' 
-              ? 'bg-white text-purple-700 border-t border-x border-gray-200 shadow-sm' 
-              : 'text-gray-500 hover:text-gray-900'
-          }`}
+          onClick={onClose}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-3, #A1A1AA)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            marginBottom: 4,
+          }}
         >
-          <Smile size={14} />
-          Emojis
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('gif')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-t-lg transition-colors ${
-            activeTab === 'gif' 
-              ? 'bg-white text-purple-700 border-t border-x border-gray-200 shadow-sm' 
-              : 'text-gray-500 hover:text-gray-900'
-          }`}
-        >
-          <Sparkles size={14} />
-          Animated GIFs
+          <X size={14} />
         </button>
       </div>
 
-      {/* Tab Body */}
+      {/* Body */}
       {activeTab === 'emoji' ? (
-        <div className="p-3">
-          <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Frequently Used Emojis
+        <div style={{ padding: 12 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: 'var(--text-3, #A1A1AA)',
+              marginBottom: 8,
+            }}
+          >
+            Frequently Used
           </div>
-          <div className="grid grid-cols-8 gap-1 max-h-56 overflow-y-auto pr-1">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(8, 1fr)',
+              gap: 4,
+              maxHeight: 210,
+              overflowY: 'auto',
+            }}
+          >
             {COMMON_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
@@ -124,7 +211,27 @@ export function EmojiGifPicker({ onSelectEmoji, onSelectGif, onClose }: EmojiGif
                   onSelectEmoji(emoji);
                   onClose();
                 }}
-                className="w-8 h-8 flex items-center justify-center text-lg hover:bg-purple-50 hover:scale-125 transition-transform rounded cursor-pointer"
+                style={{
+                  width: 34,
+                  height: 34,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background 0.12s ease, transform 0.12s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#F4F4F5';
+                  e.currentTarget.style.transform = 'scale(1.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
               >
                 {emoji}
               </button>
@@ -132,18 +239,44 @@ export function EmojiGifPicker({ onSelectEmoji, onSelectGif, onClose }: EmojiGif
           </div>
         </div>
       ) : (
-        <div className="p-3">
-          <div className="relative mb-2">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div style={{ padding: 12 }}>
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <Search
+              size={13}
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            />
             <input
               type="text"
-              placeholder="Search GIFs (celebration, work, rocket...)"
+              placeholder="Search GIFs (celebration, work, launch...)"
               value={gifSearch}
               onChange={(e) => setGifSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+              style={{
+                width: '100%',
+                padding: '7px 10px 7px 30px',
+                fontSize: 12,
+                background: '#FAF9F7',
+                border: '1px solid var(--card-border, #E4E4E7)',
+                borderRadius: 8,
+                outline: 'none',
+                color: 'var(--text-1, #18181B)',
+              }}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 8,
+              maxHeight: 220,
+              overflowY: 'auto',
+            }}
+          >
             {filteredGifs.length > 0 ? (
               filteredGifs.map((gif) => (
                 <button
@@ -153,22 +286,52 @@ export function EmojiGifPicker({ onSelectEmoji, onSelectGif, onClose }: EmojiGif
                     onSelectGif(gif.url, gif.title);
                     onClose();
                   }}
-                  className="group relative rounded-lg overflow-hidden border border-gray-100 hover:border-purple-400 aspect-video bg-gray-100 transition-all text-left"
+                  style={{
+                    position: 'relative',
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    background: '#F4F4F5',
+                    padding: 0,
+                    height: 86,
+                    cursor: 'pointer',
+                  }}
                 >
-                  <img 
-                    src={gif.preview} 
-                    alt={gif.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                  <img
+                    src={gif.preview}
+                    alt={gif.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1.5">
-                    <span className="text-[10px] text-white font-medium truncate">{gif.title}</span>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 'auto 0 0 0',
+                      padding: '4px 6px',
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                      color: '#FFFFFF',
+                      fontSize: 10,
+                      textAlign: 'left',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {gif.title}
                   </div>
                 </button>
               ))
             ) : (
-              <div className="col-span-2 text-center py-6 text-xs text-gray-400">
-                No matching GIFs found. Try searching &quot;work&quot; or &quot;celebration&quot;.
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'center',
+                  padding: '24px 8px',
+                  fontSize: 12,
+                  color: 'var(--text-3, #A1A1AA)',
+                }}
+              >
+                No matching GIFs found.
               </div>
             )}
           </div>

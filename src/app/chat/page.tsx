@@ -1,31 +1,40 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Hash, 
-  Lock, 
-  Search, 
-  Plus, 
-  Send, 
-  Smile, 
-  Paperclip, 
-  Image as ImageIcon, 
-  MessageSquare, 
-  Heart, 
-  Trash2, 
-  Users, 
-  UserPlus, 
-  Check, 
-  X, 
-  AtSign, 
-  ChevronDown, 
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import {
+  Hash,
+  Lock,
+  Search,
+  Plus,
+  Send,
+  Smile,
+  Paperclip,
+  MessageSquare,
+  Heart,
+  Trash2,
+  Users,
+  UserPlus,
+  Check,
+  X,
+  AtSign,
+  ChevronDown,
+  ChevronRight,
   Sparkles,
-  Info,
   ShieldAlert,
-  Pin
+  Pin,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Briefcase,
+  ExternalLink,
+  FileText,
 } from 'lucide-react';
-import { useChat, ChatMessage } from '@/context/ChatContext';
+import { useChat } from '@/context/ChatContext';
 import { useRole } from '@/context/RoleContext';
+import { useCompany } from '@/context/CompanyContext';
+import { Employee } from '@/data/employees';
 import { CreateChannelModal } from '@/components/chat/CreateChannelModal';
 import { ThreadDrawer } from '@/components/chat/ThreadDrawer';
 import { EmojiGifPicker } from '@/components/chat/EmojiGifPicker';
@@ -40,68 +49,155 @@ export default function GroupChatPage() {
     setActiveThread,
     sendMessage,
     deleteMessage,
+    togglePinMessage,
     toggleReaction,
     requestToJoinChannel,
     approveJoinRequest,
     rejectJoinRequest,
+    addMemberToChannel,
+    removeMemberFromChannel,
     typingUsers,
     setTyping,
     allEmployees,
   } = useChat();
 
-  const { currentUser, role } = useRole();
+  const { currentUser, role, isHRAdmin } = useRole();
+  const { company } = useCompany();
 
-  // State
+  // UI state
   const [inputText, setInputText] = useState('');
   const [searchChannelTerm, setSearchChannelTerm] = useState('');
   const [searchMessageTerm, setSearchMessageTerm] = useState('');
+  const [viewFilter, setViewFilter] = useState<'all' | 'threads' | 'pinned'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const [showMemberDrawer, setShowMemberDrawer] = useState(false);
+  const [pickerTab, setPickerTab] = useState<'emoji' | 'gif'>('emoji');
+  const [showMemberDrawer, setShowMemberDrawer] = useState(true);
+  const [selectedProfileMember, setSelectedProfileMember] = useState<Employee | null>(null);
+  const [showAddMemberInput, setShowAddMemberInput] = useState(false);
+  const [memberFilterTerm, setMemberFilterTerm] = useState('');
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [showThreadsPopover, setShowThreadsPopover] = useState(false);
+
+  // Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionAnchorIdx, setMentionAnchorIdx] = useState<number>(-1);
-  const [uploadedAttachments, setUploadedAttachments] = useState<{
-    id: string;
-    name: string;
-    url: string;
-    type: 'image' | 'file';
-    size?: string;
-  }[]>([]);
+
+  // Staged file attachments
+  const [uploadedAttachments, setUploadedAttachments] = useState<
+    {
+      id: string;
+      name: string;
+      url: string;
+      type: 'image' | 'file';
+      size?: string;
+    }[]
+  >([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto scroll to bottom of chat on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages.length, activeChannel?.id]);
 
-  // Check if current user is member / admin
+  // Membership & permissions
   const currentUserId = String(currentUser?.id || 'user');
-  const isMember = activeChannel ? activeChannel.memberIds.includes(currentUserId) : false;
-  const isChannelAdmin = activeChannel ? activeChannel.adminIds.includes(currentUserId) || role === 'HR Admin' : false;
-  const hasRequested = activeChannel ? activeChannel.pendingRequestUserIds.includes(currentUserId) : false;
+  const isPublicChannel = activeChannel
+    ? !activeChannel.isPrivate && !activeChannel.departmentRestricted
+    : false;
+  const isMember = activeChannel
+    ? isPublicChannel ||
+      activeChannel.memberIds.includes(currentUserId) ||
+      activeChannel.memberIds.includes('user')
+    : false;
+  const isChannelAdmin = activeChannel
+    ? activeChannel.adminIds.includes(currentUserId) ||
+      activeChannel.adminIds.includes('user') ||
+      isHRAdmin ||
+      role === 'HR Admin'
+    : false;
+  const hasRequested = activeChannel
+    ? activeChannel.pendingRequestUserIds.includes(currentUserId)
+    : false;
 
-  // Filter channels
-  const filteredChannels = channels.filter(ch => 
-    ch.name.toLowerCase().includes(searchChannelTerm.toLowerCase()) ||
-    (ch.department && ch.department.toLowerCase().includes(searchChannelTerm.toLowerCase()))
+  // Channel groupings
+  const filteredChannels = useMemo(
+    () =>
+      channels.filter(
+        (ch) =>
+          ch.name.toLowerCase().includes(searchChannelTerm.toLowerCase()) ||
+          (ch.department && ch.department.toLowerCase().includes(searchChannelTerm.toLowerCase()))
+      ),
+    [channels, searchChannelTerm]
   );
 
-  const publicChannels = filteredChannels.filter(c => !c.isPrivate && !c.departmentRestricted);
-  const departmentChannels = filteredChannels.filter(c => c.departmentRestricted);
-  const privateChannels = filteredChannels.filter(c => c.isPrivate && !c.departmentRestricted);
+  const generalChannels = useMemo(
+    () => filteredChannels.filter((c) => !c.departmentRestricted),
+    [filteredChannels]
+  );
 
-  // Filter messages by search
-  const visibleMessages = searchMessageTerm
-    ? messages.filter(m => 
-        m.content.toLowerCase().includes(searchMessageTerm.toLowerCase()) ||
-        m.senderName.toLowerCase().includes(searchMessageTerm.toLowerCase())
-      )
-    : messages;
+  const departmentGroups = useMemo(() => {
+    const groups: Record<string, typeof filteredChannels> = {};
+    filteredChannels
+      .filter((c) => c.departmentRestricted)
+      .forEach((c) => {
+        const dept = c.department || 'General';
+        if (!groups[dept]) groups[dept] = [];
+        groups[dept].push(c);
+      });
+    return groups;
+  }, [filteredChannels]);
 
-  // Handle Mentions typing
+  // Visible messages based on search + viewFilter
+  const visibleMessages = useMemo(() => {
+    let list = messages;
+    if (viewFilter === 'threads') {
+      list = list.filter((m) => (m.replyCount || 0) > 0);
+    } else if (viewFilter === 'pinned') {
+      list = list.filter((m) => m.pinned);
+    }
+    if (searchMessageTerm.trim()) {
+      const q = searchMessageTerm.toLowerCase();
+      list = list.filter(
+        (m) =>
+          m.content.toLowerCase().includes(q) ||
+          m.senderName.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [messages, viewFilter, searchMessageTerm]);
+
+  const threadedMessages = useMemo(
+    () => messages.filter((m) => (m.replyCount || 0) > 0),
+    [messages]
+  );
+
+  const pinnedCount = useMemo(
+    () => messages.filter((m) => m.pinned).length,
+    [messages]
+  );
+
+  // Resolve channel members list
+  const channelMembers = useMemo(() => {
+    if (!activeChannel) return [];
+    if (!activeChannel.isPrivate && !activeChannel.departmentRestricted) {
+      return allEmployees;
+    }
+    return allEmployees.filter((emp) =>
+      activeChannel.memberIds.includes(String(emp.id))
+    );
+  }, [activeChannel, allEmployees]);
+
+  const nonMembers = useMemo(() => {
+    if (!activeChannel) return [];
+    const memberSet = new Set(activeChannel.memberIds.map(String));
+    return allEmployees.filter((e) => !memberSet.has(String(e.id)));
+  }, [activeChannel, allEmployees]);
+
+  // Handle text input and @mentions
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputText(val);
@@ -127,7 +223,6 @@ export default function GroupChatPage() {
     textareaRef.current?.focus();
   };
 
-  // Send message
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim() && uploadedAttachments.length === 0) return;
@@ -144,7 +239,6 @@ export default function GroupChatPage() {
     setMentionQuery(null);
   };
 
-  // Mock file attachment upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -152,7 +246,7 @@ export default function GroupChatPage() {
     Array.from(files).forEach((file) => {
       const isImg = file.type.startsWith('image/');
       const fileUrl = URL.createObjectURL(file);
-      setUploadedAttachments(prev => [
+      setUploadedAttachments((prev) => [
         ...prev,
         {
           id: `file-${Date.now()}-${Math.random()}`,
@@ -160,272 +254,1184 @@ export default function GroupChatPage() {
           url: fileUrl,
           type: isImg ? 'image' : 'file',
           size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        }
+        },
       ]);
     });
   };
 
+  // Format message content with highlighted @mentions
+  const renderFormattedContent = (text: string) => {
+    const parts = text.split(/(@[A-Za-z]+(?:\s[A-Za-z]+)?)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('@') && part.length > 1) {
+        return (
+          <span
+            key={idx}
+            style={{
+              display: 'inline-block',
+              padding: '1px 6px',
+              borderRadius: 6,
+              background: 'var(--primary-light, #F5EBFF)',
+              color: 'var(--primary, #A238FF)',
+              fontSize: 12.5,
+            }}
+          >
+            {part}
+          </span>
+        );
+      }
+      return <React.Fragment key={idx}>{part}</React.Fragment>;
+    });
+  };
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-white text-gray-800">
-      {/* ─── LEFT: Inner Slack Channels Sidebar ──────────────────────────────── */}
-      <aside className="w-64 border-r border-gray-200 bg-slate-900 text-slate-300 flex flex-col shrink-0">
-        {/* Workspace Brand Pill */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">
-              💬
+    <div
+      style={{
+        display: 'flex',
+        height: 'calc(100vh - var(--topbar-height, 64px))',
+        width: '100%',
+        overflow: 'hidden',
+        background: '#FFFFFF',
+        color: 'var(--text-1, #18181B)',
+      }}
+    >
+      {/* ═══════════════════════════════════════════════════════════════════════
+          LEFT INNER SIDEBAR: Channels, Department Groups & Team Members
+         ═══════════════════════════════════════════════════════════════════════ */}
+      <aside
+        style={{
+          width: 260,
+          flexShrink: 0,
+          borderRight: '1px solid var(--card-border, #E4E4E7)',
+          background: '#FAF9F7',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          userSelect: 'none',
+        }}
+      >
+        {/* Workspace Header */}
+        <div
+          style={{
+            height: 58,
+            padding: '0 16px',
+            borderBottom: '1px solid var(--card-border, #E4E4E7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#FFFFFF',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: 'var(--text-1, #18181B)',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 13,
+                flexShrink: 0,
+              }}
+            >
+              {(company?.name || 'EasyHR').slice(0, 1).toUpperCase()}
             </div>
-            <div>
-              <div className="text-xs font-bold text-white tracking-wide">EasyHR Workspace</div>
-              <div className="text-[10px] text-slate-400">Team Discussions</div>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 13.5,
+                  color: 'var(--text-1, #18181B)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {company?.name || 'EasyHR Workspace'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)' }}>
+                {channels.length} channels · {allEmployees.length} members
+              </div>
             </div>
           </div>
+
           <button
+            type="button"
             onClick={() => setShowCreateModal(true)}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-            title="Create Group Chat"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              border: '1px solid var(--card-border, #E4E4E7)',
+              background: '#FFFFFF',
+              color: 'var(--text-1, #18181B)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+            title="Create new channel"
           >
             <Plus size={15} />
           </button>
         </div>
 
-        {/* Channel Search */}
-        <div className="px-3 pt-3">
-          <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Channel Filter Search */}
+        <div style={{ padding: '12px 12px 6px 12px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search
+              size={13}
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            />
             <input
               type="text"
               placeholder="Jump to channel..."
               value={searchChannelTerm}
               onChange={(e) => setSearchChannelTerm(e.target.value)}
-              className="w-full pl-7 pr-2 py-1.5 bg-slate-800/80 border border-slate-700/60 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              style={{
+                width: '100%',
+                padding: '7px 10px 7px 30px',
+                fontSize: 12,
+                background: '#FFFFFF',
+                border: '1px solid var(--card-border, #E4E4E7)',
+                borderRadius: 9,
+                outline: 'none',
+                color: 'var(--text-1, #18181B)',
+              }}
             />
           </div>
         </div>
 
-        {/* Channels List */}
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
-          {/* Public Channels */}
+        {/* Quick View Nav (All / Threads / Pinned) */}
+        <div
+          style={{
+            padding: '4px 10px 10px 10px',
+            borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setViewFilter('all')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: viewFilter === 'all' ? '#FFFFFF' : 'transparent',
+              boxShadow: viewFilter === 'all' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+              color: viewFilter === 'all' ? 'var(--text-1, #18181B)' : 'var(--text-2, #52525B)',
+              fontSize: 12.5,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Hash size={14} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+              <span>All Messages</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewFilter('threads')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: viewFilter === 'threads' ? '#FFFFFF' : 'transparent',
+              boxShadow: viewFilter === 'threads' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+              color: viewFilter === 'threads' ? 'var(--text-1, #18181B)' : 'var(--text-2, #52525B)',
+              fontSize: 12.5,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MessageSquare size={14} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+              <span>Thread Discussions</span>
+            </span>
+            {threadedMessages.length > 0 && (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  padding: '1px 6px',
+                  borderRadius: 999,
+                  background: '#F4F4F5',
+                  color: 'var(--text-2, #52525B)',
+                }}
+              >
+                {threadedMessages.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewFilter('pinned')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: viewFilter === 'pinned' ? '#FFFFFF' : 'transparent',
+              boxShadow: viewFilter === 'pinned' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+              color: viewFilter === 'pinned' ? 'var(--text-1, #18181B)' : 'var(--text-2, #52525B)',
+              fontSize: 12.5,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Pin size={14} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+              <span>Pinned Items</span>
+            </span>
+            {pinnedCount > 0 && (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  padding: '1px 6px',
+                  borderRadius: 999,
+                  background: '#F4F4F5',
+                  color: 'var(--text-2, #52525B)',
+                }}
+              >
+                {pinnedCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Scrollable Channels & Groups List */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 18,
+          }}
+        >
+          {/* Channels Section */}
           <div>
-            <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>Public Channels</span>
-              <span className="text-[9px] bg-slate-800 px-1.5 py-0.2 rounded">{publicChannels.length}</span>
+            <div
+              onClick={() => toggleSection('channels')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 8px',
+                marginBottom: 6,
+                cursor: 'pointer',
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            >
+              <span>Channels</span>
+              {collapsedSections['channels'] ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
             </div>
-            <div className="space-y-0.5">
-              {publicChannels.map(ch => {
-                const isActive = activeChannel?.id === ch.id;
-                return (
-                  <button
-                    key={ch.id}
-                    onClick={() => {
-                      setActiveChannelId(ch.id);
-                      setActiveThread(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      isActive 
-                        ? 'bg-purple-600 text-white font-semibold shadow-sm' 
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Hash size={14} className={isActive ? 'text-white' : 'text-slate-400'} />
-                      <span className="truncate">{ch.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+
+            {!collapsedSections['channels'] && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {generalChannels.map((ch) => {
+                  const isActive = activeChannel?.id === ch.id;
+                  const canAccess =
+                    !ch.isPrivate ||
+                    ch.memberIds.includes(currentUserId) ||
+                    ch.memberIds.includes('user');
+                  return (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveChannelId(ch.id);
+                        setActiveThread(null);
+                        setViewFilter('all');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: 9,
+                        border: isActive
+                          ? '1px solid var(--card-border, #E4E4E7)'
+                          : '1px solid transparent',
+                        background: isActive ? '#FFFFFF' : 'transparent',
+                        boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                        color: isActive ? 'var(--text-1, #18181B)' : 'var(--text-2, #52525B)',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {ch.isPrivate ? (
+                          <Lock
+                            size={13.5}
+                            style={{
+                              color: isActive
+                                ? 'var(--primary, #A238FF)'
+                                : 'var(--text-3, #A1A1AA)',
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <Hash
+                            size={14}
+                            style={{
+                              color: isActive
+                                ? 'var(--primary, #A238FF)'
+                                : 'var(--text-3, #A1A1AA)',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <span
+                          style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {ch.name}
+                        </span>
+                      </span>
+
+                      {ch.unreadCount ? (
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            padding: '1px 6px',
+                            borderRadius: 999,
+                            background: 'var(--primary, #A238FF)',
+                            color: '#FFFFFF',
+                          }}
+                        >
+                          {ch.unreadCount}
+                        </span>
+                      ) : !canAccess ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            padding: '1px 6px',
+                            borderRadius: 6,
+                            background: '#F4F4F5',
+                            color: 'var(--text-3, #A1A1AA)',
+                          }}
+                        >
+                          Private
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-3, #A1A1AA)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    marginTop: 2,
+                  }}
+                >
+                  <Plus size={13} />
+                  <span>Add channels</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Department Groups */}
+          {/* Department Groups Section */}
           <div>
-            <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>Department Hubs</span>
-              <span className="text-[9px] bg-slate-800 px-1.5 py-0.2 rounded">{departmentChannels.length}</span>
+            <div
+              onClick={() => toggleSection('groups')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 8px',
+                marginBottom: 8,
+                cursor: 'pointer',
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            >
+              <span>Department Groups</span>
+              {collapsedSections['groups'] ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
             </div>
-            <div className="space-y-0.5">
-              {departmentChannels.map(ch => {
-                const isActive = activeChannel?.id === ch.id;
-                const isUserInDept = ch.memberIds.includes(currentUserId);
-                return (
-                  <button
-                    key={ch.id}
-                    onClick={() => {
-                      setActiveChannelId(ch.id);
-                      setActiveThread(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      isActive 
-                        ? 'bg-purple-600 text-white font-semibold shadow-sm' 
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-xs">{ch.iconEmoji || '🏢'}</span>
-                      <span className="truncate">{ch.name}</span>
+
+            {!collapsedSections['groups'] && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {Object.entries(departmentGroups).map(([deptName, deptChans]) => (
+                  <div key={deptName}>
+                    {/* Department Group Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '4px 8px',
+                        fontSize: 12,
+                        color: 'var(--text-1, #18181B)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 6,
+                          background: '#FFFFFF',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          color: 'var(--text-1, #18181B)',
+                          fontSize: 10.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {deptName.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {deptName}
+                      </span>
                     </div>
-                    {!isUserInDept && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">Lock</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+
+                    {/* Nested Department Channels */}
+                    <div
+                      style={{
+                        marginLeft: 17,
+                        paddingLeft: 10,
+                        borderLeft: '1px solid var(--card-border, #E4E4E7)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                        marginTop: 2,
+                      }}
+                    >
+                      {deptChans.map((ch) => {
+                        const isActive = activeChannel?.id === ch.id;
+                        const isUserMember =
+                          ch.memberIds.includes(currentUserId) || ch.memberIds.includes('user');
+                        return (
+                          <button
+                            key={ch.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveChannelId(ch.id);
+                              setActiveThread(null);
+                              setViewFilter('all');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: 8,
+                              border: isActive
+                                ? '1px solid var(--card-border, #E4E4E7)'
+                                : '1px solid transparent',
+                              background: isActive ? '#FFFFFF' : 'transparent',
+                              color: isActive
+                                ? 'var(--text-1, #18181B)'
+                                : 'var(--text-2, #52525B)',
+                              fontSize: 12.5,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                minWidth: 0,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {ch.isPrivate ? (
+                                <Lock
+                                  size={12.5}
+                                  style={{
+                                    color: isActive
+                                      ? 'var(--primary, #A238FF)'
+                                      : 'var(--text-3, #A1A1AA)',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              ) : (
+                                <Hash
+                                  size={13}
+                                  style={{
+                                    color: isActive
+                                      ? 'var(--primary, #A238FF)'
+                                      : 'var(--text-3, #A1A1AA)',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
+                              <span
+                                style={{
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {ch.name}
+                              </span>
+                            </span>
+                            {!isUserMember && (
+                              <Lock size={11} style={{ color: 'var(--text-3, #A1A1AA)', flexShrink: 0 }} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Private Channels */}
+          {/* Team Members Section */}
           <div>
-            <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>Private Rooms</span>
-              <span className="text-[9px] bg-slate-800 px-1.5 py-0.2 rounded">{privateChannels.length}</span>
+            <div
+              onClick={() => toggleSection('members')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 8px',
+                marginBottom: 6,
+                cursor: 'pointer',
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            >
+              <span>Team Members</span>
+              {collapsedSections['members'] ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
             </div>
-            <div className="space-y-0.5">
-              {privateChannels.map(ch => {
-                const isActive = activeChannel?.id === ch.id;
-                const isUserInGroup = ch.memberIds.includes(currentUserId);
-                return (
-                  <button
-                    key={ch.id}
-                    onClick={() => {
-                      setActiveChannelId(ch.id);
-                      setActiveThread(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      isActive 
-                        ? 'bg-purple-600 text-white font-semibold shadow-sm' 
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Lock size={13} className={isActive ? 'text-white' : 'text-slate-400'} />
-                      <span className="truncate">{ch.name}</span>
-                    </div>
-                    {!isUserInGroup && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">Restricted</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+
+            {!collapsedSections['members'] && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {allEmployees.slice(0, 6).map((emp) => {
+                  const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+                  const isSelectedProfile = selectedProfileMember?.id === emp.id;
+                  return (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProfileMember(emp);
+                        setActiveThread(null);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '6px 8px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: isSelectedProfile ? '#FFFFFF' : 'transparent',
+                        color: 'var(--text-1, #18181B)',
+                        fontSize: 12.5,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ position: 'relative', flexShrink: 0 }}>
+                          <span
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: '#FFFFFF',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 10,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {emp.avatar ? (
+                              <img
+                                src={emp.avatar}
+                                alt={fullName}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              fullName.slice(0, 2).toUpperCase()
+                            )}
+                          </span>
+                          <span
+                            style={{
+                              position: 'absolute',
+                              right: -1,
+                              bottom: -1,
+                              width: 7,
+                              height: 7,
+                              borderRadius: '50%',
+                              background: '#10B981',
+                              border: '1.5px solid #FAF9F7',
+                            }}
+                          />
+                        </span>
+                        <span
+                          style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {fullName}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* User Status Bar in Sidebar */}
-        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="relative">
-              <div className="w-7 h-7 rounded-full bg-purple-500 text-white font-bold text-xs flex items-center justify-center overflow-hidden">
-                {currentUser?.firstName?.slice(0, 1) || 'U'}
-              </div>
-              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-slate-950" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-white truncate">{currentUser?.firstName || 'Current User'}</div>
-              <div className="text-[10px] text-slate-400 truncate">{role}</div>
-            </div>
-          </div>
+        {/* Bottom Create New Button */}
+        <div
+          style={{
+            padding: 12,
+            borderTop: '1px solid var(--card-border, #E4E4E7)',
+            background: '#FAF9F7',
+          }}
+        >
           <button
+            type="button"
             onClick={() => setShowCreateModal(true)}
-            className="p-1 rounded text-slate-400 hover:text-white"
-            title="New Group"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '9px 14px',
+              borderRadius: 10,
+              border: '1px solid var(--card-border, #E4E4E7)',
+              background: '#FFFFFF',
+              color: 'var(--text-1, #18181B)',
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            }}
           >
-            <Plus size={16} />
+            <Plus size={14} />
+            <span>Create New Channel</span>
           </button>
         </div>
       </aside>
 
-      {/* ─── CENTER: Channel Canvas ────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white">
+      {/* ═══════════════════════════════════════════════════════════════════════
+          CENTER: Active Channel Canvas
+         ═══════════════════════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          background: '#FFFFFF',
+          height: '100%',
+        }}
+      >
         {activeChannel ? (
           <>
-            {/* Channel Top Header */}
-            <div className="h-14 px-6 border-b border-gray-200 flex items-center justify-between shrink-0 bg-white shadow-xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-sm">
-                  {activeChannel.iconEmoji || (activeChannel.isPrivate ? <Lock size={15} /> : <Hash size={16} />)}
+            {/* Top Channel Bar */}
+            <div
+              style={{
+                height: 58,
+                padding: '0 22px',
+                borderBottom: '1px solid var(--card-border, #E4E4E7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                background: '#FFFFFF',
+                flexShrink: 0,
+              }}
+            >
+              {/* Left: Channel Breadcrumb & Topic */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: '#FAF9F7',
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    color: 'var(--text-1, #18181B)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {activeChannel.isPrivate ? <Lock size={15} /> : <Hash size={16} />}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-sm font-bold text-gray-900 truncate">
-                      {activeChannel.name}
-                    </h1>
+
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {activeChannel.department && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                        {activeChannel.department}
-                      </span>
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>
+                          {activeChannel.department}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>/</span>
+                      </>
                     )}
+                    <span
+                      style={{
+                        fontSize: 15,
+                        color: 'var(--text-1, #18181B)',
+                        fontFamily: 'var(--font-title)',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {activeChannel.name}
+                    </span>
+
                     {activeChannel.isPrivate && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          background: '#FAF9F7',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          color: 'var(--text-2, #52525B)',
+                        }}
+                      >
                         Private
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-500 truncate max-w-md">
-                    {activeChannel.topic || activeChannel.description || 'Welcome to this group!'}
-                  </p>
+
+                  {activeChannel.topic && (
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: 'var(--text-3, #A1A1AA)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 420,
+                      }}
+                    >
+                      {activeChannel.topic}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Header Right Actions */}
-              <div className="flex items-center gap-2">
-                {/* Search in channel */}
-                <div className="relative hidden md:block">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              {/* Right: Pinned, Thread Popover, Search in Channel, Member Avatars */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                {/* Pin Filter Button */}
+                <button
+                  type="button"
+                  onClick={() => setViewFilter(viewFilter === 'pinned' ? 'all' : 'pinned')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    height: 32,
+                    padding: '0 10px',
+                    borderRadius: 8,
+                    border:
+                      viewFilter === 'pinned'
+                        ? '1px solid var(--primary, #A238FF)'
+                        : '1px solid var(--card-border, #E4E4E7)',
+                    background:
+                      viewFilter === 'pinned' ? 'var(--primary-light, #F5EBFF)' : '#FFFFFF',
+                    color:
+                      viewFilter === 'pinned'
+                        ? 'var(--primary, #A238FF)'
+                        : 'var(--text-2, #52525B)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                  title="Pinned messages"
+                >
+                  <Pin size={13} />
+                  {pinnedCount > 0 && <span>{pinnedCount}</span>}
+                </button>
+
+                {/* Thread Dropdown Trigger (matches reference # Thread button) */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowThreadsPopover(!showThreadsPopover)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      height: 32,
+                      padding: '0 11px',
+                      borderRadius: 8,
+                      border: showThreadsPopover
+                        ? '1px solid var(--primary, #A238FF)'
+                        : '1px solid var(--card-border, #E4E4E7)',
+                      background: showThreadsPopover
+                        ? 'var(--primary-light, #F5EBFF)'
+                        : '#FFFFFF',
+                      color: showThreadsPopover
+                        ? 'var(--primary, #A238FF)'
+                        : 'var(--text-1, #18181B)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Hash size={13} />
+                    <span>Thread</span>
+                    {threadedMessages.length > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          padding: '0 5px',
+                          borderRadius: 999,
+                          background: '#F4F4F5',
+                          color: 'var(--text-2, #52525B)',
+                        }}
+                      >
+                        {threadedMessages.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {showThreadsPopover && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        right: 0,
+                        width: 300,
+                        background: '#FFFFFF',
+                        borderRadius: 14,
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        boxShadow: '0 16px 36px -6px rgba(17, 17, 24, 0.14)',
+                        zIndex: 60,
+                        padding: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: 11,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: 'var(--text-3, #A1A1AA)',
+                          borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+                          marginBottom: 4,
+                        }}
+                      >
+                        Active Threads in #{activeChannel.name}
+                      </div>
+                      {threadedMessages.length > 0 ? (
+                        threadedMessages.map((tm) => (
+                          <button
+                            key={tm.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveThread(tm);
+                              setSelectedProfileMember(null);
+                              setShowThreadsPopover(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div
+                                style={{
+                                  fontSize: 12.5,
+                                  color: 'var(--text-1, #18181B)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {tm.content}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginTop: 2 }}>
+                                Started by {tm.senderName}
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: '2px 7px',
+                                borderRadius: 999,
+                                background: 'var(--primary-light, #F5EBFF)',
+                                color: 'var(--primary, #A238FF)',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {tm.replyCount}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <div
+                          style={{
+                            padding: '16px 10px',
+                            textAlign: 'center',
+                            fontSize: 12,
+                            color: 'var(--text-3, #A1A1AA)',
+                          }}
+                        >
+                          No active threads in this channel yet.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Search in channel input */}
+                <div style={{ position: 'relative', width: 185 }}>
+                  <Search
+                    size={13}
+                    style={{
+                      position: 'absolute',
+                      left: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-3, #A1A1AA)',
+                    }}
+                  />
                   <input
                     type="text"
-                    placeholder="Search channel..."
+                    placeholder={`Search in #${activeChannel.name}`}
                     value={searchMessageTerm}
                     onChange={(e) => setSearchMessageTerm(e.target.value)}
-                    className="pl-7 pr-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-purple-500 w-36 focus:w-52 transition-all"
+                    style={{
+                      width: '100%',
+                      height: 32,
+                      padding: '0 10px 0 30px',
+                      fontSize: 12,
+                      background: '#FAF9F7',
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      borderRadius: 8,
+                      outline: 'none',
+                      color: 'var(--text-1, #18181B)',
+                    }}
                   />
                 </div>
 
-                {/* Members Drawer Toggle */}
+                {/* Member Avatars Pill Toggle */}
                 <button
-                  onClick={() => setShowMemberDrawer(!showMemberDrawer)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                    showMemberDrawer 
-                      ? 'bg-purple-50 border-purple-200 text-purple-700' 
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
+                  type="button"
+                  onClick={() => {
+                    if (selectedProfileMember || activeThread) {
+                      setSelectedProfileMember(null);
+                      setActiveThread(null);
+                      setShowMemberDrawer(true);
+                    } else {
+                      setShowMemberDrawer(!showMemberDrawer);
+                    }
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    height: 32,
+                    padding: '0 10px',
+                    borderRadius: 8,
+                    border:
+                      showMemberDrawer && !activeThread && !selectedProfileMember
+                        ? '1px solid var(--primary, #A238FF)'
+                        : '1px solid var(--card-border, #E4E4E7)',
+                    background:
+                      showMemberDrawer && !activeThread && !selectedProfileMember
+                        ? 'var(--primary-light, #F5EBFF)'
+                        : '#FFFFFF',
+                    color: 'var(--text-1, #18181B)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                  title="Toggle channel members sidebar"
                 >
-                  <Users size={14} />
-                  <span>{activeChannel.memberIds.length}</span>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    {channelMembers.slice(0, 3).map((m, idx) => (
+                      <span
+                        key={m.id}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: '#F4F4F5',
+                          border: '1.5px solid #FFFFFF',
+                          marginLeft: idx === 0 ? 0 : -6,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 9,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {m.avatar ? (
+                          <img
+                            src={m.avatar}
+                            alt={m.firstName}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          m.firstName.slice(0, 1)
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  <span>{channelMembers.length}</span>
                 </button>
               </div>
             </div>
 
-            {/* Pending Access Banner for Admins */}
+            {/* Admin Pending Access Approval Bar */}
             {isChannelAdmin && activeChannel.pendingRequestUserIds.length > 0 && (
-              <div className="p-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-medium text-amber-900">
-                  <ShieldAlert size={16} className="text-amber-600" />
+              <div
+                style={{
+                  padding: '10px 22px',
+                  background: '#FAF9F7',
+                  borderBottom: '1px solid var(--card-border, #E4E4E7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                  <ShieldAlert size={15} style={{ color: 'var(--primary, #A238FF)' }} />
                   <span>
-                    <strong>{activeChannel.pendingRequestUserIds.length}</strong> {activeChannel.pendingRequestUserIds.length === 1 ? 'employee wants' : 'employees want'} to join this channel.
+                    <strong>{activeChannel.pendingRequestUserIds.length}</strong> pending request
+                    {activeChannel.pendingRequestUserIds.length === 1 ? '' : 's'} to join{' '}
+                    <strong>#{activeChannel.name}</strong>
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {activeChannel.pendingRequestUserIds.map((userId) => {
-                    const emp = allEmployees.find(e => String(e.id) === userId);
-                    const empFullName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : `Employee #${userId}`;
+                    const emp = allEmployees.find((e) => String(e.id) === userId);
+                    const empFullName = emp
+                      ? `${emp.firstName} ${emp.lastName}`.trim()
+                      : `Employee #${userId}`;
                     return (
-                      <div key={userId} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-amber-200 text-xs shadow-xs">
-                        <span className="font-semibold text-gray-800">{empFullName}</span>
+                      <div
+                        key={userId}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          background: '#FFFFFF',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <span>{empFullName}</span>
                         <button
                           type="button"
                           onClick={() => approveJoinRequest(activeChannel.id, userId)}
-                          className="p-1 rounded hover:bg-emerald-50 text-emerald-600 transition-colors"
-                          title="Approve"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            padding: '2px 7px',
+                            borderRadius: 6,
+                            border: 'none',
+                            background: 'var(--primary, #A238FF)',
+                            color: '#FFFFFF',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
                         >
-                          <Check size={14} />
+                          <Check size={12} />
+                          <span>Accept</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => rejectJoinRequest(activeChannel.id, userId)}
-                          className="p-1 rounded hover:bg-rose-50 text-rose-600 transition-colors"
-                          title="Decline"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '2px 5px',
+                            borderRadius: 6,
+                            border: '1px solid var(--card-border, #E4E4E7)',
+                            background: '#FFFFFF',
+                            color: 'var(--text-2, #52525B)',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
                         >
-                          <X size={14} />
+                          <X size={12} />
                         </button>
                       </div>
                     );
@@ -434,258 +1440,780 @@ export default function GroupChatPage() {
               </div>
             )}
 
-            {/* If user is NOT a member of private / restricted channel */}
+            {/* Restricted / Non-Member Gate */}
             {!isMember ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
-                <div className="w-16 h-16 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mb-4">
-                  <Lock size={32} />
-                </div>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">This channel is private or restricted</h2>
-                <p className="text-xs text-gray-500 max-w-sm mb-5 leading-relaxed">
-                  You need approval from the channel administrator to view conversations and participate in #{activeChannel.name}.
-                </p>
-
-                {hasRequested ? (
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
-                    <Sparkles size={15} />
-                    <span>Join request pending admin approval</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => requestToJoinChannel(activeChannel.id)}
-                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center gap-2"
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 36,
+                  textAlign: 'center',
+                  background: '#FAF9F7',
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: 420,
+                    background: '#FFFFFF',
+                    borderRadius: 18,
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    padding: '32px 28px',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      background: '#FAF9F7',
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      color: 'var(--text-1, #18181B)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px auto',
+                    }}
                   >
-                    <UserPlus size={15} />
-                    <span>Request to Join Channel</span>
-                  </button>
-                )}
+                    <Lock size={22} />
+                  </div>
+
+                  <h2 style={{ fontSize: 18, color: 'var(--text-1, #18181B)', marginBottom: 8 }}>
+                    #{activeChannel.name} is a restricted channel
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--text-2, #52525B)',
+                      lineHeight: 1.55,
+                      marginBottom: 22,
+                    }}
+                  >
+                    {activeChannel.departmentRestricted
+                      ? `This channel is restricted to the ${activeChannel.department} department. To join, request access from the channel administrator.`
+                      : 'This is a private group channel. You must be invited or approved by a channel administrator to view messages.'}
+                  </p>
+
+                  {hasRequested ? (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '9px 16px',
+                        borderRadius: 10,
+                        background: '#FAF9F7',
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        color: 'var(--text-2, #52525B)',
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <Check size={14} style={{ color: 'var(--primary, #A238FF)' }} />
+                      <span>Access request sent · Pending admin approval</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => requestToJoinChannel(activeChannel.id)}
+                      className="btn btn-primary"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '10px 20px',
+                      }}
+                    >
+                      <UserPlus size={15} />
+                      <span>Request Access to Join</span>
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
-              /* Message Stream */
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {/* Channel Welcome Banner */}
-                <div className="p-5 bg-gradient-to-r from-purple-50/80 to-indigo-50/40 rounded-2xl border border-purple-100 mb-4">
-                  <div className="flex items-center gap-2 text-purple-700 font-bold text-base mb-1">
-                    <span>{activeChannel.iconEmoji || '🚀'}</span>
-                    <span>Welcome to #{activeChannel.name}!</span>
-                  </div>
-                  <p className="text-xs text-gray-600 leading-relaxed max-w-xl">
-                    {activeChannel.description || 'This is the start of the channel. Discuss projects, share files, react with emojis, and start threads.'}
-                  </p>
-                  <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-400">
-                    <span>Created by {activeChannel.createdBy}</span>
-                    <span>•</span>
-                    <span>{activeChannel.memberIds.length} members</span>
-                  </div>
-                </div>
-
-                {/* Messages list */}
-                {visibleMessages.map((msg) => {
-                  const isMine = msg.senderId === currentUserId;
-                  const hasReplies = (msg.replyCount || 0) > 0;
-
-                  return (
-                    <div 
-                      key={msg.id}
-                      className="group flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors relative"
+              /* ─── MESSAGE STREAM ─── */
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '20px 24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                {/* Channel Intro Header */}
+                <div
+                  style={{
+                    padding: '16px 18px',
+                    borderRadius: 14,
+                    background: '#FAF9F7',
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    marginBottom: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: '#FFFFFF',
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-1, #18181B)',
+                        flexShrink: 0,
+                      }}
                     >
-                      {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden ring-1 ring-purple-200/50">
-                        {msg.senderAvatar ? (
-                          <img src={msg.senderAvatar} alt={msg.senderName} className="w-full h-full object-cover" />
-                        ) : (
-                          msg.senderName.slice(0, 2).toUpperCase()
-                        )}
+                      {activeChannel.isPrivate ? <Lock size={18} /> : <Hash size={18} />}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, color: 'var(--text-1, #18181B)' }}>
+                        Welcome to <strong>#{activeChannel.name}</strong>
                       </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-bold text-gray-900">{msg.senderName}</span>
-                          {msg.senderRole && (
-                            <span className="text-[10px] text-gray-400 font-medium">({msg.senderRole})</span>
-                          )}
-                          <span className="text-[10px] text-gray-400">{msg.createdAt}</span>
-                        </div>
-
-                        {/* Message Text */}
-                        <div className="text-xs text-gray-800 mt-1 leading-relaxed whitespace-pre-wrap">
-                          {msg.content}
-                        </div>
-
-                        {/* Attachments */}
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="mt-2.5 flex flex-wrap gap-2">
-                            {msg.attachments.map(att => (
-                              <div key={att.id} className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 shadow-xs max-w-sm">
-                                {att.type === 'image' ? (
-                                  <img 
-                                    src={att.url} 
-                                    alt={att.name} 
-                                    className="max-h-60 rounded-xl object-contain hover:scale-102 transition-transform cursor-pointer"
-                                  />
-                                ) : (
-                                  <a 
-                                    href={att.url} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="flex items-center gap-2 p-2.5 hover:bg-gray-100 transition-colors"
-                                  >
-                                    <Paperclip size={14} className="text-purple-600" />
-                                    <div className="text-xs">
-                                      <div className="font-semibold text-gray-800">{att.name}</div>
-                                      {att.size && <div className="text-[10px] text-gray-400">{att.size}</div>}
-                                    </div>
-                                  </a>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Reaction pills */}
-                        {msg.reactions && Object.values(msg.reactions).length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            {Object.values(msg.reactions).map(r => {
-                              const hasReacted = r.users.includes(currentUserId);
-                              return (
-                                <button
-                                  key={r.emoji}
-                                  type="button"
-                                  onClick={() => toggleReaction(msg.id, r.emoji)}
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors border ${
-                                    hasReacted 
-                                      ? 'bg-purple-50 border-purple-300 text-purple-700 font-bold' 
-                                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                                  }`}
-                                >
-                                  <span>{r.emoji}</span>
-                                  <span className="text-[11px]">{r.count}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Thread Replies Button */}
-                        {hasReplies && (
-                          <button
-                            type="button"
-                            onClick={() => setActiveThread(msg)}
-                            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 hover:text-purple-700 hover:underline"
-                          >
-                            <MessageSquare size={13} />
-                            <span>{msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}</span>
-                            <span className="text-[11px] text-gray-400 font-normal">View thread</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Floating Action Controls on Hover */}
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 top-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-sm p-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleReaction(msg.id, '❤️')}
-                          className="p-1 text-gray-400 hover:text-rose-500 rounded hover:bg-gray-50"
-                          title="Love"
-                        >
-                          <Heart size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleReaction(msg.id, '🔥')}
-                          className="p-1 text-gray-400 hover:text-amber-500 rounded hover:bg-gray-50"
-                          title="Fire"
-                        >
-                          🔥
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleReaction(msg.id, '🚀')}
-                          className="p-1 text-gray-400 hover:text-purple-500 rounded hover:bg-gray-50"
-                          title="Rocket"
-                        >
-                          🚀
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveThread(msg)}
-                          className="p-1 text-gray-400 hover:text-purple-600 rounded hover:bg-gray-50"
-                          title="Reply in thread"
-                        >
-                          <MessageSquare size={14} />
-                        </button>
-                        {(isMine || role === 'HR Admin') && (
-                          <button
-                            type="button"
-                            onClick={() => deleteMessage(msg.id)}
-                            className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-rose-50"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                      <div style={{ fontSize: 12, color: 'var(--text-2, #52525B)', marginTop: 2 }}>
+                        {activeChannel.description ||
+                          'Start threads, share documents & images, or mention team members with @name.'}{' '}
+                        <span style={{ color: 'var(--text-3, #A1A1AA)' }}>
+                          · Created by {activeChannel.createdBy}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+
+                  {viewFilter !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setViewFilter('all')}
+                      className="btn btn-neutral"
+                      style={{ fontSize: 11.5, padding: '5px 10px' }}
+                    >
+                      Show All Messages
+                    </button>
+                  )}
+                </div>
+
+                {/* Date Divider Pill (Matches Reference Image) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    margin: '8px 0 12px 0',
+                  }}
+                >
+                  <div style={{ flex: 1, height: 1, background: 'var(--border-subtle, #F0F0F3)' }} />
+                  <span
+                    style={{
+                      fontSize: 11,
+                      padding: '4px 12px',
+                      borderRadius: 999,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      background: '#FFFFFF',
+                      color: 'var(--text-2, #52525B)',
+                    }}
+                  >
+                    {viewFilter === 'pinned'
+                      ? 'Pinned Messages'
+                      : viewFilter === 'threads'
+                      ? 'Active Threads'
+                      : 'Today'}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border-subtle, #F0F0F3)' }} />
+                </div>
+
+                {/* Message Items */}
+                {visibleMessages.length === 0 ? (
+                  <div
+                    style={{
+                      padding: '48px 20px',
+                      textAlign: 'center',
+                      color: 'var(--text-3, #A1A1AA)',
+                      fontSize: 13,
+                    }}
+                  >
+                    No messages match the current filter.
+                  </div>
+                ) : (
+                  visibleMessages.map((msg) => {
+                    const isMine = msg.senderId === currentUserId || msg.senderId === 'user';
+                    const hasReplies = (msg.replyCount || 0) > 0;
+                    const isHovered = hoveredMsgId === msg.id;
+
+                    return (
+                      <div
+                        key={msg.id}
+                        onMouseEnter={() => setHoveredMsgId(msg.id)}
+                        onMouseLeave={() => setHoveredMsgId(null)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 12,
+                          padding: '10px 12px',
+                          borderRadius: 12,
+                          background: isHovered ? '#FAF9F7' : 'transparent',
+                          position: 'relative',
+                          transition: 'background 0.12s ease',
+                        }}
+                      >
+                        {/* Left Column: Avatar + Optional Thread Connector */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div
+                            onClick={() => {
+                              const found = allEmployees.find(
+                                (e) =>
+                                  String(e.id) === msg.senderId ||
+                                  `${e.firstName} ${e.lastName}`.trim() === msg.senderName
+                              );
+                              if (found) {
+                                setSelectedProfileMember(found);
+                                setActiveThread(null);
+                              }
+                            }}
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: '50%',
+                              background: '#F4F4F5',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              color: 'var(--text-1, #18181B)',
+                              fontSize: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {msg.senderAvatar ? (
+                              <img
+                                src={msg.senderAvatar}
+                                alt={msg.senderName}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              msg.senderName.slice(0, 2).toUpperCase()
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right Column: Sender Header, Message Body, Attachments, Reactions, Thread Connector */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                color: 'var(--text-1, #18181B)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {msg.senderName}
+                            </span>
+                            {msg.senderRole && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: 'var(--text-3, #A1A1AA)',
+                                }}
+                              >
+                                {msg.senderRole}
+                              </span>
+                            )}
+                            <span style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)' }}>
+                              {msg.createdAt}
+                            </span>
+                            {msg.pinned && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  fontSize: 10.5,
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  background: 'var(--primary-light, #F5EBFF)',
+                                  color: 'var(--primary, #A238FF)',
+                                }}
+                              >
+                                <Pin size={10} />
+                                <span>Pinned</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Message Text */}
+                          <div
+                            style={{
+                              fontSize: 13.5,
+                              color: 'var(--text-1, #18181B)',
+                              marginTop: 4,
+                              lineHeight: 1.55,
+                              whiteSpace: 'pre-wrap',
+                            }}
+                          >
+                            {renderFormattedContent(msg.content)}
+                          </div>
+
+                          {/* Attachments */}
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 10,
+                                marginTop: 10,
+                              }}
+                            >
+                              {msg.attachments.map((att) => (
+                                <div
+                                  key={att.id}
+                                  style={{
+                                    borderRadius: 12,
+                                    overflow: 'hidden',
+                                    border: '1px solid var(--card-border, #E4E4E7)',
+                                    background: '#FAF9F7',
+                                    maxWidth: 380,
+                                  }}
+                                >
+                                  {att.type === 'image' ? (
+                                    <img
+                                      src={att.url}
+                                      alt={att.name}
+                                      style={{
+                                        display: 'block',
+                                        maxWidth: '100%',
+                                        maxHeight: 230,
+                                        objectFit: 'cover',
+                                      }}
+                                    />
+                                  ) : (
+                                    <a
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 10,
+                                        padding: '10px 14px',
+                                        color: 'var(--text-1, #18181B)',
+                                      }}
+                                    >
+                                      <FileText size={16} style={{ color: 'var(--primary, #A238FF)' }} />
+                                      <div>
+                                        <div style={{ fontSize: 12.5 }}>{att.name}</div>
+                                        {att.size && (
+                                          <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)' }}>
+                                            {att.size}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </a>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Emoji Reaction Pills */}
+                          {msg.reactions && Object.values(msg.reactions).length > 0 && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                gap: 6,
+                                marginTop: 8,
+                              }}
+                            >
+                              {Object.values(msg.reactions).map((r) => {
+                                const hasReacted =
+                                  r.users.includes(currentUserId) || r.users.includes('user');
+                                return (
+                                  <button
+                                    key={r.emoji}
+                                    type="button"
+                                    onClick={() => toggleReaction(msg.id, r.emoji)}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 5,
+                                      padding: '3px 9px',
+                                      borderRadius: 999,
+                                      fontSize: 12,
+                                      border: hasReacted
+                                        ? '1px solid var(--primary, #A238FF)'
+                                        : '1px solid var(--card-border, #E4E4E7)',
+                                      background: hasReacted
+                                        ? 'var(--primary-light, #F5EBFF)'
+                                        : '#FFFFFF',
+                                      color: hasReacted
+                                        ? 'var(--primary, #A238FF)'
+                                        : 'var(--text-1, #18181B)',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <span>{r.emoji}</span>
+                                    <span style={{ fontSize: 11 }}>{r.count}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Curved L-Connector Thread Summary Bar (Matches Reference Image 1) */}
+                          {hasReplies && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginTop: 8,
+                                position: 'relative',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 18,
+                                  height: 16,
+                                  borderLeft: '2px solid var(--card-border, #E4E4E7)',
+                                  borderBottom: '2px solid var(--card-border, #E4E4E7)',
+                                  borderBottomLeftRadius: 8,
+                                  marginRight: 8,
+                                  marginTop: -8,
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveThread(msg);
+                                  setSelectedProfileMember(null);
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '4px 10px',
+                                  borderRadius: 8,
+                                  border: '1px solid var(--card-border, #E4E4E7)',
+                                  background: '#FFFFFF',
+                                  cursor: 'pointer',
+                                  fontSize: 12,
+                                }}
+                              >
+                                {/* Reply avatars */}
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  {(msg.replies || []).slice(0, 3).map((rep, idx) => (
+                                    <span
+                                      key={rep.id}
+                                      style={{
+                                        width: 18,
+                                        height: 18,
+                                        borderRadius: '50%',
+                                        background: '#F4F4F5',
+                                        border: '1.5px solid #FFFFFF',
+                                        marginLeft: idx === 0 ? 0 : -5,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: 8.5,
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      {rep.senderAvatar ? (
+                                        <img
+                                          src={rep.senderAvatar}
+                                          alt={rep.senderName}
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        />
+                                      ) : (
+                                        rep.senderName.slice(0, 1)
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+
+                                <span style={{ color: 'var(--primary, #A238FF)' }}>
+                                  {msg.replyCount} {msg.replyCount === 1 ? 'Message' : 'Messages'}
+                                </span>
+                                <span style={{ color: 'var(--text-3, #A1A1AA)', fontSize: 11 }}>
+                                  View thread →
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Floating Hover Action Bar */}
+                        {isHovered && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 6,
+                              right: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              background: '#FFFFFF',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              borderRadius: 10,
+                              padding: 3,
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
+                              zIndex: 10,
+                            }}
+                          >
+                            {['👍', '❤️', '🔥', '🚀'].map((emo) => (
+                              <button
+                                key={emo}
+                                type="button"
+                                onClick={() => toggleReaction(msg.id, emo)}
+                                style={{
+                                  width: 26,
+                                  height: 26,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  fontSize: 13,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                title={`React with ${emo}`}
+                              >
+                                {emo}
+                              </button>
+                            ))}
+
+                            <div
+                              style={{
+                                width: 1,
+                                height: 16,
+                                background: 'var(--border-subtle, #F0F0F3)',
+                                margin: '0 2px',
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveThread(msg);
+                                setSelectedProfileMember(null);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '0 8px',
+                                height: 26,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-2, #52525B)',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                fontSize: 11.5,
+                              }}
+                              title="Reply in thread"
+                            >
+                              <MessageSquare size={13} />
+                              <span>Thread</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => togglePinMessage(msg.id)}
+                              style={{
+                                width: 26,
+                                height: 26,
+                                border: 'none',
+                                background: 'transparent',
+                                color: msg.pinned
+                                  ? 'var(--primary, #A238FF)'
+                                  : 'var(--text-2, #52525B)',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              title={msg.pinned ? 'Unpin message' : 'Pin message'}
+                            >
+                              <Pin size={13} />
+                            </button>
+
+                            {(isMine || isChannelAdmin) && (
+                              <button
+                                type="button"
+                                onClick={() => deleteMessage(msg.id)}
+                                style={{
+                                  width: 26,
+                                  height: 26,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#DC2626',
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                title="Delete message"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
             )}
 
             {/* Typing Indicator */}
             {typingUsers.length > 0 && (
-              <div className="px-6 py-1 text-[11px] text-purple-600 italic animate-pulse">
+              <div
+                style={{
+                  padding: '2px 24px 6px 24px',
+                  fontSize: 11.5,
+                  color: 'var(--text-3, #A1A1AA)',
+                }}
+              >
                 {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
               </div>
             )}
 
-            {/* Message Compose Box */}
+            {/* Bottom Message Composer */}
             {isMember && (
-              <div className="p-4 border-t border-gray-200 bg-white relative">
-                {/* Emoji / GIF popover */}
+              <div
+                style={{
+                  padding: '12px 22px 18px 22px',
+                  background: '#FFFFFF',
+                  borderTop: '1px solid var(--border-subtle, #F0F0F3)',
+                  position: 'relative',
+                }}
+              >
+                {/* Emoji / GIF Picker Popover */}
                 {showPicker && (
                   <EmojiGifPicker
+                    initialTab={pickerTab}
                     onSelectEmoji={(emoji) => {
-                      setInputText(prev => prev + emoji);
+                      setInputText((prev) => prev + emoji);
                       setShowPicker(false);
                     }}
                     onSelectGif={(gifUrl, title) => {
-                      sendMessage(title || 'GIF', [{
-                        id: `gif-${Date.now()}`,
-                        name: title || 'animated.gif',
-                        url: gifUrl,
-                        type: 'image',
-                      }]);
+                      sendMessage(title || 'Shared a GIF', [
+                        {
+                          id: `gif-${Date.now()}`,
+                          name: title || 'animated.gif',
+                          url: gifUrl,
+                          type: 'image',
+                        },
+                      ]);
                       setShowPicker(false);
                     }}
                     onClose={() => setShowPicker(false)}
                   />
                 )}
 
-                {/* Mentions Autocomplete Box */}
+                {/* @Mention Autocomplete Popover */}
                 {mentionQuery !== null && (
-                  <div className="absolute bottom-full mb-2 left-6 z-40 w-64 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden text-gray-800">
-                    <div className="px-3 py-1.5 bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                      Mention Colleague
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      left: 24,
+                      width: 260,
+                      background: '#FFFFFF',
+                      borderRadius: 12,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.12)',
+                      zIndex: 70,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: '7px 12px',
+                        fontSize: 10.5,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: 'var(--text-3, #A1A1AA)',
+                        background: '#FAF9F7',
+                        borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+                      }}
+                    >
+                      Mention Team Member
                     </div>
-                    <div className="max-h-40 overflow-y-auto">
+                    <div style={{ maxHeight: 180, overflowY: 'auto', padding: 4 }}>
                       {allEmployees
-                        .filter(e => `${e.firstName} ${e.lastName}`.toLowerCase().includes(mentionQuery))
-                        .map(emp => {
+                        .filter((e) =>
+                          `${e.firstName} ${e.lastName}`.toLowerCase().includes(mentionQuery)
+                        )
+                        .map((emp) => {
                           const fullName = `${emp.firstName} ${emp.lastName}`.trim();
                           return (
                             <button
                               key={emp.id}
                               type="button"
                               onClick={() => handleSelectMention(fullName)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-purple-50 text-left transition-colors"
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '7px 10px',
+                                borderRadius: 8,
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontSize: 12.5,
+                              }}
                             >
-                              <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 font-bold text-[9px] flex items-center justify-center">
-                                {fullName.slice(0, 1)}
-                              </div>
-                              <span className="font-semibold text-gray-800">{fullName}</span>
-                              <span className="text-[10px] text-gray-400">({emp.department})</span>
+                              <span
+                                style={{
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: '50%',
+                                  background: '#F4F4F5',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 10,
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {emp.avatar ? (
+                                  <img
+                                    src={emp.avatar}
+                                    alt={fullName}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  fullName.slice(0, 1)
+                                )}
+                              </span>
+                              <span style={{ color: 'var(--text-1, #18181B)' }}>{fullName}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)' }}>
+                                · {emp.department}
+                              </span>
                             </button>
                           );
                         })}
@@ -693,31 +2221,105 @@ export default function GroupChatPage() {
                   </div>
                 )}
 
-                {/* Staged Attachments Previews */}
+                {/* Staged Attachments Bar */}
                 {uploadedAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2 p-2 bg-purple-50/50 rounded-xl border border-purple-100">
-                    {uploadedAttachments.map(att => (
-                      <div key={att.id} className="relative group bg-white px-2 py-1 rounded-lg border border-gray-200 text-xs flex items-center gap-1.5 shadow-2xs">
-                        <Paperclip size={12} className="text-purple-600" />
-                        <span className="max-w-xs truncate font-medium text-gray-700">{att.name}</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                      marginBottom: 8,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: '#FAF9F7',
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                    }}
+                  >
+                    {uploadedAttachments.map((att) => (
+                      <div
+                        key={att.id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          background: '#FFFFFF',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <Paperclip size={12} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <span>{att.name}</span>
                         <button
                           type="button"
-                          onClick={() => setUploadedAttachments(prev => prev.filter(a => a.id !== att.id))}
-                          className="text-gray-400 hover:text-rose-600"
+                          onClick={() =>
+                            setUploadedAttachments((prev) => prev.filter((a) => a.id !== att.id))
+                          }
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--text-3, #A1A1AA)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
                         >
-                          <X size={12} />
+                          <X size={13} />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Main Input Box */}
-                <form onSubmit={handleSend} className="border border-gray-200 rounded-2xl bg-white focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-100 transition-all shadow-2xs">
+                {/* Composer Box (Matches Reference Image) */}
+                <form
+                  onSubmit={handleSend}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    borderRadius: 14,
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    background: '#FAF9F7',
+                  }}
+                >
+                  {/* Left + Attachment Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      background: '#FFFFFF',
+                      color: 'var(--text-2, #52525B)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                    title="Attach files or images"
+                  >
+                    <Plus size={16} />
+                  </button>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                  />
+
+                  {/* Auto-sizing single/multi-line input */}
                   <textarea
                     ref={textareaRef}
-                    rows={2}
-                    placeholder={`Message #${activeChannel.name}... (type @ to mention)`}
+                    rows={1}
+                    placeholder={`Write a message to #${activeChannel.name}... (type @ to mention)`}
                     value={inputText}
                     onChange={handleInputChange}
                     onKeyDown={(e) => {
@@ -726,54 +2328,120 @@ export default function GroupChatPage() {
                         handleSend();
                       }
                     }}
-                    className="w-full px-4 pt-3 pb-1 text-xs text-gray-800 placeholder-gray-400 focus:outline-none resize-none bg-transparent"
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      background: 'transparent',
+                      outline: 'none',
+                      resize: 'none',
+                      fontSize: 13.5,
+                      color: 'var(--text-1, #18181B)',
+                      padding: '4px 4px',
+                      lineHeight: 1.4,
+                    }}
                   />
 
-                  {/* Input Toolstrip */}
-                  <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setShowPicker(!showPicker)}
-                        className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-white transition-colors"
-                        title="Emojis & GIFs"
-                      >
-                        <Smile size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-white transition-colors"
-                        title="Attach Files / Photos"
-                      >
-                        <Paperclip size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInputText(prev => prev + '@');
-                          setMentionQuery('');
-                          setMentionAnchorIdx(inputText.length);
-                          textareaRef.current?.focus();
-                        }}
-                        className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-white transition-colors"
-                        title="Mention colleague"
-                      >
-                        <AtSign size={16} />
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={handleFileUpload}
-                      />
-                    </div>
+                  {/* Right Actions: Mention, Emoji, GIF, Send */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputText((prev) => prev + '@');
+                        setMentionQuery('');
+                        setMentionAnchorIdx(inputText.length);
+                        textareaRef.current?.focus();
+                      }}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-2, #52525B)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                      title="Mention colleague (@)"
+                    >
+                      <AtSign size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerTab('emoji');
+                        setShowPicker(!showPicker);
+                      }}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-2, #52525B)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                      title="Add Emoji"
+                    >
+                      <Smile size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerTab('gif');
+                        setShowPicker(!showPicker);
+                      }}
+                      style={{
+                        height: 26,
+                        padding: '0 8px',
+                        borderRadius: 6,
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        background: '#FFFFFF',
+                        color: 'var(--text-2, #52525B)',
+                        fontSize: 10.5,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        cursor: 'pointer',
+                      }}
+                      title="Send Animated GIF"
+                    >
+                      <Sparkles size={11} />
+                      <span>GIF</span>
+                    </button>
 
                     <button
                       type="submit"
                       disabled={!inputText.trim() && uploadedAttachments.length === 0}
-                      className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        height: 32,
+                        padding: '0 14px',
+                        borderRadius: 9,
+                        border: 'none',
+                        background:
+                          inputText.trim() || uploadedAttachments.length > 0
+                            ? 'var(--primary, #A238FF)'
+                            : '#E4E4E7',
+                        color:
+                          inputText.trim() || uploadedAttachments.length > 0
+                            ? '#FFFFFF'
+                            : '#A1A1AA',
+                        fontSize: 12.5,
+                        cursor:
+                          inputText.trim() || uploadedAttachments.length > 0
+                            ? 'pointer'
+                            : 'not-allowed',
+                        marginLeft: 4,
+                      }}
                     >
                       <span>Send</span>
                       <Send size={12} />
@@ -783,81 +2451,582 @@ export default function GroupChatPage() {
               </div>
             )}
           </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-400">
-            <MessageSquare size={36} className="mb-2 text-purple-300" />
-            <h3 className="text-sm font-bold text-gray-700">No Channel Selected</h3>
-            <p className="text-xs text-gray-400 max-w-sm mt-1">
-              Select a channel from the left sidebar or create a new group chat to start collaborating.
-            </p>
-          </div>
-        )}
+        ) : null}
       </div>
 
-      {/* ─── RIGHT: Collapsible Thread Drawer ───────────────────────────────── */}
-      {activeThread && (
-        <ThreadDrawer
-          parentMessage={activeThread}
-          onClose={() => setActiveThread(null)}
-        />
-      )}
-
-      {/* ─── RIGHT: Members Drawer ─────────────────────────────────────────── */}
-      {showMemberDrawer && activeChannel && !activeThread && (
-        <div className="w-72 border-l border-gray-200 bg-white flex flex-col h-full shadow-lg z-20 animate-in slide-in-from-right duration-200">
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-200 bg-gray-50/70">
-            <div className="flex items-center gap-2">
-              <Users size={16} className="text-purple-600" />
-              <span className="text-xs font-bold text-gray-900">Channel Members</span>
-            </div>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          RIGHT CONTEXTUAL DRAWER:
+          1. ThreadDrawer (when replying/viewing a thread)
+          2. Member Profile Sidebar (when clicking a member, matching Reference Image 3)
+          3. All Members Directory (default right sidebar, matching Reference Image 1)
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {activeThread ? (
+        <ThreadDrawer parentMessage={activeThread} onClose={() => setActiveThread(null)} />
+      ) : selectedProfileMember ? (
+        <aside
+          style={{
+            width: 310,
+            flexShrink: 0,
+            borderLeft: '1px solid var(--card-border, #E4E4E7)',
+            background: '#FFFFFF',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflowY: 'auto',
+          }}
+        >
+          {/* Profile Header */}
+          <div
+            style={{
+              height: 58,
+              padding: '0 18px',
+              borderBottom: '1px solid var(--card-border, #E4E4E7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 14, color: 'var(--text-1, #18181B)', fontWeight: 600 }}>
+              Profile
+            </span>
             <button
-              onClick={() => setShowMemberDrawer(false)}
-              className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              type="button"
+              onClick={() => setSelectedProfileMember(null)}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-3, #A1A1AA)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
             >
               <X size={16} />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-              Members ({activeChannel.memberIds.length})
+          {/* Avatar & Identity */}
+          <div
+            style={{
+              padding: '24px 20px 18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+            }}
+          >
+            <div style={{ position: 'relative', marginBottom: 12 }}>
+              <div
+                style={{
+                  width: 84,
+                  height: 84,
+                  borderRadius: '50%',
+                  background: '#FAF9F7',
+                  border: '1px solid var(--card-border, #E4E4E7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 24,
+                  color: 'var(--text-1, #18181B)',
+                  overflow: 'hidden',
+                }}
+              >
+                {selectedProfileMember.avatar ? (
+                  <img
+                    src={selectedProfileMember.avatar}
+                    alt={selectedProfileMember.firstName}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  `${selectedProfileMember.firstName.slice(0, 1)}${selectedProfileMember.lastName.slice(0, 1)}`
+                )}
+              </div>
+              <span
+                style={{
+                  position: 'absolute',
+                  right: 4,
+                  bottom: 4,
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  border: '2.5px solid #FFFFFF',
+                }}
+              />
             </div>
-            {activeChannel.memberIds.map(memId => {
-              const emp = allEmployees.find(e => String(e.id) === memId);
-              const isAdmin = activeChannel.adminIds.includes(memId);
-              const empFullName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : (memId === 'user' ? 'Me' : `User #${memId}`);
+
+            <div
+              style={{
+                fontSize: 16,
+                color: 'var(--text-1, #18181B)',
+                fontFamily: 'var(--font-title)',
+                fontWeight: 700,
+              }}
+            >
+              {selectedProfileMember.firstName} {selectedProfileMember.lastName}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-2, #52525B)', marginTop: 3 }}>
+              {selectedProfileMember.title} · {selectedProfileMember.department}
+            </div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: 11.5,
+                color: '#059669',
+                marginTop: 6,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#10B981',
+                }}
+              />
+              <span>Online</span>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const fullName = `${selectedProfileMember.firstName} ${selectedProfileMember.lastName}`.trim();
+                  setInputText((prev) => `${prev}@${fullName} `);
+                  textareaRef.current?.focus();
+                }}
+                style={{
+                  flex: 1,
+                  height: 34,
+                  borderRadius: 9,
+                  border: '1px solid var(--card-border, #E4E4E7)',
+                  background: '#FFFFFF',
+                  color: 'var(--text-1, #18181B)',
+                  fontSize: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                <AtSign size={13} />
+                <span>Mention</span>
+              </button>
+
+              {(isHRAdmin || role === 'Manager') && (
+                <Link
+                  href={`/people/${selectedProfileMember.id}`}
+                  style={{
+                    flex: 1,
+                    height: 34,
+                    borderRadius: 9,
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    background: '#FAF9F7',
+                    color: 'var(--text-1, #18181B)',
+                    fontSize: 12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span>Directory</span>
+                  <ExternalLink size={12} />
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Profile Specifications */}
+          <div
+            style={{
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginBottom: 3 }}>
+                Display Name
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-1, #18181B)' }}>
+                {selectedProfileMember.firstName} {selectedProfileMember.lastName}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginBottom: 3 }}>
+                Role & Department
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-1, #18181B)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Briefcase size={13} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+                <span>
+                  {selectedProfileMember.title} ({selectedProfileMember.department})
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginBottom: 3 }}>
+                Location
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-1, #18181B)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <MapPin size={13} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+                <span>{selectedProfileMember.location || 'Headquarters'}</span>
+              </div>
+            </div>
+
+            {selectedProfileMember.email && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginBottom: 3 }}>
+                  Email Address
+                </div>
+                <a
+                  href={`mailto:${selectedProfileMember.email}`}
+                  style={{
+                    fontSize: 12.5,
+                    color: 'var(--primary, #A238FF)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  <Mail size={13} />
+                  <span>{selectedProfileMember.email}</span>
+                </a>
+              </div>
+            )}
+
+            {selectedProfileMember.phone && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginBottom: 3 }}>
+                  Phone Number
+                </div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: 'var(--text-1, #18181B)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <Phone size={13} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+                  <span>{selectedProfileMember.phone}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+      ) : showMemberDrawer && activeChannel ? (
+        <aside
+          style={{
+            width: 280,
+            flexShrink: 0,
+            borderLeft: '1px solid var(--card-border, #E4E4E7)',
+            background: '#FFFFFF',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+          }}
+        >
+          {/* All Members Header */}
+          <div
+            style={{
+              height: 58,
+              padding: '0 18px',
+              borderBottom: '1px solid var(--card-border, #E4E4E7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 13.5, color: 'var(--text-1, #18181B)', fontWeight: 600 }}>
+              All members ({channelMembers.length})
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {isChannelAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddMemberInput(!showAddMemberInput)}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 7,
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    background: showAddMemberInput ? 'var(--primary-light, #F5EBFF)' : '#FFFFFF',
+                    color: showAddMemberInput
+                      ? 'var(--primary, #A238FF)'
+                      : 'var(--text-2, #52525B)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                  title="Add member to channel"
+                >
+                  <UserPlus size={13} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowMemberDrawer(false)}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 7,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-3, #A1A1AA)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Admin Add Member Panel */}
+          {isChannelAdmin && showAddMemberInput && (
+            <div
+              style={{
+                padding: 12,
+                background: '#FAF9F7',
+                borderBottom: '1px solid var(--card-border, #E4E4E7)',
+              }}
+            >
+              <div style={{ fontSize: 11, color: 'var(--text-2, #52525B)', marginBottom: 6 }}>
+                Add Employee to #{activeChannel.name}
+              </div>
+              <input
+                type="text"
+                placeholder="Filter employees..."
+                value={memberFilterTerm}
+                onChange={(e) => setMemberFilterTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  background: '#FFFFFF',
+                  border: '1px solid var(--card-border, #E4E4E7)',
+                  borderRadius: 8,
+                  outline: 'none',
+                  marginBottom: 6,
+                }}
+              />
+              <div style={{ maxHeight: 130, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {nonMembers
+                  .filter((e) =>
+                    `${e.firstName} ${e.lastName}`
+                      .toLowerCase()
+                      .includes(memberFilterTerm.toLowerCase())
+                  )
+                  .map((emp) => {
+                    const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+                    return (
+                      <div
+                        key={emp.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '5px 8px',
+                          borderRadius: 7,
+                          background: '#FFFFFF',
+                          border: '1px solid var(--border-subtle, #F0F0F3)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <span style={{ truncate: 'true' } as React.CSSProperties}>{fullName}</span>
+                        <button
+                          type="button"
+                          onClick={() => addMemberToChannel(activeChannel.id, String(emp.id))}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            border: 'none',
+                            background: 'var(--primary, #A238FF)',
+                            color: '#FFFFFF',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    );
+                  })}
+                {nonMembers.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', padding: 4 }}>
+                    All company employees are already in this channel.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Member List */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            {channelMembers.map((emp) => {
+              const empId = String(emp.id);
+              const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+              const isChanCreator = activeChannel.adminIds.includes(empId);
+
               return (
-                <div key={memId} className="flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
-                      {emp?.avatar ? (
-                        <img src={emp.avatar} alt={empFullName} className="w-full h-full object-cover" />
-                      ) : (
-                        empFullName.slice(0, 2).toUpperCase()
-                      )}
+                <div
+                  key={empId}
+                  onClick={() => setSelectedProfileMember(emp)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    transition: 'background 0.12s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#FAF9F7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          background: '#F4F4F5',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 11,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {emp.avatar ? (
+                          <img
+                            src={emp.avatar}
+                            alt={fullName}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          fullName.slice(0, 2).toUpperCase()
+                        )}
+                      </div>
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: -1,
+                          bottom: -1,
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: '#10B981',
+                          border: '1.5px solid #FFFFFF',
+                        }}
+                      />
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-gray-900 truncate">{empFullName}</div>
-                      <div className="text-[10px] text-gray-400 truncate">{emp?.title || 'Team Member'}</div>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: 'var(--text-1, #18181B)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span>{fullName}</span>
+                        {isChanCreator && (
+                          <span
+                            style={{
+                              fontSize: 9.5,
+                              padding: '1px 5px',
+                              borderRadius: 5,
+                              background: '#F4F4F5',
+                              color: 'var(--text-2, #52525B)',
+                            }}
+                          >
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--text-3, #A1A1AA)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {emp.title}
+                      </div>
                     </div>
                   </div>
-                  {isAdmin && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
-                      Admin
-                    </span>
+
+                  {isChannelAdmin && !isPublicChannel && empId !== currentUserId && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeMemberFromChannel(activeChannel.id, empId);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-3, #A1A1AA)',
+                        cursor: 'pointer',
+                        padding: 4,
+                      }}
+                      title="Remove from channel"
+                    >
+                      <X size={13} />
+                    </button>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
+        </aside>
+      ) : null}
 
-      {/* ─── MODAL: Create Group Chat ─────────────────────────────────────── */}
-      <CreateChannelModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-      />
+      {/* Create Channel Modal */}
+      <CreateChannelModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
     </div>
   );
 }

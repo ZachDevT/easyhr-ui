@@ -129,16 +129,16 @@ export default function Dashboard() {
       </div>
 
       {/* Main Layout: Left Column (Compulsory) + Right Column (Optional Widgets) */}
-      <div className="dash-grid" style={{ gridTemplateColumns: '360px 1fr', gap: 24, alignItems: 'stretch' }}>
+      <div className="dash-grid" style={{ gridTemplateColumns: '360px 1fr', gap: 24, alignItems: 'start' }}>
         
-        {/* Left Column - Compulsory */}
-        <div className="col gap-16">
+        {/* Left Column - Compulsory (Stays at its natural content height, completely unaffected by optional widgets) */}
+        <div className="col gap-16" style={{ alignSelf: 'start', flexShrink: 0 }}>
           <CompulsoryMyTimeWidget />
           <CompulsoryTimeOffWidget />
         </div>
 
         {/* Right Column - Optional Widgets in a Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, alignItems: 'stretch' }}>
+        <div className="dash-optional-widgets" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, alignItems: 'stretch' }}>
           
           {activeWidgets.length === 0 && (
             <div

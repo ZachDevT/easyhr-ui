@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
-import { useCompany } from '@/context/CompanyContext';
+import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { employees as initialEmployees, Employee } from '@/data/employees';
 
 export interface ChatReaction {
@@ -39,7 +39,7 @@ export interface ChatMessage {
 
 export interface ChatChannel {
   id: string;
-  name: string; // e.g. "general", "design", "engineering"
+  name: string; // e.g. "general", "design-system", "engineering"
   topic?: string;
   description?: string;
   isPrivate: boolean;
@@ -52,7 +52,7 @@ export interface ChatChannel {
   memberIds: string[];
   pendingRequestUserIds: string[]; // users requesting to join private/restricted channel
   avatar?: string;
-  iconEmoji?: string;
+  unreadCount?: number;
 }
 
 interface ChatContextType {
@@ -60,10 +60,12 @@ interface ChatContextType {
   activeChannel: ChatChannel | null;
   setActiveChannelId: (id: string) => void;
   messages: ChatMessage[];
+  allMessages: ChatMessage[];
   activeThread: ChatMessage | null;
   setActiveThread: (msg: ChatMessage | null) => void;
   sendMessage: (content: string, attachments?: ChatAttachment[], threadParentId?: string) => void;
   deleteMessage: (messageId: string, threadParentId?: string) => void;
+  togglePinMessage: (messageId: string) => void;
   toggleReaction: (messageId: string, emoji: string, threadParentId?: string) => void;
   createChannel: (input: {
     name: string;
@@ -72,7 +74,6 @@ interface ChatContextType {
     departmentRestricted: boolean;
     department?: string;
     memberIds?: string[];
-    iconEmoji?: string;
   }) => ChatChannel;
   requestToJoinChannel: (channelId: string) => void;
   approveJoinRequest: (channelId: string, userId: string) => void;
@@ -84,15 +85,15 @@ interface ChatContextType {
   allEmployees: Employee[];
 }
 
-const STORAGE_KEY_CHANNELS = 'easyhr_chat_channels_v2';
-const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v2';
+const STORAGE_KEY_CHANNELS = 'easyhr_chat_channels_v3';
+const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v3';
 
 const DEFAULT_CHANNELS: ChatChannel[] = [
   {
     id: 'ch-general',
     name: 'general',
-    topic: 'Company-wide updates, watercooler discussions & announcements',
-    description: 'The open square for the entire company.',
+    topic: 'Company-wide updates, announcements & team discussions',
+    description: 'The primary workspace channel for everyone at the company.',
     isPrivate: false,
     departmentRestricted: false,
     createdById: '1',
@@ -101,45 +102,72 @@ const DEFAULT_CHANNELS: ChatChannel[] = [
     adminIds: ['1', 'user'],
     memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
     pendingRequestUserIds: [],
-    iconEmoji: '🌍',
+  },
+  {
+    id: 'ch-announcements',
+    name: 'announcements',
+    topic: 'Official company news, policy releases & milestones',
+    description: 'Broadcast channel for executive and HR updates.',
+    isPrivate: false,
+    departmentRestricted: false,
+    createdById: '1',
+    createdBy: 'Sarah Johnson',
+    createdAt: '2026-01-02T09:00:00Z',
+    adminIds: ['1', 'user'],
+    memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
+    pendingRequestUserIds: [],
+    unreadCount: 2,
   },
   {
     id: 'ch-design',
     name: 'design-system',
-    topic: 'Product UI/UX design, Figma updates, design token critiques',
-    description: 'All things creative, typography, components, and user experience.',
+    topic: 'Product UI/UX design, Figma updates & design token critiques',
+    description: 'All things product design, typography, components, and user experience.',
     isPrivate: false,
     departmentRestricted: true,
     department: 'Design',
     createdById: '1',
     createdBy: 'Sarah Johnson',
     createdAt: '2026-01-05T09:30:00Z',
-    adminIds: ['1'],
+    adminIds: ['1', 'user'],
     memberIds: ['1', '2', '4', 'user'],
     pendingRequestUserIds: [],
-    iconEmoji: '🎨',
   },
   {
     id: 'ch-engineering',
-    name: 'engineering',
-    topic: 'Sprint commits, architectural decisions, PR reviews, CI/CD alerts',
-    description: 'Technical discussions and system engineering.',
+    name: 'engineering-core',
+    topic: 'Sprint commits, architectural decisions, PR reviews & CI/CD alerts',
+    description: 'Technical discussions and core system engineering.',
     isPrivate: true,
     departmentRestricted: true,
     department: 'Engineering',
     createdById: '2',
     createdBy: 'James Mwangi',
     createdAt: '2026-01-10T11:00:00Z',
-    adminIds: ['2'],
-    memberIds: ['2', '3', 'user'],
+    adminIds: ['2', '1'],
+    memberIds: ['2', '3', '1'],
     pendingRequestUserIds: ['5'],
-    iconEmoji: '⚡',
+  },
+  {
+    id: 'ch-people-ops',
+    name: 'people-operations',
+    topic: 'Onboarding coordination, culture initiatives & employee engagement',
+    description: 'Human Resources and People Operations coordination hub.',
+    isPrivate: false,
+    departmentRestricted: true,
+    department: 'Human Resources',
+    createdById: '1',
+    createdBy: 'Sarah Johnson',
+    createdAt: '2026-01-08T10:00:00Z',
+    adminIds: ['1', 'user'],
+    memberIds: ['1', '3', '5', 'user'],
+    pendingRequestUserIds: [],
   },
   {
     id: 'ch-leadership',
     name: 'leadership-private',
-    topic: 'Quarterly OKRs, compensation reviews, company strategy',
-    description: 'Confidential executive room.',
+    topic: 'Quarterly OKRs, compensation reviews & executive strategy',
+    description: 'Confidential executive room. Request access or ask an admin to invite you.',
     isPrivate: true,
     departmentRestricted: false,
     createdById: '1',
@@ -148,22 +176,6 @@ const DEFAULT_CHANNELS: ChatChannel[] = [
     adminIds: ['1'],
     memberIds: ['1'],
     pendingRequestUserIds: [],
-    iconEmoji: '🔒',
-  },
-  {
-    id: 'ch-random',
-    name: 'random-memes',
-    topic: 'Music recommendations, pet photos, memes, weekend plans',
-    description: 'Non-work fun and celebrations.',
-    isPrivate: false,
-    departmentRestricted: false,
-    createdById: '3',
-    createdBy: 'Amina Abdi',
-    createdAt: '2026-01-12T14:20:00Z',
-    adminIds: ['3'],
-    memberIds: ['1', '2', '3', '4', 'user'],
-    pendingRequestUserIds: [],
-    iconEmoji: '🎉',
   },
 ];
 
@@ -174,14 +186,15 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderId: '1',
     senderName: 'Sarah Johnson',
     senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    senderRole: 'HR Administrator',
-    content: "Welcome everyone to our new unified EasyHR Team Chat! 🎉 Threads, file sharing, and department channels are fully live.",
-    createdAt: '10:00 AM',
+    senderRole: 'HR Director',
+    content: "Good morning team! Welcome to our new workspace channels. Feel free to start threads on any topic, share files or specifications, and mention colleagues with @name.",
+    createdAt: '09:30 AM',
+    pinned: true,
     reactions: {
       '🚀': { emoji: '🚀', count: 4, users: ['2', '3', '4', 'user'] },
-      '❤️': { emoji: '❤️', count: 3, users: ['2', 'user', '5'] },
+      '👏': { emoji: '👏', count: 3, users: ['2', 'user', '5'] },
     },
-    replyCount: 2,
+    replyCount: 3,
     replies: [
       {
         id: 'reply-1',
@@ -189,20 +202,30 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
         senderId: '2',
         senderName: 'James Mwangi',
         senderAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-        senderRole: 'Software Engineer',
-        content: 'This is super smooth! Love the Slack-style thread drawer.',
-        createdAt: '10:04 AM',
+        senderRole: 'Senior Software Engineer',
+        content: 'The thread drawer and file previews are super clean. Great upgrade for cross-department syncs!',
+        createdAt: '09:34 AM',
         reactions: { '💯': { emoji: '💯', count: 2, users: ['1', 'user'] } },
       },
       {
         id: 'reply-2',
         channelId: 'ch-general',
-        senderId: 'user',
-        senderName: 'Me',
-        senderAvatar: '',
-        senderRole: 'Employee',
-        content: 'Agreed, love having all project threads right next to our HR operations.',
-        createdAt: '10:15 AM',
+        senderId: '3',
+        senderName: 'Elena Rostova',
+        senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
+        senderRole: 'Lead Product Designer',
+        content: 'We just moved all UI review notes into #design-system as well.',
+        createdAt: '09:41 AM',
+      },
+      {
+        id: 'reply-3',
+        channelId: 'ch-general',
+        senderId: '1',
+        senderName: 'Sarah Johnson',
+        senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+        senderRole: 'HR Director',
+        content: 'Awesome! Let me know if any department needs a dedicated private room.',
+        createdAt: '09:45 AM',
       },
     ],
   },
@@ -212,41 +235,70 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderId: '2',
     senderName: 'James Mwangi',
     senderAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    senderRole: 'Software Engineer',
-    content: "Quick reminder for the product launch: please review the updated Figma flow and drop feedback in the #design-system channel.",
-    createdAt: '10:32 AM',
-    reactions: { '👀': { emoji: '👀', count: 3, users: ['1', '3', 'user'] } },
+    senderRole: 'Senior Software Engineer',
+    content: "Quick update for the Q4 product release: @Sarah Johnson and I finalized the shift scheduling & timesheet movement logs. Please review the latest build before Friday's demo.",
+    createdAt: '10:18 AM',
+    reactions: {
+      '🔥': { emoji: '🔥', count: 3, users: ['1', '3', 'user'] },
+      '✅': { emoji: '✅', count: 2, users: ['1', '4'] },
+    },
+    replyCount: 1,
+    replies: [
+      {
+        id: 'reply-4',
+        channelId: 'ch-general',
+        senderId: '1',
+        senderName: 'Sarah Johnson',
+        senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+        senderRole: 'HR Director',
+        content: 'Reviewed and verified! The punch movement breakdown on the timesheet looks spot on.',
+        createdAt: '10:24 AM',
+      },
+    ],
+  },
+  {
+    id: 'msg-3',
+    channelId: 'ch-general',
+    senderId: '3',
+    senderName: 'Elena Rostova',
+    senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
+    senderRole: 'Lead Product Designer',
+    content: "Here is the updated workspace architecture & design system preview for the upcoming sprint.",
+    createdAt: '11:05 AM',
+    attachments: [
+      {
+        id: 'att-1',
+        name: 'workspace-architecture-v2.png',
+        url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=900&q=80',
+        type: 'image',
+        size: '1.4 MB',
+      },
+    ],
+    reactions: { '❤️': { emoji: '❤️', count: 4, users: ['1', '2', 'user', '4'] } },
     replyCount: 0,
     replies: [],
   },
   {
-    id: 'msg-3',
+    id: 'msg-4',
     channelId: 'ch-design',
-    senderId: '1',
-    senderName: 'Sarah Johnson',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    senderRole: 'HR Administrator',
-    content: "Here is the updated design token guide for modern people operations! Check the card border-radii and contrast ratios.",
+    senderId: '3',
+    senderName: 'Elena Rostova',
+    senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
+    senderRole: 'Lead Product Designer',
+    content: "Updated typography tokens: Fraunces for display headings and Questrial/Gilroy geometric sans for clean body readability.",
     createdAt: '11:15 AM',
-    attachments: [
-      {
-        id: 'att-1',
-        name: 'design-tokens-v2.png',
-        url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=600&q=80',
-        type: 'image',
-        size: '1.2 MB',
-      },
-    ],
-    reactions: { '🔥': { emoji: '🔥', count: 3, users: ['2', 'user', '4'] } },
+    pinned: true,
+    reactions: { '✨': { emoji: '✨', count: 3, users: ['1', '2', 'user'] } },
     replyCount: 1,
     replies: [
       {
-        id: 'reply-3',
+        id: 'reply-5',
         channelId: 'ch-design',
-        senderId: 'user',
-        senderName: 'Me',
-        senderAvatar: '',
-        content: 'Colors look crisp and super readable.',
+        senderId: '1',
+        senderName: 'Sarah Johnson',
+        senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+        senderRole: 'HR Director',
+        content: 'Much cleaner and super legible across all dashboard cards.',
         createdAt: '11:20 AM',
       },
     ],
@@ -257,25 +309,101 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { currentUser, isHRAdmin } = useRole();
+  const { getToken, isSignedIn } = useAuth();
   const [channels, setChannels] = useState<ChatChannel[]>(DEFAULT_CHANNELS);
   const [activeChannelId, setActiveChannelId] = useState<string>('ch-general');
   const [allMessages, setAllMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
   const [activeThread, setActiveThread] = useState<ChatMessage | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>(initialEmployees);
+
+  // Fetch real company employees and merge with initialEmployees fallback
+  useEffect(() => {
+    let isMounted = true;
+    async function loadEmployees() {
+      if (!isSignedIn) return;
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch(`${API_BASE_URL}/api/v1/employees`, {
+          credentials: 'omit',
+          headers: getAuthHeaders(token),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json) ? json : json.data || [];
+          if (isMounted && list.length > 0) {
+            const mapped: Employee[] = list.map((e: any) => ({
+              id: String(e.id || e._id),
+              firstName: e.firstName || e.first_name || 'Team',
+              lastName: e.lastName || e.last_name || 'Member',
+              email: e.email || '',
+              phone: e.phone || '',
+              title: e.jobTitle || e.title || e.role || 'Team Member',
+              department: e.department?.name || e.department || 'General',
+              location: e.location || e.workLocation || 'Headquarters',
+              status: 'Active',
+              startDate: e.hireDate || e.startDate || '2025-01-01',
+              avatar: e.avatarUrl || e.avatar || '',
+              salary: e.salary || 0,
+            }));
+            // Combine mapped real employees with initialEmployees so seeded messages always resolve avatars/profiles
+            const existingIds = new Set(mapped.map((m) => String(m.id)));
+            const combined = [
+              ...mapped,
+              ...initialEmployees.filter((ie) => !existingIds.has(String(ie.id))),
+            ];
+            setAllEmployees(combined);
+          }
+        }
+      } catch {
+        // Fallback to initialEmployees silently
+      }
+    }
+    loadEmployees();
+    return () => {
+      isMounted = false;
+    };
+  }, [isSignedIn, getToken]);
 
   // Load from local storage
   useEffect(() => {
     try {
       const savedChannels = localStorage.getItem(STORAGE_KEY_CHANNELS);
       if (savedChannels) {
-        setChannels(JSON.parse(savedChannels));
+        const parsed = JSON.parse(savedChannels);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setChannels(parsed);
+        }
       }
       const savedMessages = localStorage.getItem(STORAGE_KEY_MESSAGES);
       if (savedMessages) {
-        setAllMessages(JSON.parse(savedMessages));
+        const parsedMsg = JSON.parse(savedMessages);
+        if (Array.isArray(parsedMsg) && parsedMsg.length > 0) {
+          setAllMessages(parsedMsg);
+        }
       }
     } catch {}
   }, []);
+
+  // Ensure currentUser.id is always a member of public channels (and HR Admin is in default channels)
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const myId = String(currentUser.id);
+    setChannels((prev) =>
+      prev.map((ch) => {
+        if (!ch.isPrivate && !ch.departmentRestricted) {
+          if (!ch.memberIds.includes(myId)) {
+            return { ...ch, memberIds: [...ch.memberIds, myId] };
+          }
+        }
+        if ((ch.id === 'ch-design' || ch.id === 'ch-people-ops') && !ch.memberIds.includes(myId)) {
+          return { ...ch, memberIds: [...ch.memberIds, myId] };
+        }
+        return ch;
+      })
+    );
+  }, [currentUser?.id, isHRAdmin]);
 
   // Save to local storage
   useEffect(() => {
@@ -289,6 +417,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(allMessages));
     } catch {}
   }, [allMessages]);
+
+  const handleSelectChannel = useCallback((id: string) => {
+    setActiveChannelId(id);
+    setChannels((prev) =>
+      prev.map((c) => (c.id === id && c.unreadCount ? { ...c, unreadCount: 0 } : c))
+    );
+  }, []);
 
   const activeChannel = useMemo(
     () => channels.find((c) => c.id === activeChannelId) || channels[0] || null,
@@ -305,7 +440,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     (content: string, attachments?: ChatAttachment[], threadParentId?: string) => {
       if (!content.trim() && (!attachments || attachments.length === 0)) return;
 
-      const myId = currentUser?.id || 'user';
+      const myId = String(currentUser?.id || 'user');
       const myName = `${currentUser?.firstName || 'User'} ${currentUser?.lastName || ''}`.trim();
       const myAvatar = currentUser?.avatar || '';
 
@@ -325,7 +460,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       };
 
       if (threadParentId) {
-        // Appending reply to thread parent
         setAllMessages((prev) =>
           prev.map((m) => {
             if (m.id === threadParentId) {
@@ -344,7 +478,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           })
         );
       } else {
-        // Top level channel message
         setAllMessages((prev) => [...prev, newMsg]);
       }
     },
@@ -352,37 +485,47 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Delete message
-  const deleteMessage = useCallback((messageId: string, threadParentId?: string) => {
-    if (threadParentId) {
-      setAllMessages((prev) =>
-        prev.map((m) => {
-          if (m.id === threadParentId) {
-            const updatedReplies = (m.replies || []).filter((r) => r.id !== messageId);
-            const updated = {
-              ...m,
-              replyCount: updatedReplies.length,
-              replies: updatedReplies,
-            };
-            if (activeThread?.id === threadParentId) {
-              setActiveThread(updated);
+  const deleteMessage = useCallback(
+    (messageId: string, threadParentId?: string) => {
+      if (threadParentId) {
+        setAllMessages((prev) =>
+          prev.map((m) => {
+            if (m.id === threadParentId) {
+              const updatedReplies = (m.replies || []).filter((r) => r.id !== messageId);
+              const updated = {
+                ...m,
+                replyCount: updatedReplies.length,
+                replies: updatedReplies,
+              };
+              if (activeThread?.id === threadParentId) {
+                setActiveThread(updated);
+              }
+              return updated;
             }
-            return updated;
-          }
-          return m;
-        })
-      );
-    } else {
-      setAllMessages((prev) => prev.filter((m) => m.id !== messageId));
-      if (activeThread?.id === messageId) {
-        setActiveThread(null);
+            return m;
+          })
+        );
+      } else {
+        setAllMessages((prev) => prev.filter((m) => m.id !== messageId));
+        if (activeThread?.id === messageId) {
+          setActiveThread(null);
+        }
       }
-    }
-  }, [activeThread]);
+    },
+    [activeThread]
+  );
+
+  // Pin or unpin message
+  const togglePinMessage = useCallback((messageId: string) => {
+    setAllMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, pinned: !m.pinned } : m))
+    );
+  }, []);
 
   // Toggle reaction emoji
   const toggleReaction = useCallback(
     (messageId: string, emoji: string, threadParentId?: string) => {
-      const myId = currentUser?.id || 'user';
+      const myId = String(currentUser?.id || 'user');
 
       const updateReactions = (reactions: Record<string, ChatReaction> = {}) => {
         const current = reactions[emoji] || { emoji, count: 0, users: [] };
@@ -454,16 +597,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       departmentRestricted: boolean;
       department?: string;
       memberIds?: string[];
-      iconEmoji?: string;
     }): ChatChannel => {
-      const myId = currentUser?.id || 'user';
+      const myId = String(currentUser?.id || 'user');
       const myName = `${currentUser?.firstName || 'User'} ${currentUser?.lastName || ''}`.trim();
 
       const newChan: ChatChannel = {
         id: `ch-${Date.now()}`,
         name: input.name.toLowerCase().replace(/\s+/g, '-'),
         description: input.description || '',
-        topic: input.description || `Discussion in #${input.name}`,
+        topic: input.description || `Team collaboration in #${input.name.toLowerCase().replace(/\s+/g, '-')}`,
         isPrivate: input.isPrivate,
         departmentRestricted: input.departmentRestricted,
         department: input.department,
@@ -473,7 +615,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         adminIds: [myId],
         memberIds: Array.from(new Set([myId, ...(input.memberIds || [])])),
         pendingRequestUserIds: [],
-        iconEmoji: input.iconEmoji || (input.isPrivate ? '🔒' : '💬'),
       };
 
       setChannels((prev) => [...prev, newChan]);
@@ -486,7 +627,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // Request to join a private/department channel
   const requestToJoinChannel = useCallback(
     (channelId: string) => {
-      const myId = currentUser?.id || 'user';
+      const myId = String(currentUser?.id || 'user');
       setChannels((prev) =>
         prev.map((c) => {
           if (c.id === channelId && !c.memberIds.includes(myId) && !c.pendingRequestUserIds.includes(myId)) {
@@ -584,12 +725,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       value={{
         channels,
         activeChannel,
-        setActiveChannelId,
+        setActiveChannelId: handleSelectChannel,
         messages: currentChannelMessages,
+        allMessages,
         activeThread,
         setActiveThread,
         sendMessage,
         deleteMessage,
+        togglePinMessage,
         toggleReaction,
         createChannel,
         requestToJoinChannel,
@@ -599,7 +742,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         removeMemberFromChannel,
         typingUsers,
         setTyping,
-        allEmployees: initialEmployees,
+        allEmployees,
       }}
     >
       {children}

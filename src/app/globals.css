@@ -58,7 +58,7 @@
 
   /* Typography tokens */
   --font-title: 'Fraunces', Georgia, serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: 'Questrial', 'Gilroy', system-ui, -apple-system, sans-serif;
 }
 
 /* ============================================================
@@ -82,6 +82,7 @@ h1, h2, h3, h4, h5, h6,
 .kanban-col-title,
 .profile-banner-name {
   font-family: var(--font-title) !important;
+  font-weight: 700;
   letter-spacing: -0.015em;
 }
 
@@ -413,18 +414,12 @@ img { display: block; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 .card-body-0 { 
   padding: 0; 
   flex: 1; 
   display: flex; 
   flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 /* ============================================================
@@ -863,39 +858,39 @@ tr:hover td { background: #FAFAF8; }
   align-items: stretch;
 }
 
-/* Dashboard Optional Widgets: Full available height & internal scroll */
-.dash-grid .card {
-  height: 100%;
-  min-height: 240px;
+/* Dashboard Optional Widgets: Fixed uniform height & internal scroll only */
+.dash-grid .dash-optional-widgets .card {
+  height: 310px;
+  min-height: 310px;
+  max-height: 310px;
   display: flex;
   flex-direction: column;
 }
 
-.dash-grid .card-body,
-.dash-grid .card-body-0 {
+.dash-grid .dash-optional-widgets .card-body,
+.dash-grid .dash-optional-widgets .card-body-0 {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 380px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 /* Custom sleek scrollbar for dashboard widget contents */
-.dash-grid .card-body::-webkit-scrollbar,
-.dash-grid .card-body-0::-webkit-scrollbar {
+.dash-grid .dash-optional-widgets .card-body::-webkit-scrollbar,
+.dash-grid .dash-optional-widgets .card-body-0::-webkit-scrollbar {
   width: 5px;
 }
-.dash-grid .card-body::-webkit-scrollbar-track,
-.dash-grid .card-body-0::-webkit-scrollbar-track {
+.dash-grid .dash-optional-widgets .card-body::-webkit-scrollbar-track,
+.dash-grid .dash-optional-widgets .card-body-0::-webkit-scrollbar-track {
   background: transparent;
 }
-.dash-grid .card-body::-webkit-scrollbar-thumb,
-.dash-grid .card-body-0::-webkit-scrollbar-thumb {
+.dash-grid .dash-optional-widgets .card-body::-webkit-scrollbar-thumb,
+.dash-grid .dash-optional-widgets .card-body-0::-webkit-scrollbar-thumb {
   background: #E4E4E7;
   border-radius: 999px;
 }
-.dash-grid .card-body::-webkit-scrollbar-thumb:hover,
-.dash-grid .card-body-0::-webkit-scrollbar-thumb:hover {
+.dash-grid .dash-optional-widgets .card-body::-webkit-scrollbar-thumb:hover,
+.dash-grid .dash-optional-widgets .card-body-0::-webkit-scrollbar-thumb:hover {
   background: #A1A1AA;
 }
 
@@ -962,10 +957,10 @@ tr:hover td { background: #FAFAF8; }
 .text-xl   { font-size: 20px; }
 .text-2xl  { font-size: 24px; }
 .text-3xl  { font-size: 30px; }
-.fw-500 { font-weight: 500; }
-.fw-600 { font-weight: 600; }
-.fw-700 { font-weight: 700; }
-.fw-800 { font-weight: 800; }
+.fw-500 { font-weight: 400; }
+.fw-600 { font-weight: 400; }
+.fw-700 { font-weight: 400; }
+.fw-800 { font-weight: 400; }
 .text-1 { color: var(--text-1); }
 .text-2 { color: var(--text-2); }
 .text-3 { color: var(--text-3); }

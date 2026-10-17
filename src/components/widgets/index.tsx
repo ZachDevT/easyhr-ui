@@ -29,7 +29,14 @@ import {
   Trash2,
   Pin,
   Maximize2,
-  Loader2
+  Loader2,
+  Coffee,
+  Utensils,
+  Music,
+  MapPin,
+  Briefcase,
+  Mail,
+  User,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
@@ -1569,16 +1576,17 @@ export function BirthdaysWidget({ onRemove, preview }: { onRemove?: () => void; 
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 3,
+                        gap: 4,
                         fontSize: 10,
-                        fontWeight: 700,
+                        fontWeight: 600,
                         padding: '1px 6px',
-                        borderRadius: 10,
-                        background: b.type === 'birthday' ? '#fdf2f8' : '#eff6ff',
-                        color: b.type === 'birthday' ? '#db2777' : '#2563eb',
+                        borderRadius: 6,
+                        background: '#f4f4f5',
+                        color: '#52525b',
+                        border: '1px solid #e4e4e7',
                       }}
                     >
-                      {b.type === 'birthday' ? <Gift size={10} /> : <Award size={10} />}
+                      {b.type === 'birthday' ? <Gift size={10} strokeWidth={2} /> : <Award size={10} strokeWidth={2} />}
                       {b.type === 'birthday' ? 'Birthday' : b.milestone}
                     </span>
                   </div>
@@ -1932,6 +1940,7 @@ interface NewHireProfile {
 
 export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
   const { getToken, isSignedIn } = useAuth();
+  const { isHRAdmin, role } = useRole();
   const [newHires, setNewHires] = useState<NewHireProfile[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
@@ -2012,8 +2021,8 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
     <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
       <div className="card-header">
         <div className="card-header-left">
-          <div className="card-header-icon" style={{ background: '#fdf2f8', color: '#db2777' }}>
-            <Sparkles size={16} strokeWidth={2.5} />
+          <div className="card-header-icon">
+            <UserPlus size={16} strokeWidth={2.5} />
           </div>
           <h2 className="card-header-title">Welcome New Hires</h2>
         </div>
@@ -2038,16 +2047,13 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
           <div className="col">
             {newHires.map((emp) => {
               const isExpanded = expandedId === emp.id;
-              const hasOnboardingDetails = Boolean(
-                emp.bio || emp.funFact || emp.favoriteFood || emp.favoriteMovies || emp.favoriteMusic || emp.coffeeTea
-              );
 
               return (
                 <div
                   key={emp.id}
                   style={{
-                    borderBottom: '1px solid var(--border)',
-                    background: isExpanded ? 'rgba(162, 56, 255, 0.02)' : 'transparent',
+                    borderBottom: '1px solid var(--card-border)',
+                    background: isExpanded ? '#FAFAF9' : 'transparent',
                     transition: 'background 0.15s ease',
                   }}
                 >
@@ -2055,7 +2061,7 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
                   <div
                     onClick={() => toggleExpand(emp.id)}
                     style={{
-                      padding: '14px 20px',
+                      padding: '12px 20px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 12,
@@ -2066,17 +2072,14 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
                     <Avatar src={emp.avatar} name={emp.name} size="sm" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="row gap-8 align-center">
-                        <p className="text-sm fw-700 text-1 m-0 truncate">{emp.name}</p>
+                        <p className="text-sm text-1 m-0 truncate">{emp.name}</p>
                         <span
                           style={{
                             fontSize: 10,
-                            fontWeight: 800,
                             padding: '1px 7px',
-                            borderRadius: 12,
-                            background: '#ecfdf5',
-                            color: '#059669',
-                            letterSpacing: '0.04em',
-                            textTransform: 'uppercase',
+                            borderRadius: 999,
+                            background: 'var(--primary-tint)',
+                            color: 'var(--primary)',
                           }}
                         >
                           New
@@ -2087,18 +2090,18 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
                       </p>
                     </div>
 
-                    <div className="row gap-8 align-center">
+                    <div className="row gap-6 align-center">
                       <span
-                        className="text-xs fw-600"
+                        className="text-xs"
                         style={{
                           fontSize: 11,
                           color: isExpanded ? 'var(--primary)' : 'var(--text-4)',
                         }}
                       >
-                        {isExpanded ? 'Less' : 'About'}
+                        {isExpanded ? 'Hide' : 'About'}
                       </span>
                       <ChevronDown
-                        size={15}
+                        size={14}
                         style={{
                           color: isExpanded ? 'var(--primary)' : 'var(--text-4)',
                           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -2108,128 +2111,90 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
                     </div>
                   </div>
 
-                  {/* Expanded Cute Profile Drawer */}
+                  {/* Expanded Cohesive Profile Details (No emojis, no multicolor sub-cards) */}
                   {isExpanded && (
                     <div
                       style={{
-                        padding: '0 20px 18px 20px',
-                        animation: 'fadeIn 0.2s ease',
+                        padding: '0 20px 16px 56px',
+                        animation: 'fadeIn 0.18s ease',
                       }}
                     >
                       {loadingDetails[emp.id] ? (
-                        <div className="p-16 text-center text-xs text-5">
-                          <Loader2 size={16} className="animate-spin mr-6 inline" />
-                          Getting {emp.firstName}&apos;s profile...
+                        <div className="py-8 text-xs text-5">
+                          <Loader2 size={14} className="animate-spin mr-6 inline" />
+                          Loading details...
                         </div>
                       ) : (
-                        <div
-                          style={{
-                            background: '#FFFFFF',
-                            borderRadius: 14,
-                            padding: '16px 18px',
-                            border: '1px solid var(--border)',
-                            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                          }}
-                          className="col gap-12"
-                        >
-                          {/* Cute Bio / Intro */}
-                          <div>
-                            <span className="text-xs fw-700 text-1" style={{ fontSize: 11 }}>
-                              👋 About {emp.firstName}
-                            </span>
-                            <p className="text-xs text-4 mt-4 m-0" style={{ lineHeight: 1.6 }}>
-                              {emp.bio || `${emp.firstName} recently joined the ${emp.department} team as ${emp.title}. Welcome aboard!`}
-                            </p>
-                          </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <p className="text-xs text-3 m-0" style={{ lineHeight: 1.55 }}>
+                            {emp.bio || `${emp.firstName} recently joined the ${emp.department} team as ${emp.title}.`}
+                          </p>
 
-                          {/* Quick Badges / Favorites */}
                           <div
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                              gap: 8,
-                              paddingTop: 8,
-                              borderTop: '1px dashed var(--border)',
+                              gridTemplateColumns: '1fr 1fr',
+                              rowGap: 8,
+                              columnGap: 16,
+                              paddingTop: 10,
+                              borderTop: '1px solid var(--card-border)',
                             }}
                           >
-                            <div
-                              style={{
-                                background: '#FFFBEB',
-                                border: '1px solid #FEF3C7',
-                                padding: '8px 10px',
-                                borderRadius: 8,
-                              }}
-                            >
-                              <div className="text-xs fw-700 text-amber-800" style={{ fontSize: 10 }}>
-                                ☕ Drink
-                              </div>
-                              <div className="text-xs text-1 fw-600 mt-2 truncate">
-                                {emp.coffeeTea || 'Coffee enthusiast'}
+                            <div className="row gap-8">
+                              <MapPin size={13} style={{ color: 'var(--text-5)', flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <span className="text-xs text-5" style={{ fontSize: 10, display: 'block' }}>Location</span>
+                                <span className="text-xs text-1 truncate" style={{ display: 'block' }}>{emp.location || 'Headquarters'}</span>
                               </div>
                             </div>
 
-                            <div
-                              style={{
-                                background: '#F0FDF4',
-                                border: '1px solid #DCFCE7',
-                                padding: '8px 10px',
-                                borderRadius: 8,
-                              }}
-                            >
-                              <div className="text-xs fw-700 text-emerald-800" style={{ fontSize: 10 }}>
-                                🍕 Favorite Food
-                              </div>
-                              <div className="text-xs text-1 fw-600 mt-2 truncate">
-                                {emp.favoriteFood || 'Foodie adventures'}
+                            <div className="row gap-8">
+                              <Briefcase size={13} style={{ color: 'var(--text-5)', flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <span className="text-xs text-5" style={{ fontSize: 10, display: 'block' }}>Department</span>
+                                <span className="text-xs text-1 truncate" style={{ display: 'block' }}>{emp.department}</span>
                               </div>
                             </div>
 
-                            <div
-                              style={{
-                                background: '#F5F3FF',
-                                border: '1px solid #EDE9FE',
-                                padding: '8px 10px',
-                                borderRadius: 8,
-                              }}
-                            >
-                              <div className="text-xs fw-700 text-purple-800" style={{ fontSize: 10 }}>
-                                🎧 Music & Hobbies
+                            {(emp.coffeeTea || emp.favoriteFood) && (
+                              <div className="row gap-8">
+                                <Coffee size={13} style={{ color: 'var(--text-5)', flexShrink: 0 }} />
+                                <div style={{ minWidth: 0 }}>
+                                  <span className="text-xs text-5" style={{ fontSize: 10, display: 'block' }}>Favorites</span>
+                                  <span className="text-xs text-1 truncate" style={{ display: 'block' }}>
+                                    {[emp.coffeeTea, emp.favoriteFood].filter(Boolean).join(' · ')}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="text-xs text-1 fw-600 mt-2 truncate">
-                                {emp.favoriteMusic || emp.funFact || 'Music & Reading'}
-                              </div>
-                            </div>
+                            )}
 
-                            <div
-                              style={{
-                                background: '#EFF6FF',
-                                border: '1px solid #DBEAFE',
-                                padding: '8px 10px',
-                                borderRadius: 8,
-                              }}
-                            >
-                              <div className="text-xs fw-700 text-blue-800" style={{ fontSize: 10 }}>
-                                📍 Office & Team
+                            {(emp.favoriteMusic || emp.funFact) && (
+                              <div className="row gap-8">
+                                <Music size={13} style={{ color: 'var(--text-5)', flexShrink: 0 }} />
+                                <div style={{ minWidth: 0 }}>
+                                  <span className="text-xs text-5" style={{ fontSize: 10, display: 'block' }}>Interests</span>
+                                  <span className="text-xs text-1 truncate" style={{ display: 'block' }}>
+                                    {emp.favoriteMusic || emp.funFact}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="text-xs text-1 fw-600 mt-2 truncate">
-                                {emp.location || 'Headquarters'}
-                              </div>
-                            </div>
+                            )}
                           </div>
 
-                          {/* Link to full employee profile */}
-                          <div className="row-between pt-6 align-center">
-                            <span className="text-xs text-5" style={{ fontSize: 11 }}>
-                              {emp.startDate ? `Joined ${emp.startDate}` : 'New team member'}
-                            </span>
-                            <Link
-                              href={`/people/${emp.id}`}
-                              className="text-xs fw-700 text-primary"
-                              style={{ textDecoration: 'none' }}
-                            >
-                              Full Profile &rarr;
-                            </Link>
-                          </div>
+                          {(isHRAdmin || role === 'Manager') && (
+                            <div className="row-between pt-6" style={{ borderTop: '1px solid var(--card-border)' }}>
+                              <span className="text-xs text-5" style={{ fontSize: 11 }}>
+                                {emp.startDate ? `Started ${emp.startDate}` : 'Active team member'}
+                              </span>
+                              <Link
+                                href={`/people/${emp.id}`}
+                                className="text-xs text-primary"
+                                style={{ textDecoration: 'none' }}
+                              >
+                                View Profile &rarr;
+                              </Link>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
