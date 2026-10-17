@@ -332,7 +332,7 @@ export default function SignaturesAdminPage() {
       <PageHeader
         title="Document Signatures"
         subtitle="Send uploaded documents for signature and track recipient responses."
-        icon={<FileSignature size={28} className="text-white" />}
+        icon={<FileSignature size={18} />}
         tabs={['Overview', 'Sent Requests', 'Template Builder']}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -343,35 +343,39 @@ export default function SignaturesAdminPage() {
               background: 'white',
               color: 'var(--primary)',
               border: 'none',
-              padding: '12px 24px',
-              fontSize: 14,
+              height: 34,
+              padding: '0 14px',
+              fontSize: 12.5,
               fontWeight: 700,
-              borderRadius: 20,
+              borderRadius: 9,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
             onClick={() => setShowSendModal(true)}
           >
-            <Plus size={16} style={{ marginRight: 8 }} /> New Request
+            <Plus size={14} /> New Request
           </button>
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 32, background: 'var(--bg-page)' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 32px', background: 'var(--bg-page)' }}>
         {activeTab === 'Overview' && (
-          <div className="col gap-32">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
             {/* Stats Row */}
             <StatRibbon
               stats={[
-                { label: 'Pending Signatures', value: pendingCount, icon: <Clock size={18} />, color: 'var(--warning)' },
+                { label: 'Pending Signatures', value: pendingCount, icon: <Clock size={16} />, color: 'var(--warning)' },
                 {
                   label: 'Completed Signatures',
                   value: completedCount,
-                  icon: <CheckCircle2 size={18} />,
+                  icon: <CheckCircle2 size={16} />,
                   color: 'var(--success)',
                 },
                 {
                   label: 'Declined / Action Required',
                   value: declinedRequests.length,
-                  icon: <AlertTriangle size={18} />,
+                  icon: <AlertTriangle size={16} />,
                   color: 'var(--error)',
                 },
               ]}
@@ -380,75 +384,125 @@ export default function SignaturesAdminPage() {
             {/* Action Required if any declined */}
             {declinedRequests.length > 0 && (
               <div>
-                <h2 className="text-lg fw-700 text-1 mb-16 row gap-12 align-center">
-                  <Bell size={20} className="text-error" /> Needs Attention
-                </h2>
-                {declinedRequests.map((req) => {
-                  const declinedRec = req.recipients?.find((rec) => rec.status === 'declined');
-                  return (
-                    <Card key={req.id} style={{ border: '1px solid var(--error-tint)', marginBottom: 12 }}>
-                      <CardBody className="row-between align-center p-20">
-                        <div className="row gap-16 align-center">
-                          <Avatar name={declinedRec?.name || 'Recipient'} size="md" />
-                          <div>
-                            <h4 className="text-base fw-700 text-1 m-0 mb-4">{req.documentName}</h4>
-                            <div className="text-sm text-5">
-                              Declined by {declinedRec?.name} •{' '}
-                              <span className="text-error fw-600">
-                                Reason: {declinedRec?.declineReason || 'Disagreed with clauses'}
-                              </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Bell size={15} style={{ color: 'var(--error)' }} />
+                  <h2 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Needs Attention</h2>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA' }}>
+                    {declinedRequests.length}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {declinedRequests.map((req) => {
+                    const declinedRec = req.recipients?.find((rec) => rec.status === 'declined');
+                    return (
+                      <Card key={req.id} style={{ border: '1px solid #FECACA', background: '#FFFFFF' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 18px',
+                            gap: 16,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                            <Avatar name={declinedRec?.name || 'Recipient'} size="md" />
+                            <div style={{ minWidth: 0 }}>
+                              <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 3px 0' }}>{req.documentName}</h4>
+                              <div style={{ fontSize: 12.5, color: 'var(--text-4)' }}>
+                                Declined by <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>{declinedRec?.name}</strong> •{' '}
+                                <span style={{ color: '#B91C1C', fontWeight: 600 }}>
+                                  Reason: {declinedRec?.declineReason || 'Disagreed with clauses'}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="row gap-12">
                           <button
-                            className="btn-secondary row gap-8"
+                            className="btn-neutral btn-sm"
+                            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                             onClick={() => {
                               setShowSendModal(true);
                             }}
                           >
-                            <FileText size={16} /> Send Revised Version
+                            <FileText size={14} /> Send Revised Version
                           </button>
                         </div>
-                      </CardBody>
-                    </Card>
-                  );
-                })}
+                      </Card>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
             {/* Quick Actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
               <Card>
-                <CardBody style={{ padding: 24 }}>
-                  <div className="icon-chip mb-16" style={{ background: 'var(--primary-tint)', color: 'var(--primary)' }}>
-                    <FileSignature size={24} />
+                <CardBody style={{ padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: '#FAF9F7',
+                        border: '1px solid var(--card-border)',
+                        color: 'var(--text-1)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <FileSignature size={17} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 4px 0' }}>Standard Document Templates</h3>
+                      <p style={{ fontSize: 12.5, color: 'var(--text-4)', margin: 0, lineHeight: 1.5 }}>
+                        Choose an uploaded, available company document or reusable HR template and send it to an employee or external signer.
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-base fw-700 text-1 mb-8">Standard Document Templates</h3>
-                  <p className="text-xs text-4 mb-20">
-                    Choose an uploaded, available company document and send it to an employee or external signer.
-                  </p>
-                  <button className="btn-primary w-full" onClick={() => setShowSendModal(true)}>
-                    Create Signature Request
-                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+                    <button className="btn-primary btn-sm" onClick={() => setShowSendModal(true)}>
+                      <Plus size={14} /> Create Signature Request
+                    </button>
+                  </div>
                 </CardBody>
               </Card>
 
               <Card>
-                <CardBody style={{ padding: 24 }}>
-                  <div className="icon-chip mb-16" style={{ background: '#ecfdf5', color: '#059669' }}>
-                    <Shield size={24} />
+                <CardBody style={{ padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: '#FAF9F7',
+                        border: '1px solid var(--card-border)',
+                        color: 'var(--text-1)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Shield size={17} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 4px 0' }}>Audit Trail & Compliance</h3>
+                      <p style={{ fontSize: 12.5, color: 'var(--text-4)', margin: 0, lineHeight: 1.5 }}>
+                        Signature records capture the signer’s consent, typed name, timestamp, request details, and a SHA-256 digest in the audit trail.
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-base fw-700 text-1 mb-8">Audit Trail & Compliance</h3>
-                  <p className="text-xs text-4 mb-20">
-                    Signature records capture the signer’s consent, typed name, timestamp, request details, and a SHA-256 digest in the audit trail.
-                  </p>
-                  <button
-                    className="btn-neutral w-full"
-                    onClick={() => setActiveTab('Sent Requests')}
-                  >
-                    View All Tracking Logs
-                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+                    <button
+                      className="btn-neutral btn-sm"
+                      onClick={() => setActiveTab('Sent Requests')}
+                    >
+                      View All Tracking Logs <ArrowRight size={13} />
+                    </button>
+                  </div>
                 </CardBody>
               </Card>
             </div>

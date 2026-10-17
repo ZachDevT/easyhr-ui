@@ -30,6 +30,9 @@ import {
   Briefcase,
   ExternalLink,
   FileText,
+  Maximize2,
+  Play,
+  Zap,
 } from 'lucide-react';
 import { useChat } from '@/context/ChatContext';
 import { useRole } from '@/context/RoleContext';
@@ -37,7 +40,8 @@ import { useCompany } from '@/context/CompanyContext';
 import { Employee } from '@/data/employees';
 import { CreateChannelModal } from '@/components/chat/CreateChannelModal';
 import { ThreadDrawer } from '@/components/chat/ThreadDrawer';
-import { EmojiGifPicker } from '@/components/chat/EmojiGifPicker';
+import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
+import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
 
 export default function GroupChatPage() {
   const {
@@ -71,7 +75,8 @@ export default function GroupChatPage() {
   const [viewFilter, setViewFilter] = useState<'all' | 'threads' | 'pinned'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const [pickerTab, setPickerTab] = useState<'emoji' | 'gif'>('emoji');
+  const [pickerTab, setPickerTab] = useState<PickerTab>('emoji');
+  const [lightboxMedia, setLightboxMedia] = useState<LightboxMediaItem | null>(null);
   const [showMemberDrawer, setShowMemberDrawer] = useState(true);
   const [selectedProfileMember, setSelectedProfileMember] = useState<Employee | null>(null);
   const [showAddMemberInput, setShowAddMemberInput] = useState(false);
@@ -90,7 +95,7 @@ export default function GroupChatPage() {
       id: string;
       name: string;
       url: string;
-      type: 'image' | 'file';
+      type: 'image' | 'video' | 'file';
       size?: string;
     }[]
   >([]);
@@ -245,6 +250,7 @@ export default function GroupChatPage() {
 
     Array.from(files).forEach((file) => {
       const isImg = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
       const fileUrl = URL.createObjectURL(file);
       setUploadedAttachments((prev) => [
         ...prev,
@@ -252,7 +258,7 @@ export default function GroupChatPage() {
           id: `file-${Date.now()}-${Math.random()}`,
           name: file.name,
           url: fileUrl,
-          type: isImg ? 'image' : 'file',
+          type: isImg ? 'image' : isVideo ? 'video' : 'file',
           size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
         },
       ]);
@@ -1788,19 +1794,150 @@ export default function GroupChatPage() {
                                     border: '1px solid var(--card-border, #E4E4E7)',
                                     background: '#FAF9F7',
                                     maxWidth: 380,
+                                    position: 'relative',
                                   }}
                                 >
                                   {att.type === 'image' ? (
-                                    <img
-                                      src={att.url}
-                                      alt={att.name}
+                                    <div
+                                      onClick={() =>
+                                        setLightboxMedia({
+                                          url: att.url,
+                                          name: att.name,
+                                          type: 'image',
+                                          size: att.size,
+                                        })
+                                      }
+                                      style={{ position: 'relative', cursor: 'zoom-in' }}
+                                      title="Click to open full view"
+                                    >
+                                      <img
+                                        src={att.url}
+                                        alt={att.name}
+                                        style={{
+                                          display: 'block',
+                                          maxWidth: '100%',
+                                          maxHeight: 230,
+                                          objectFit: 'cover',
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          bottom: 8,
+                                          right: 8,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                          padding: '4px 8px',
+                                          borderRadius: 6,
+                                          background: 'rgba(9, 9, 11, 0.72)',
+                                          backdropFilter: 'blur(4px)',
+                                          color: '#FFFFFF',
+                                          fontSize: 10.5,
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        <Maximize2 size={11} />
+                                        <span>Full view</span>
+                                      </div>
+                                    </div>
+                                  ) : att.type === 'video' ? (
+                                    <div
+                                      onClick={() =>
+                                        setLightboxMedia({
+                                          url: att.url,
+                                          name: att.name,
+                                          type: 'video',
+                                          size: att.size,
+                                        })
+                                      }
                                       style={{
-                                        display: 'block',
+                                        position: 'relative',
+                                        cursor: 'pointer',
+                                        background: '#09090B',
+                                        width: 340,
                                         maxWidth: '100%',
-                                        maxHeight: 230,
-                                        objectFit: 'cover',
                                       }}
-                                    />
+                                      title="Click to play video in full view"
+                                    >
+                                      <video
+                                        src={att.url}
+                                        muted
+                                        playsInline
+                                        preload="metadata"
+                                        style={{
+                                          display: 'block',
+                                          width: '100%',
+                                          height: 196,
+                                          objectFit: 'cover',
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          inset: 0,
+                                          background: 'linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.18))',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            width: 44,
+                                            height: 44,
+                                            borderRadius: '50%',
+                                            background: 'rgba(255, 255, 255, 0.22)',
+                                            border: '1px solid rgba(255, 255, 255, 0.35)',
+                                            backdropFilter: 'blur(6px)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#FFFFFF',
+                                          }}
+                                        >
+                                          <Play size={18} fill="#FFFFFF" />
+                                        </div>
+                                      </div>
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          left: 10,
+                                          right: 10,
+                                          bottom: 8,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          color: '#FFFFFF',
+                                          fontSize: 11,
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            maxWidth: 210,
+                                          }}
+                                        >
+                                          {att.name}
+                                        </span>
+                                        <span
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                            padding: '2px 7px',
+                                            borderRadius: 6,
+                                            background: 'rgba(255,255,255,0.18)',
+                                            fontSize: 10,
+                                            fontWeight: 600,
+                                          }}
+                                        >
+                                          <Maximize2 size={10} /> Full video
+                                        </span>
+                                      </div>
+                                    </div>
                                   ) : (
                                     <a
                                       href={att.url}
@@ -2310,6 +2447,7 @@ export default function GroupChatPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
+                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
                     multiple
                     style={{ display: 'none' }}
                     onChange={handleFileUpload}
@@ -2341,7 +2479,7 @@ export default function GroupChatPage() {
                     }}
                   />
 
-                  {/* Right Actions: Mention, Emoji, GIF, Send */}
+                  {/* Right Actions: Mention, Emoji, Animated Emoji, Live GIF, Send */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                     <button
                       type="button"
@@ -2372,7 +2510,7 @@ export default function GroupChatPage() {
                       type="button"
                       onClick={() => {
                         setPickerTab('emoji');
-                        setShowPicker(!showPicker);
+                        setShowPicker((prev) => (pickerTab === 'emoji' ? !prev : true));
                       }}
                       style={{
                         width: 30,
@@ -2386,7 +2524,7 @@ export default function GroupChatPage() {
                         justifyContent: 'center',
                         cursor: 'pointer',
                       }}
-                      title="Add Emoji"
+                      title="All Emojis"
                     >
                       <Smile size={16} />
                     </button>
@@ -2394,8 +2532,8 @@ export default function GroupChatPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setPickerTab('gif');
-                        setShowPicker(!showPicker);
+                        setPickerTab('animated');
+                        setShowPicker((prev) => (pickerTab === 'animated' ? !prev : true));
                       }}
                       style={{
                         height: 26,
@@ -2410,9 +2548,34 @@ export default function GroupChatPage() {
                         gap: 4,
                         cursor: 'pointer',
                       }}
-                      title="Send Animated GIF"
+                      title="Animated Emojis"
                     >
-                      <Sparkles size={11} />
+                      <Zap size={11} style={{ color: 'var(--primary)' }} />
+                      <span>Animated</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerTab('gif');
+                        setShowPicker((prev) => (pickerTab === 'gif' ? !prev : true));
+                      }}
+                      style={{
+                        height: 26,
+                        padding: '0 8px',
+                        borderRadius: 6,
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        background: '#FFFFFF',
+                        color: 'var(--text-2, #52525B)',
+                        fontSize: 10.5,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        cursor: 'pointer',
+                      }}
+                      title="Live GIF Search"
+                    >
+                      <Sparkles size={11} style={{ color: 'var(--primary)' }} />
                       <span>GIF</span>
                     </button>
 
@@ -3027,6 +3190,9 @@ export default function GroupChatPage() {
 
       {/* Create Channel Modal */}
       <CreateChannelModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
+
+      {/* Full-Screen Media Lightbox (Images & Videos) */}
+      <MediaLightbox item={lightboxMedia} onClose={() => setLightboxMedia(null)} />
     </div>
   );
 }

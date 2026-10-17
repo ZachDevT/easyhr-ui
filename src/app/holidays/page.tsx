@@ -10,17 +10,10 @@ import {
   Loader2,
   CalendarDays,
   Repeat,
-  Sparkles,
   Calendar as CalendarIcon,
   CheckCircle2,
-  Filter,
-  Info,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  MapPin,
-  Building2,
-  Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -78,7 +71,7 @@ export default function HolidaysPage() {
     holidayDate: new Date().toISOString().split("T")[0],
     holidayType: "company",
     appliesTo: "all",
-    isRecurring: true, // Default to recurring yearly as requested!
+    isRecurring: true,
     description: "",
   });
 
@@ -92,8 +85,7 @@ export default function HolidaysPage() {
       if (res.ok) {
         const json = await res.json();
         const list: HolidayItem[] = Array.isArray(json) ? json : json.data || [];
-        
-        // Enrich from local storage metadata if available (for persistence of recurring flags)
+
         const localMeta = localStorage.getItem("easyhr_holiday_metadata");
         let metaMap: Record<string, { isRecurring?: boolean; description?: string }> = {};
         if (localMeta) {
@@ -104,7 +96,7 @@ export default function HolidaysPage() {
 
         const enriched = list.map((h) => {
           const meta = metaMap[h.id] || metaMap[h.name];
-          const isRec = meta?.isRecurring ?? true; // defaults to true for annual holidays
+          const isRec = meta?.isRecurring ?? true;
           return {
             ...h,
             isRecurring: isRec,
@@ -153,12 +145,13 @@ export default function HolidaysPage() {
 
       if (res.ok) {
         const created = await res.json().catch(() => ({}));
-        
-        // Save recurring state metadata locally so recurring holidays project across all years
+
         const localMeta = localStorage.getItem("easyhr_holiday_metadata");
         let metaMap: Record<string, any> = {};
         if (localMeta) {
-          try { metaMap = JSON.parse(localMeta); } catch {}
+          try {
+            metaMap = JSON.parse(localMeta);
+          } catch {}
         }
         const key = created.id || form.name.trim();
         metaMap[key] = {
@@ -198,7 +191,7 @@ export default function HolidaysPage() {
     }
   };
 
-  const applyTemplate = (tpl: typeof POPULAR_TEMPLATES[0]) => {
+  const applyTemplate = (tpl: (typeof POPULAR_TEMPLATES)[0]) => {
     setForm({
       ...form,
       name: tpl.name,
@@ -209,7 +202,6 @@ export default function HolidaysPage() {
     });
   };
 
-  // Generate holidays for the selected calendar year (with annual recurrence projection!)
   const yearHolidays = useMemo(() => {
     const list: (HolidayItem & { computedDate: string })[] = [];
     const seen = new Set<string>();
@@ -220,7 +212,6 @@ export default function HolidaysPage() {
       const monthDay = `${parts[1]}-${parts[2]}`;
 
       if (h.isRecurring) {
-        // Project to the currently viewed year
         const projectedDate = `${selectedYear}-${monthDay}`;
         const key = `${h.name}-${projectedDate}`;
         if (!seen.has(key)) {
@@ -236,11 +227,9 @@ export default function HolidaysPage() {
       }
     });
 
-    // Sort chronologically by date
     return list.sort((a, b) => a.computedDate.localeCompare(b.computedDate));
   }, [holidays, selectedYear]);
 
-  // Filtered list
   const filteredHolidays = useMemo(() => {
     let result = yearHolidays;
     if (filterType !== "all") {
@@ -259,7 +248,6 @@ export default function HolidaysPage() {
     return result;
   }, [yearHolidays, filterType, query]);
 
-  // Grouped by month for the calendar overview
   const monthGroups = useMemo(() => {
     const groups: Record<number, (HolidayItem & { computedDate: string })[]> = {};
     for (let m = 0; m < 12; m++) groups[m] = [];
@@ -275,28 +263,28 @@ export default function HolidaysPage() {
   const recurringCount = yearHolidays.filter((h) => h.isRecurring).length;
 
   return (
-    <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader
         title="Company Holidays"
         subtitle="Manage annual recurring holidays, public observances, and custom company days off."
-        icon={<CalendarRange size={28} className="text-white" />}
+        icon={<CalendarRange size={20} />}
         tabs={["Calendar", "List", "Annual Templates"]}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         actions={
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {/* Year selector */}
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 4,
-                background: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(8px)",
-                padding: "4px 8px",
-                borderRadius: 999,
-                color: "white",
-                border: "1px solid rgba(255,255,255,0.25)",
+                gap: 2,
+                background: "rgba(255, 255, 255, 0.14)",
+                height: 34,
+                padding: "0 6px",
+                borderRadius: 9,
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.22)",
               }}
             >
               <button
@@ -305,49 +293,52 @@ export default function HolidaysPage() {
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "white",
+                  color: "#FFFFFF",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  padding: "4px",
+                  padding: "0 4px !important" as any,
+                  height: "24px !important" as any,
                 }}
                 title="Previous Year"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={15} />
               </button>
-              <span style={{ fontSize: 13, fontWeight: 700, padding: "0 6px" }}>{selectedYear}</span>
+              <span style={{ fontSize: 12.5, padding: "0 6px" }}>{selectedYear}</span>
               <button
                 type="button"
                 onClick={() => setSelectedYear((y) => y + 1)}
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "white",
+                  color: "#FFFFFF",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  padding: "4px",
+                  padding: "0 4px !important" as any,
+                  height: "24px !important" as any,
                 }}
                 title="Next Year"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={15} />
               </button>
             </div>
 
             <button
-              className="btn-secondary"
+              type="button"
               style={{
-                background: "white",
+                background: "#FFFFFF",
                 color: "var(--primary)",
                 border: "none",
-                padding: "10px 18px",
-                fontSize: 13.5,
-                fontWeight: 700,
-                borderRadius: 20,
+                height: 34,
+                padding: "0 14px",
+                fontSize: 12.5,
+                borderRadius: 9,
                 cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                gap: 6,
+                boxShadow: "0 1px 4px rgba(0, 0, 0, 0.08)",
               }}
               onClick={() => {
                 setForm({
@@ -361,151 +352,166 @@ export default function HolidaysPage() {
                 setShowModal(true);
               }}
             >
-              <Plus size={16} style={{ marginRight: 6 }} /> Add Holiday
+              <Plus size={14} />
+              <span>Add Holiday</span>
             </button>
           </div>
         }
       />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px 40px", background: "var(--bg-page)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <StatRibbon
           stats={[
             {
               label: `Total Holidays (${selectedYear})`,
               value: yearHolidays.length,
-              icon: <CalendarDays size={20} />,
-              color: "var(--primary)",
+              icon: <CalendarDays size={17} />,
             },
             {
               label: "Annual Recurring",
               value: recurringCount,
-              icon: <Repeat size={20} />,
-              color: "#8B5CF6",
+              icon: <Repeat size={17} />,
             },
             {
               label: "Company Observances",
               value: companyCount,
-              icon: <Sun size={20} />,
-              color: "var(--warning)",
+              icon: <Sun size={17} />,
             },
             {
               label: "Public / National",
               value: nationalCount,
-              icon: <Globe size={20} />,
-              color: "var(--success)",
+              icon: <Globe size={17} />,
             },
           ]}
         />
 
-        {/* ─── Annual Recurrence Notice Banner ─── */}
+        {/* Annual Recurrence Notice Bar (Clean Brand-Consistent Surface) */}
         <div
           style={{
-            marginTop: 18,
-            marginBottom: 20,
             padding: "12px 18px",
-            background: "#F5F3FF",
-            border: "1px solid #DDD6FE",
+            background: "#FFFFFF",
+            border: "1px solid var(--card-border, #E4E4E7)",
             borderRadius: 12,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 14,
+            flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: "#EDE9FE",
-                color: "#7C3AED",
-                display: "grid",
-                placeItems: "center",
+                width: 34,
+                height: 34,
+                borderRadius: 9,
+                background: "var(--primary-tint)",
+                color: "var(--primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 flexShrink: 0,
               }}
             >
-              <Repeat size={17} />
+              <Repeat size={16} />
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#4C1D95" }}>
-                Annual Recurring Holiday Engine Active
+              <div style={{ fontSize: 13, color: "var(--text-1, #18181B)" }}>
+                Annual Recurring Holiday Engine
               </div>
-              <div style={{ fontSize: 11.5, color: "#6D28D9" }}>
-                Holidays set to <strong>Repeat every year</strong> automatically roll forward on their exact calendar day across all future years without manual re-entry.
+              <div style={{ fontSize: 12, color: "var(--text-3, #A1A1AA)", marginTop: 1 }}>
+                Holidays marked to repeat annually automatically project onto the same calendar day across all future years.
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setActiveTab("Annual Templates")}
-            style={{
-              padding: "6px 14px",
-              borderRadius: 8,
-              border: "1px solid #C4B5FD",
-              background: "#FFFFFF",
-              color: "#7C3AED",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Browse Popular Templates
-          </button>
+          {activeTab !== "Annual Templates" && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("Annual Templates")}
+              className="btn-neutral btn-sm"
+            >
+              Browse Annual Templates
+            </button>
+          )}
         </div>
 
         {isLoading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-            <Loader2 className="animate-spin text-primary" size={32} />
+          <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
+            <Loader2 className="animate-spin text-primary" size={28} />
           </div>
         ) : activeTab === "Annual Templates" ? (
           /* ─── TAB 3: POPULAR ANNUAL TEMPLATES ─── */
           <Card>
             <CardBody>
               <SectionHeading
-                title="Popular Annual Holiday Templates"
-                description="One-click standard holidays configured to repeat every year on specific calendar days."
+                title="Annual Holiday Templates"
+                description="Standard public and company holidays pre-configured to repeat every year on their calendar date."
               />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16, marginTop: 14 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                  gap: 14,
+                }}
+              >
                 {POPULAR_TEMPLATES.map((tpl) => {
-                  const alreadyAdded = holidays.some((h) => h.name.toLowerCase() === tpl.name.toLowerCase());
+                  const alreadyAdded = holidays.some(
+                    (h) => h.name.toLowerCase() === tpl.name.toLowerCase()
+                  );
                   return (
                     <div
                       key={tpl.name}
                       style={{
                         padding: 16,
-                        borderRadius: 14,
-                        border: "1px solid var(--border)",
-                        background: "white",
+                        borderRadius: 12,
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        background: "#FFFFFF",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between",
-                        gap: 12,
+                        gap: 14,
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                         <div
                           style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 10,
-                            background: tpl.type === "national" ? "var(--primary-tint)" : "#FEF3C7",
-                            color: tpl.type === "national" ? "var(--primary)" : "#D97706",
-                            display: "grid",
-                            placeItems: "center",
+                            width: 36,
+                            height: 36,
+                            borderRadius: 9,
+                            background: "#FAF9F7",
+                            border: "1px solid var(--card-border, #E4E4E7)",
+                            color: "var(--text-1, #18181B)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                             flexShrink: 0,
                           }}
                         >
-                          <CalendarIcon size={18} />
+                          <CalendarIcon size={16} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }}>
+                          <div style={{ fontSize: 13.5, color: "var(--text-1, #18181B)" }}>
                             {tpl.name}
                           </div>
-                          <div style={{ fontSize: 11.5, color: "var(--text-4)", marginTop: 2 }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--text-3, #A1A1AA)",
+                              marginTop: 2,
+                              lineHeight: 1.4,
+                            }}
+                          >
                             {tpl.desc}
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              marginTop: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
                             <span
                               style={{
                                 display: "inline-flex",
@@ -513,24 +519,26 @@ export default function HolidaysPage() {
                                 gap: 4,
                                 padding: "2px 8px",
                                 borderRadius: 6,
-                                background: "#F5F3FF",
-                                color: "#7C3AED",
+                                background: "#FAF9F7",
+                                border: "1px solid var(--card-border, #E4E4E7)",
+                                color: "var(--text-2, #52525B)",
                                 fontSize: 11,
-                                fontWeight: 700,
                               }}
                             >
-                              <Repeat size={10} /> Yearly on {tpl.monthDay}
+                              <Repeat size={10} />
+                              <span>Yearly · {tpl.monthDay}</span>
                             </span>
-                            <StatusPill tone={tpl.type === "national" ? "primary" : "warning"}>
-                              {tpl.type.toUpperCase()}
+                            <StatusPill tone={tpl.type === "national" ? "primary" : "neutral"}>
+                              {tpl.type === "national" ? "Public" : "Company"}
                             </StatusPill>
                           </div>
                         </div>
                       </div>
 
                       <button
-                        className={alreadyAdded ? "btn-neutral" : "btn-primary"}
-                        style={{ width: "100%", justifyContent: "center", fontSize: 12.5 }}
+                        type="button"
+                        className={alreadyAdded ? "btn-neutral btn-sm" : "btn-primary btn-sm"}
+                        style={{ width: "100%", justifyContent: "center" }}
                         disabled={alreadyAdded}
                         onClick={() => {
                           applyTemplate(tpl);
@@ -539,11 +547,13 @@ export default function HolidaysPage() {
                       >
                         {alreadyAdded ? (
                           <>
-                            <CheckCircle2 size={14} color="#10B981" /> Already in Calendar
+                            <CheckCircle2 size={13} color="#059669" />
+                            <span>Scheduled in Calendar</span>
                           </>
                         ) : (
                           <>
-                            <Plus size={14} /> Add to {selectedYear} & Future Years
+                            <Plus size={13} />
+                            <span>Schedule Annual Holiday</span>
                           </>
                         )}
                       </button>
@@ -555,209 +565,11 @@ export default function HolidaysPage() {
           </Card>
         ) : activeTab === "Calendar" ? (
           /* ─── TAB 1: 12-MONTH CALENDAR GRID OVERVIEW ─── */
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <Card>
-              <CardBody>
-                <SectionHeading
-                  title={`${selectedYear} Annual Calendar Overview`}
-                  description="All scheduled observances grouped by month. Holidays with annual recurrence repeat automatically."
-                  action={
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "6px 12px",
-                          border: "1px solid var(--border)",
-                          borderRadius: 8,
-                          background: "white",
-                        }}
-                      >
-                        <Search size={14} color="var(--text-4)" />
-                        <input
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder="Filter observances..."
-                          style={{ border: 0, outline: 0, fontSize: 12.5, width: 150 }}
-                        />
-                      </div>
-                      <Select
-                        value={filterType}
-                        onChange={(e) => setFilterType(e.target.value)}
-                        style={{ fontSize: 12.5, padding: "6px 10px", width: 140 }}
-                      >
-                        <option value="all">All Types</option>
-                        <option value="company">Company Only</option>
-                        <option value="national">Public / National</option>
-                      </Select>
-                    </div>
-                  }
-                />
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))",
-                    gap: 16,
-                    marginTop: 16,
-                  }}
-                >
-                  {MONTH_NAMES.map((mName, mIdx) => {
-                    const monthHolidays = monthGroups[mIdx] || [];
-                    const hasItems = monthHolidays.length > 0;
-                    return (
-                      <div
-                        key={mName}
-                        style={{
-                          border: hasItems ? "1.5px solid #DDD6FE" : "1px solid var(--border)",
-                          borderRadius: 14,
-                          background: hasItems ? "#FAFAFE" : "white",
-                          padding: 14,
-                          display: "flex",
-                          flexDirection: "column",
-                          minHeight: 140,
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            paddingBottom: 8,
-                            borderBottom: "1px solid var(--border)",
-                            marginBottom: 8,
-                          }}
-                        >
-                          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-1)" }}>
-                            {mName}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              padding: "2px 7px",
-                              borderRadius: 999,
-                              background: hasItems ? "var(--primary-tint)" : "var(--bg-page)",
-                              color: hasItems ? "var(--primary)" : "var(--text-4)",
-                            }}
-                          >
-                            {monthHolidays.length} {monthHolidays.length === 1 ? "day" : "days"}
-                          </span>
-                        </div>
-
-                        {monthHolidays.length === 0 ? (
-                          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <span style={{ fontSize: 11.5, color: "var(--text-5)", fontStyle: "italic" }}>
-                              No holidays scheduled
-                            </span>
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-                            {monthHolidays.map((h) => {
-                              const day = parseInt(h.computedDate.split("-")[2], 10);
-                              return (
-                                <div
-                                  key={h.id || h.name}
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderRadius: 8,
-                                    background: "white",
-                                    border: "1px solid var(--border)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: 8,
-                                  }}
-                                >
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                    <span
-                                      style={{
-                                        width: 22,
-                                        height: 22,
-                                        borderRadius: 6,
-                                        background: h.holidayType === "national" ? "var(--primary-tint)" : "#FEF3C7",
-                                        color: h.holidayType === "national" ? "var(--primary)" : "#D97706",
-                                        fontSize: 11,
-                                        fontWeight: 800,
-                                        display: "grid",
-                                        placeItems: "center",
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {day}
-                                    </span>
-                                    <span
-                                      style={{
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        color: "var(--text-1)",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                      }}
-                                    >
-                                      {h.name}
-                                    </span>
-                                  </div>
-                                  {h.isRecurring && (
-                                    <span title="Repeats every year on this day" style={{ color: "#7C3AED", flexShrink: 0 }}>
-                                      <Repeat size={12} />
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const mm = String(mIdx + 1).padStart(2, "0");
-                            setForm({
-                              name: "",
-                              holidayDate: `${selectedYear}-${mm}-01`,
-                              holidayType: "company",
-                              appliesTo: "all",
-                              isRecurring: true,
-                              description: "",
-                            });
-                            setShowModal(true);
-                          }}
-                          style={{
-                            marginTop: 10,
-                            padding: "4px 8px",
-                            borderRadius: 6,
-                            border: "1px dashed var(--border)",
-                            background: "transparent",
-                            color: "var(--text-4)",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <Plus size={11} /> Add to {mName}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-        ) : (
-          /* ─── TAB 2: DETAILED LIST VIEW ─── */
           <Card>
             <CardBody>
               <SectionHeading
-                title={`All Company Holidays (${selectedYear})`}
-                description="List of all company and public holidays with recurrence rules and employee applicability."
+                title={`${selectedYear} Annual Calendar`}
+                description="Scheduled observances grouped by month."
                 action={
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div
@@ -765,67 +577,315 @@ export default function HolidaysPage() {
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
-                        padding: "8px 12px",
-                        border: "1px solid var(--border)",
+                        padding: "0 12px",
+                        height: 36,
+                        border: "1px solid var(--card-border, #E4E4E7)",
                         borderRadius: 9,
-                        minWidth: 240,
-                        background: "white",
+                        background: "#FFFFFF",
                       }}
                     >
-                      <Search size={15} color="var(--text-4)" />
+                      <Search size={14} color="var(--text-3, #A1A1AA)" />
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Filter observances..."
+                        style={{
+                          border: 0,
+                          outline: 0,
+                          fontSize: 12.5,
+                          width: 150,
+                          background: "transparent",
+                        }}
+                      />
+                    </div>
+                    <div style={{ width: 160 }}>
+                      <Select
+                        value={filterType}
+                        onValueChange={(val) => setFilterType(val)}
+                        options={[
+                          { value: "all", label: "All Types" },
+                          { value: "company", label: "Company Only" },
+                          { value: "national", label: "Public / National" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                }
+              />
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                {MONTH_NAMES.map((mName, mIdx) => {
+                  const monthHolidays = monthGroups[mIdx] || [];
+                  const hasItems = monthHolidays.length > 0;
+                  return (
+                    <div
+                      key={mName}
+                      style={{
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        borderRadius: 12,
+                        background: hasItems ? "#FFFFFF" : "#FAF9F7",
+                        padding: 14,
+                        display: "flex",
+                        flexDirection: "column",
+                        minHeight: 136,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          paddingBottom: 8,
+                          borderBottom: "1px solid var(--card-border, #E4E4E7)",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 13, color: "var(--text-1, #18181B)" }}>
+                          {mName}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            padding: "2px 7px",
+                            borderRadius: 999,
+                            background: hasItems ? "var(--primary-tint)" : "#F4F4F5",
+                            color: hasItems ? "var(--primary)" : "var(--text-3, #A1A1AA)",
+                          }}
+                        >
+                          {monthHolidays.length} {monthHolidays.length === 1 ? "day" : "days"}
+                        </span>
+                      </div>
+
+                      {monthHolidays.length === 0 ? (
+                        <div
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span style={{ fontSize: 11.5, color: "var(--text-3, #A1A1AA)" }}>
+                            No holidays scheduled
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                            flex: 1,
+                          }}
+                        >
+                          {monthHolidays.map((h) => {
+                            const day = parseInt(h.computedDate.split("-")[2], 10);
+                            return (
+                              <div
+                                key={h.id || h.name}
+                                style={{
+                                  padding: "6px 8px",
+                                  borderRadius: 8,
+                                  background: "#FAF9F7",
+                                  border: "1px solid var(--card-border, #E4E4E7)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 8,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: 22,
+                                      height: 22,
+                                      borderRadius: 6,
+                                      background: "#FFFFFF",
+                                      border: "1px solid var(--card-border, #E4E4E7)",
+                                      color: "var(--text-1, #18181B)",
+                                      fontSize: 11,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {day}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      color: "var(--text-1, #18181B)",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {h.name}
+                                  </span>
+                                </div>
+                                {h.isRecurring && (
+                                  <span
+                                    title="Repeats every year on this day"
+                                    style={{ color: "var(--text-3, #A1A1AA)", flexShrink: 0 }}
+                                  >
+                                    <Repeat size={12} />
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mm = String(mIdx + 1).padStart(2, "0");
+                          setForm({
+                            name: "",
+                            holidayDate: `${selectedYear}-${mm}-01`,
+                            holidayType: "company",
+                            appliesTo: "all",
+                            isRecurring: true,
+                            description: "",
+                          });
+                          setShowModal(true);
+                        }}
+                        style={{
+                          marginTop: 10,
+                          padding: "5px 8px",
+                          borderRadius: 7,
+                          border: "1px dashed var(--card-border, #E4E4E7)",
+                          background: "#FFFFFF",
+                          color: "var(--text-2, #52525B)",
+                          fontSize: 11,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Plus size={11} />
+                        <span>Add to {mName}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardBody>
+          </Card>
+        ) : (
+          /* ─── TAB 2: DETAILED LIST VIEW ─── */
+          <Card>
+            <CardBody>
+              <SectionHeading
+                title={`All Company Holidays (${selectedYear})`}
+                description="Complete directory of scheduled public and internal company holidays."
+                action={
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "0 12px",
+                        height: 36,
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        borderRadius: 9,
+                        minWidth: 220,
+                        background: "#FFFFFF",
+                      }}
+                    >
+                      <Search size={14} color="var(--text-3, #A1A1AA)" />
                       <input
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search holidays..."
-                        style={{ border: 0, outline: 0, width: "100%", fontFamily: "inherit", fontSize: 13 }}
+                        style={{
+                          border: 0,
+                          outline: 0,
+                          width: "100%",
+                          fontFamily: "inherit",
+                          fontSize: 12.5,
+                          background: "transparent",
+                        }}
                       />
                     </div>
-                    <Select
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
-                      style={{ fontSize: 13, padding: "7px 12px", width: 150 }}
-                    >
-                      <option value="all">All Classifications</option>
-                      <option value="company">Company Only</option>
-                      <option value="national">Public / National</option>
-                    </Select>
+                    <div style={{ width: 170 }}>
+                      <Select
+                        value={filterType}
+                        onValueChange={(val) => setFilterType(val)}
+                        options={[
+                          { value: "all", label: "All Classifications" },
+                          { value: "company", label: "Company Only" },
+                          { value: "national", label: "Public / National" },
+                        ]}
+                      />
+                    </div>
                   </div>
                 }
               />
 
               {filteredHolidays.length === 0 ? (
-                <div style={{ padding: 48, textAlign: "center" }}>
-                  <CalendarRange size={36} className="text-4 mb-12" style={{ margin: "0 auto 12px" }} />
-                  <h3 className="text-base fw-800 text-1">No holidays match your filter</h3>
-                  <p className="text-xs text-4 mt-4 mb-16">
+                <div style={{ padding: 40, textAlign: "center" }}>
+                  <CalendarRange
+                    size={32}
+                    style={{ margin: "0 auto 10px", color: "var(--text-3, #A1A1AA)" }}
+                  />
+                  <h3 style={{ fontSize: 15, color: "var(--text-1, #18181B)", margin: 0 }}>
+                    No holidays match your filter
+                  </h3>
+                  <p style={{ fontSize: 12.5, color: "var(--text-3, #A1A1AA)", margin: "4px 0 16px" }}>
                     Add regional public holidays or recurring company days off to your calendar.
                   </p>
-                  <button className="btn-primary" onClick={() => setShowModal(true)}>
-                    <Plus size={15} /> Add Holiday
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => setShowModal(true)}
+                  >
+                    <Plus size={14} />
+                    <span>Add Holiday</span>
                   </button>
                 </div>
               ) : (
-                <div className="col gap-10" style={{ marginTop: 14 }}>
+                <div style={{ display: "flex", flexDirection: "column" }}>
                   {filteredHolidays.map((h) => (
                     <DataRow
                       key={h.id || `${h.name}-${h.computedDate}`}
                       leading={
                         <div
                           style={{
-                            width: 42,
-                            height: 42,
-                            borderRadius: 11,
-                            display: "grid",
-                            placeItems: "center",
-                            background: h.holidayType === "national" ? "var(--primary-tint)" : "#FEF3C7",
-                            color: h.holidayType === "national" ? "var(--primary)" : "#D97706",
+                            width: 36,
+                            height: 36,
+                            borderRadius: 9,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "#FAF9F7",
+                            border: "1px solid var(--card-border, #E4E4E7)",
+                            color: "var(--text-1, #18181B)",
                           }}
                         >
-                          <Sun size={19} />
+                          <CalendarIcon size={16} />
                         </div>
                       }
                       title={
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                           <span>{h.name}</span>
                           {h.isRecurring && (
                             <span
@@ -835,24 +895,25 @@ export default function HolidaysPage() {
                                 gap: 4,
                                 padding: "2px 7px",
                                 borderRadius: 6,
-                                background: "#F5F3FF",
-                                color: "#7C3AED",
+                                background: "#FAF9F7",
+                                border: "1px solid var(--card-border, #E4E4E7)",
+                                color: "var(--text-2, #52525B)",
                                 fontSize: 10.5,
-                                fontWeight: 700,
                               }}
                             >
-                              <Repeat size={10} /> Yearly on {h.computedDate.slice(5)}
+                              <Repeat size={10} />
+                              <span>Yearly · {h.computedDate.slice(5)}</span>
                             </span>
                           )}
                         </div>
                       }
-                      subtitle={`${h.computedDate} · Applies to: ${h.appliesTo === "all" ? "All Team Members" : h.appliesTo}`}
+                      subtitle={`${h.computedDate} · Applies to: ${
+                        h.appliesTo === "all" ? "All Team Members" : h.appliesTo
+                      }`}
                       meta={
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <StatusPill tone={h.holidayType === "national" ? "primary" : "warning"}>
-                            {h.holidayType.toUpperCase()}
-                          </StatusPill>
-                        </div>
+                        <StatusPill tone={h.holidayType === "national" ? "primary" : "neutral"}>
+                          {h.holidayType === "national" ? "Public" : "Company"}
+                        </StatusPill>
                       }
                     />
                   ))}
@@ -863,32 +924,48 @@ export default function HolidaysPage() {
         )}
       </div>
 
-      {/* ─── Add Holiday Modal ─── */}
+      {/* ─── Schedule Company Holiday Modal ─── */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title="Schedule Company Holiday"
-        subtitle="Configure public or internal observances with annual recurrence rules"
-        width={560}
+        subtitle="Configure public or internal observances with annual recurrence rules."
+        width={500}
         footer={
           <>
-            <button className="btn-neutral" onClick={() => setShowModal(false)}>
+            <button
+              type="button"
+              className="btn-neutral"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
             </button>
             <button
+              type="button"
               className="btn-primary"
               onClick={handleCreateHoliday}
               disabled={isSaving}
             >
-              {isSaving ? <Loader2 size={15} className="animate-spin" /> : "Save Holiday"}
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : "Save Holiday"}
             </button>
           </>
         }
       >
-        <form onSubmit={handleCreateHoliday} className="col gap-14">
+        <form
+          onSubmit={handleCreateHoliday}
+          style={{ display: "flex", flexDirection: "column", gap: 18 }}
+        >
+          {/* Holiday Name */}
           <div>
-            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
-              Holiday Name *
+            <label
+              style={{
+                display: "block",
+                fontSize: 12.5,
+                color: "var(--text-1, #18181B)",
+                marginBottom: 6,
+              }}
+            >
+              Holiday Name <span style={{ color: "#DC2626" }}>*</span>
             </label>
             <Input
               value={form.name}
@@ -898,10 +975,18 @@ export default function HolidaysPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {/* Date & Classification Row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
-              <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
-                Observed Date *
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  color: "var(--text-1, #18181B)",
+                  marginBottom: 6,
+                }}
+              >
+                Observed Date <span style={{ color: "#DC2626" }}>*</span>
               </label>
               <Input
                 type="date"
@@ -912,82 +997,115 @@ export default function HolidaysPage() {
             </div>
 
             <div>
-              <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  color: "var(--text-1, #18181B)",
+                  marginBottom: 6,
+                }}
+              >
                 Classification
               </label>
               <Select
                 value={form.holidayType}
-                onChange={(e) => setForm({ ...form, holidayType: e.target.value })}
-              >
-                <option value="company">Company Day Off</option>
-                <option value="national">Public / National Holiday</option>
-              </Select>
+                onValueChange={(val) => setForm({ ...form, holidayType: val })}
+                options={[
+                  { value: "company", label: "Company Day Off" },
+                  { value: "national", label: "Public / National Holiday" },
+                ]}
+              />
             </div>
           </div>
 
-          {/* ─── Recurrence Toggle (Addressing user request directly) ─── */}
+          {/* Recurrence Specification Toggle Card (Clean Brand Colors) */}
           <div
+            onClick={() => setForm({ ...form, isRecurring: !form.isRecurring })}
             style={{
-              padding: "12px 14px",
+              padding: "14px 16px",
               borderRadius: 12,
-              background: form.isRecurring ? "#F5F3FF" : "var(--bg-page)",
-              border: form.isRecurring ? "1.5px solid #DDD6FE" : "1px solid var(--border)",
+              background: form.isRecurring ? "var(--primary-tint)" : "#FAF9F7",
+              border: form.isRecurring
+                ? "1px solid var(--primary)"
+                : "1px solid var(--card-border, #E4E4E7)",
+              cursor: "pointer",
               transition: "all 0.15s ease",
             }}
           >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                cursor: "pointer",
-                margin: 0,
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
               <input
                 type="checkbox"
                 checked={form.isRecurring}
                 onChange={(e) => setForm({ ...form, isRecurring: e.target.checked })}
+                onClick={(e) => e.stopPropagation()}
                 style={{
-                  marginTop: 3,
-                  width: 17,
-                  height: 17,
-                  accentColor: "#7C3AED",
+                  marginTop: 2,
+                  width: 16,
+                  height: 16,
+                  accentColor: "var(--primary)",
                   cursor: "pointer",
+                  flexShrink: 0,
                 }}
               />
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Repeat size={14} color="#7C3AED" />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: form.isRecurring ? "#4C1D95" : "var(--text-1)" }}>
+                  <Repeat size={13.5} style={{ color: "var(--primary)" }} />
+                  <span style={{ fontSize: 13, color: "var(--text-1, #18181B)" }}>
                     Repeats Every Year on This Specific Date
                   </span>
                 </div>
-                <p style={{ fontSize: 11.5, color: form.isRecurring ? "#6D28D9" : "var(--text-4)", margin: "3px 0 0" }}>
-                  When enabled, this holiday automatically applies year after year (e.g. Jan 1st, July 4th, Dec 25th) without manual reconfiguration.
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--text-2, #52525B)",
+                    margin: "4px 0 0 0",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  When enabled, this observance automatically applies year after year on the same calendar date without manual reconfiguration.
                 </p>
               </div>
-            </label>
+            </div>
           </div>
 
+          {/* Applies To */}
           <div>
-            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12.5,
+                color: "var(--text-1, #18181B)",
+                marginBottom: 6,
+              }}
+            >
               Applies To
             </label>
             <Select
+              searchable
+              searchPlaceholder="Search scope..."
               value={form.appliesTo}
-              onChange={(e) => setForm({ ...form, appliesTo: e.target.value })}
-            >
-              <option value="all">All Employees (Company-wide)</option>
-              <option value="hq">Headquarters Only</option>
-              <option value="remote">Remote Team Members Only</option>
-              <option value="engineering">Engineering Division</option>
-            </Select>
+              onValueChange={(val) => setForm({ ...form, appliesTo: val })}
+              options={[
+                { value: "all", label: "All Employees (Company-wide)" },
+                { value: "hq", label: "Headquarters Only" },
+                { value: "remote", label: "Remote Team Members Only" },
+                { value: "engineering", label: "Engineering Division" },
+              ]}
+            />
           </div>
 
+          {/* Notes */}
           <div>
-            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
-              Notes or Observance Details (Optional)
+            <label
+              style={{
+                display: "block",
+                fontSize: 12.5,
+                color: "var(--text-1, #18181B)",
+                marginBottom: 6,
+              }}
+            >
+              Notes or Observance Details{" "}
+              <span style={{ color: "var(--text-3, #A1A1AA)" }}>(Optional)</span>
             </label>
             <Input
               value={form.description}

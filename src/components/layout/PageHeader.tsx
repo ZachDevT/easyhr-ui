@@ -10,23 +10,21 @@ interface PageHeaderProps {
   tabs?: string[];
   activeTab?: string;
   onTabChange?: (tab: string) => void;
-  // Controls if it's edge-to-edge or rounded
   variant?: 'page' | 'card';
   children?: React.ReactNode;
 }
 
-export function PageHeader({ 
-  title, 
-  subtitle, 
-  icon, 
-  actions, 
-  tabs = [], 
-  activeTab, 
+export function PageHeader({
+  title,
+  subtitle,
+  icon,
+  actions,
+  tabs = [],
+  activeTab,
   onTabChange,
   variant = 'page',
-  children
+  children,
 }: PageHeaderProps) {
-  
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,81 +37,147 @@ export function PageHeader({
     }
   }, [activeTab]);
 
-  const containerStyle: React.CSSProperties = { 
-    background: 'var(--gradient)', 
-    padding: '32px 32px 0 32px', 
-    color: 'white', 
-    borderRadius: 12, 
-    position: 'relative',
-    margin: variant === 'page' ? '0 0 20px 0' : '0' 
-  };
-
   return (
-    <div style={containerStyle}>
-      <div className="row-between align-start" style={{ paddingBottom: tabs.length > 0 ? 0 : 32 }}>
-        <div className="row gap-16 align-center">
+    <div
+      className="page-header-banner"
+      style={{
+        background: 'var(--gradient)',
+        padding: tabs.length > 0 ? '18px 24px 0 24px' : '18px 24px',
+        color: '#FFFFFF',
+        borderRadius: 14,
+        position: 'relative',
+        margin: variant === 'page' ? '0 0 16px 0' : '0',
+        boxShadow: '0 4px 16px -4px rgba(17, 17, 24, 0.08)',
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
           {icon && typeof title === 'string' && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div
+              className="page-header-icon-box"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: 'rgba(255, 255, 255, 0.14)',
+                border: '1px solid rgba(255, 255, 255, 0.22)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                color: '#FFFFFF',
+              }}
+            >
               {icon}
             </div>
           )}
-          <div>
-            <h1 className="page-title text-white m-0 mb-4 row gap-12 align-center" style={{ fontSize: 28, fontWeight: 800 }}>
+          <div style={{ minWidth: 0 }}>
+            <h1
+              className="page-title"
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: '#FFFFFF',
+                margin: 0,
+                lineHeight: 1.25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
               {title}
             </h1>
             {subtitle && (
-              <p className="text-base m-0" style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>
+              <p
+                style={{
+                  fontSize: 12.5,
+                  color: 'rgba(255, 255, 255, 0.82)',
+                  margin: '3px 0 0 0',
+                  lineHeight: 1.4,
+                }}
+              >
                 {subtitle}
               </p>
             )}
           </div>
         </div>
-        
+
         {actions && (
-          <div className="row gap-12 align-center mt-4">
+          <div
+            className="page-header-actions"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexShrink: 0,
+            }}
+          >
             {actions}
           </div>
         )}
       </div>
-      
+
       {tabs.length > 0 && (
-        <div 
+        <div
           ref={scrollContainerRef}
-          style={{ display: 'flex', gap: 4, overflowX: 'auto', marginTop: 24, padding: '0 32px 0 32px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           className="hide-scrollbar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            overflowX: 'auto',
+            marginTop: 14,
+            paddingTop: 8,
+            borderTop: '1px solid rgba(255, 255, 255, 0.14)',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
         >
-          {tabs.map(tab => (
-            <button
-              key={tab}
-              data-active={activeTab === tab}
-              onClick={() => onTabChange?.(tab)}
-              style={{
-                background: activeTab === tab ? 'var(--card-bg)' : 'transparent',
-                color: activeTab === tab ? 'var(--primary)' : 'white',
-                border: 'none',
-                padding: '12px 24px',
-                fontSize: 14,
-                borderTopLeftRadius: 8,
-                borderTopRightRadius: 8,
-                borderBottomLeftRadius: 0,
-                borderBottomRightRadius: 0,
-                cursor: 'pointer',
-                fontWeight: activeTab === tab ? 700 : 500,
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                position: 'relative',
-                whiteSpace: 'nowrap',
-              }}
-              className={activeTab === tab ? '' : 'hover-bg-subtle-white'}
-            >
-              {tab}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                data-active={isActive}
+                onClick={() => onTabChange?.(tab)}
+                style={{
+                  background: isActive ? 'var(--card-bg, #FFFFFF)' : 'transparent',
+                  color: isActive ? 'var(--primary)' : 'rgba(255, 255, 255, 0.86)',
+                  border: 'none',
+                  padding: '8px 16px',
+                  fontSize: 12.5,
+                  borderTopLeftRadius: 8,
+                  borderTopRightRadius: 8,
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  cursor: 'pointer',
+                  fontWeight: isActive ? 600 : 400,
+                  transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  position: 'relative',
+                  whiteSpace: 'nowrap',
+                }}
+                className={isActive ? '' : 'hover-bg-subtle-white'}
+              >
+                {tab}
+              </button>
+            );
+          })}
         </div>
       )}
-      
+
       {children}
     </div>
   );

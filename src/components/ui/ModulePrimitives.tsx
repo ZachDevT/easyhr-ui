@@ -3,28 +3,149 @@ import { ChevronRight } from 'lucide-react';
 
 export type Tone = 'primary' | 'success' | 'warning' | 'error' | 'neutral';
 
-const tones: Record<Tone, { color: string; background: string }> = {
-  primary: { color: 'var(--primary)', background: 'var(--primary-tint)' },
-  success: { color: 'var(--success)', background: 'rgba(22,163,74,.09)' },
-  warning: { color: 'var(--warning)', background: 'rgba(245,158,11,.10)' },
-  error: { color: 'var(--error)', background: 'rgba(220,38,38,.09)' },
-  neutral: { color: 'var(--text-4)', background: 'var(--bg-page)' },
+const tones: Record<Tone, { color: string; background: string; border: string }> = {
+  primary: {
+    color: 'var(--primary)',
+    background: 'var(--primary-tint)',
+    border: '1px solid var(--card-border, #E4E4E7)',
+  },
+  success: {
+    color: '#059669',
+    background: 'rgba(16, 185, 129, 0.08)',
+    border: '1px solid rgba(16, 185, 129, 0.2)',
+  },
+  warning: {
+    color: 'var(--text-2, #52525B)',
+    background: '#FAF9F7',
+    border: '1px solid var(--card-border, #E4E4E7)',
+  },
+  error: {
+    color: '#DC2626',
+    background: 'rgba(220, 38, 38, 0.07)',
+    border: '1px solid rgba(220, 38, 38, 0.18)',
+  },
+  neutral: {
+    color: 'var(--text-2, #52525B)',
+    background: '#FAF9F7',
+    border: '1px solid var(--card-border, #E4E4E7)',
+  },
 };
 
 export function StatusPill({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
-  return <span style={{ ...tones[tone], borderRadius: 999, padding: '5px 9px', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' }}>{children}</span>;
+  return (
+    <span
+      style={{
+        ...tones[tone],
+        borderRadius: 999,
+        padding: '3px 9px',
+        fontSize: 11,
+        whiteSpace: 'nowrap',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      {children}
+    </span>
+  );
 }
 
-export function ProgressBar({ value, color = 'var(--primary)', height = 8 }: { value: number; color?: string; height?: number }) {
+export function ProgressBar({
+  value,
+  color = 'var(--primary)',
+  height = 6,
+}: {
+  value: number;
+  color?: string;
+  height?: number;
+}) {
   const width = Math.max(0, Math.min(100, value));
-  return <div aria-label={`${width}% complete`} style={{ height, borderRadius: 999, background: 'var(--bg-page)', overflow: 'hidden' }}><div style={{ width: `${width}%`, height: '100%', borderRadius: 999, background: color, transition: 'width .2s ease' }} /></div>;
+  return (
+    <div
+      aria-label={`${width}% complete`}
+      style={{
+        height,
+        borderRadius: 999,
+        background: '#F4F4F5',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          width: `${width}%`,
+          height: '100%',
+          borderRadius: 999,
+          background: color,
+          transition: 'width .2s ease',
+        }}
+      />
+    </div>
+  );
 }
 
-export function SectionHeading({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
-  return <div className="row-between align-center" style={{ marginBottom: 18 }}><div><h2 className="text-xl fw-800 text-1 m-0 mb-4">{title}</h2>{description && <p className="text-sm text-4 m-0">{description}</p>}</div>{action}</div>;
+export function SectionHeading({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 16,
+        marginBottom: 16,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div>
+        <h2
+          style={{
+            fontSize: 16.5,
+            fontWeight: 700,
+            color: 'var(--text-1, #18181B)',
+            margin: 0,
+            lineHeight: 1.3,
+          }}
+        >
+          {title}
+        </h2>
+        {description && (
+          <p
+            style={{
+              fontSize: 12.5,
+              color: 'var(--text-3, #A1A1AA)',
+              margin: '3px 0 0 0',
+              lineHeight: 1.45,
+            }}
+          >
+            {description}
+          </p>
+        )}
+      </div>
+      {action && <div style={{ flexShrink: 0 }}>{action}</div>}
+    </div>
+  );
 }
 
-export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?: ReactNode; title: ReactNode; subtitle?: ReactNode; meta?: ReactNode; onClick?: () => void }) {
+export function DataRow({
+  leading,
+  title,
+  subtitle,
+  meta,
+  onClick,
+}: {
+  leading?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  meta?: ReactNode;
+  onClick?: () => void;
+}) {
   if (onClick) {
     return (
       <div
@@ -41,9 +162,9 @@ export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?:
           width: '100%',
           display: 'flex',
           alignItems: 'center',
-          gap: 14,
-          padding: '14px 0',
-          borderBottom: '1px solid var(--border)',
+          gap: 12,
+          padding: '12px 0',
+          borderBottom: '1px solid var(--card-border, #E4E4E7)',
           background: 'transparent',
           cursor: 'pointer',
           textAlign: 'left',
@@ -52,11 +173,31 @@ export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?:
       >
         {leading}
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div className="text-sm fw-700 text-1" style={{ marginBottom: subtitle ? 4 : 0 }}>{title}</div>
-          {subtitle && <div className="text-xs text-4" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+          <div
+            style={{
+              fontSize: 13.5,
+              color: 'var(--text-1, #18181B)',
+              marginBottom: subtitle ? 3 : 0,
+            }}
+          >
+            {title}
+          </div>
+          {subtitle && (
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--text-3, #A1A1AA)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {subtitle}
+            </div>
+          )}
         </div>
         {meta}
-        <ChevronRight size={16} color="var(--text-5)" />
+        <ChevronRight size={15} color="var(--text-3, #A1A1AA)" />
       </div>
     );
   }
@@ -66,9 +207,9 @@ export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?:
         width: '100%',
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
-        padding: '14px 0',
-        borderBottom: '1px solid var(--border)',
+        gap: 12,
+        padding: '12px 0',
+        borderBottom: '1px solid var(--card-border, #E4E4E7)',
         background: 'transparent',
         textAlign: 'left',
         fontFamily: 'inherit',
@@ -76,14 +217,74 @@ export function DataRow({ leading, title, subtitle, meta, onClick }: { leading?:
     >
       {leading}
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="text-sm fw-700 text-1" style={{ marginBottom: subtitle ? 4 : 0 }}>{title}</div>
-        {subtitle && <div className="text-xs text-4" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+        <div
+          style={{
+            fontSize: 13.5,
+            color: 'var(--text-1, #18181B)',
+            marginBottom: subtitle ? 3 : 0,
+          }}
+        >
+          {title}
+        </div>
+        {subtitle && (
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--text-3, #A1A1AA)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {subtitle}
+          </div>
+        )}
       </div>
       {meta}
     </div>
   );
 }
 
-export function SegmentedControl({ options, value, onChange }: { options: string[]; value: string; onChange: (value: string) => void }) {
-  return <div style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: 'var(--bg-page)', border: '1px solid var(--border)' }}>{options.map(option => <button key={option} onClick={() => onChange(option)} style={{ border: 0, borderRadius: 6, padding: '7px 12px', background: value === option ? 'white' : 'transparent', boxShadow: value === option ? '0 1px 3px rgba(0,0,0,.08)' : 'none', color: value === option ? 'var(--text-1)' : 'var(--text-4)', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>{option}</button>)}</div>;
+export function SegmentedControl({
+  options,
+  value,
+  onChange,
+}: {
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        gap: 3,
+        padding: 3,
+        borderRadius: 9,
+        background: '#FAF9F7',
+        border: '1px solid var(--card-border, #E4E4E7)',
+      }}
+    >
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          style={{
+            border: 0,
+            borderRadius: 6,
+            padding: '6px 12px',
+            background: value === option ? '#FFFFFF' : 'transparent',
+            boxShadow: value === option ? '0 1px 2px rgba(0,0,0,.06)' : 'none',
+            color: value === option ? 'var(--text-1, #18181B)' : 'var(--text-3, #A1A1AA)',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
 }

@@ -16,7 +16,7 @@ export interface ChatAttachment {
   id: string;
   name: string;
   url: string;
-  type: 'image' | 'file';
+  type: 'image' | 'video' | 'file';
   size?: string;
   mimeType?: string;
 }
@@ -86,7 +86,7 @@ interface ChatContextType {
 }
 
 const STORAGE_KEY_CHANNELS = 'easyhr_chat_channels_v3';
-const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v3';
+const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v4';
 
 const DEFAULT_CHANNELS: ChatChannel[] = [
   {
@@ -272,6 +272,13 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
         url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=900&q=80',
         type: 'image',
         size: '1.4 MB',
+      },
+      {
+        id: 'att-2',
+        name: 'q4-product-walkthrough.mp4',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        type: 'video',
+        size: '4.2 MB',
       },
     ],
     reactions: { '❤️': { emoji: '❤️', count: 4, users: ['1', '2', 'user', '4'] } },

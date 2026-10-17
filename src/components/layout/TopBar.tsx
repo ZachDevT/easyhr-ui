@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search,
   Inbox,
@@ -20,11 +20,13 @@ import {
   LogOut,
   ExternalLink,
   ChevronRight,
-  Check
+  Check,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRole } from '../../context/RoleContext';
 import { useCompany } from '../../context/CompanyContext';
+import { useChat } from '../../context/ChatContext';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { Input } from '../ui/Input';
 import { toast } from '../ui/Toast';
@@ -42,10 +44,22 @@ interface NotificationItem {
 
 export function TopBar() {
   const router = useRouter();
+  const pathname = usePathname();
   const { signOut } = useClerk();
   const { getToken, isSignedIn } = useAuth();
   const { role, isHRAdmin, currentUser } = useRole();
   const { userProfile, company } = useCompany();
+  const { channels } = useChat();
+
+  // Compute live chat activity badge (unread channel messages + pending join requests for admins)
+  const currentUserId = String(currentUser?.id || 'user');
+  const chatActivityCount = channels.reduce((acc, ch) => {
+    const unread = ch.unreadCount || 0;
+    const isChanAdmin = ch.adminIds.includes(currentUserId) || ch.adminIds.includes('user') || isHRAdmin;
+    const pendingReqs = isChanAdmin ? (ch.pendingRequestUserIds?.length || 0) : 0;
+    return acc + unread + pendingReqs;
+  }, 0);
+  const isChatActive = pathname === '/chat' || pathname?.startsWith('/chat/');
 
   // Dropdown states
   const [notifOpen, setNotifOpen] = useState(false);
@@ -209,6 +223,23 @@ export function TopBar() {
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }} />
           <span>{userProfile?.role || role}</span>
         </div>
+
+        {/* 0. Group Chat Shortcut with Activity Badge */}
+        <Link
+          href="/chat"
+          className="topbar-icon-btn"
+          title="Group Chats & Channels"
+          style={{
+            background: isChatActive ? 'var(--primary-tint)' : undefined,
+            color: isChatActive ? 'var(--primary)' : undefined,
+            borderColor: isChatActive ? 'var(--primary)' : undefined,
+          }}
+        >
+          <MessageSquare size={17} strokeWidth={2} />
+          {chatActivityCount > 0 && (
+            <span className="topbar-badge">{chatActivityCount}</span>
+          )}
+        </Link>
 
         {/* 1. Notifications Center */}
         <div ref={notifRef} style={{ position: 'relative' }}>

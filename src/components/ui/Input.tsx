@@ -47,25 +47,28 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ? 'var(--danger, #D14343)'
       : isFocused
       ? 'var(--primary, #A238FF)'
-      : 'var(--card-border, #EAEAE4)';
+      : 'var(--card-border, #E4E4E7)';
     const boxShadow = isFocused
       ? hasError
-        ? '0 0 0 3px rgba(209, 67, 67, 0.15)'
-        : '0 0 0 3px var(--primary-tint, #F3E8FF)'
+        ? '0 0 0 3px rgba(209, 67, 67, 0.12)'
+        : '0 0 0 3px var(--primary-tint, rgba(162, 56, 255, 0.1))'
       : 'none';
 
     return (
-      <div className={`col ${containerClassName}`} style={{ width: '100%', gap: '4px', ...containerStyle }}>
+      <div
+        className={`col ${containerClassName}`}
+        style={{ width: '100%', gap: '4px', flex: 'none', ...containerStyle }}
+      >
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             width: '100%',
-            background: 'white',
+            background: '#FFFFFF',
             border: `1px solid ${borderColor}`,
             borderRadius: '10px',
             boxShadow,
-            transition: 'all 0.2s ease',
+            transition: 'all 0.15s ease',
             overflow: 'hidden',
           }}
         >
@@ -76,8 +79,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                width: '38px',
-                color: 'var(--text-4, #66655A)',
+                width: '36px',
+                color: 'var(--text-3, #A1A1AA)',
                 pointerEvents: 'none',
               }}
             >
@@ -87,7 +90,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
           <input
             ref={(node) => {
-              // Support both forwarded ref and internal ref for showPicker()
               if (typeof ref === 'function') ref(node);
               else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
               inputRef.current = node;
@@ -101,17 +103,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              fontSize: '14px',
-              color: 'var(--text-1, #1E1D19)',
-              paddingTop: '10px',
-              paddingBottom: '10px',
-              paddingLeft: leftIcon ? '4px' : isDate ? '6px' : '14px',
-              paddingRight: rightIcon ? '4px' : isDate ? '12px' : '14px',
+              fontSize: '13.5px',
+              color: 'var(--text-1, #18181B)',
+              paddingTop: '9px',
+              paddingBottom: '9px',
+              paddingLeft: leftIcon ? '4px' : '12px',
+              paddingRight: rightIcon || isDate ? '4px' : '12px',
               fontFamily: 'inherit',
               cursor: isDate ? 'pointer' : 'text',
               ...style,
             }}
-            className={className}
+            className={`${isDate ? 'easyhr-date-input ' : ''}${className}`.trim()}
             {...props}
           />
 
@@ -122,7 +124,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               onClick={() => {
                 if (inputRef.current) {
                   try {
-                    // Modern browser showPicker()
                     if ('showPicker' in HTMLInputElement.prototype) {
                       (inputRef.current as any).showPicker();
                     } else {
@@ -141,12 +142,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 border: 'none',
                 cursor: 'pointer',
                 padding: '0 12px',
-                color: isFocused ? 'var(--primary, #A238FF)' : 'var(--text-4, #66655A)',
+                color: isFocused ? 'var(--primary, #A238FF)' : 'var(--text-3, #A1A1AA)',
                 transition: 'color 0.15s ease',
               }}
-              title="Open calendar"
+              title="Select date"
             >
-              <Calendar size={17} />
+              <Calendar size={15} />
             </button>
           )}
 
@@ -157,8 +158,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                width: '38px',
-                color: 'var(--text-4, #66655A)',
+                width: '36px',
+                color: 'var(--text-3, #A1A1AA)',
               }}
             >
               {rightIcon}
@@ -168,9 +169,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {(helperText || (typeof error === 'string' && error)) && (
           <span
             style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              color: hasError ? 'var(--danger, #D14343)' : 'var(--text-4, #66655A)',
+              fontSize: '11.5px',
+              color: hasError ? 'var(--danger, #D14343)' : 'var(--text-3, #A1A1AA)',
               marginLeft: '4px',
             }}
           >

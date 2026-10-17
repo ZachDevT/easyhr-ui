@@ -169,7 +169,7 @@ export default function CompanySettingsPage() {
       <PageHeader
         title="Company Settings"
         subtitle="Configure the company foundation and brand shared by every EasyHR module."
-        icon={<Settings2 size={28} />}
+        icon={<Settings2 size={18} />}
         tabs={["Company profile", "Locations", "Work calendar", "Branding"]}
         activeTab={tab}
         onTabChange={setTab}
@@ -179,43 +179,48 @@ export default function CompanySettingsPage() {
             style={{
               background: saveSuccess ? "#16A34A" : "white",
               color: saveSuccess ? "white" : "var(--primary)",
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
-              gap: 8,
+              gap: 6,
+              height: 34,
+              padding: "0 14px",
+              borderRadius: 9,
+              fontSize: 12.5,
+              fontWeight: 700,
               transition: "all 0.2s",
             }}
             onClick={handleSaveChanges}
             disabled={isSaving}
           >
             {isSaving ? (
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={14} className="animate-spin" />
             ) : saveSuccess ? (
-              <Check size={16} />
+              <Check size={14} />
             ) : (
-              <Save size={16} />
+              <Save size={14} />
             )}
             {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save changes"}
           </button>
         }
       />
 
-      <main style={{ padding: "0 24px 32px" }}>
+      <main style={{ padding: "0 0 32px" }}>
         {saveError && (
           <div
             style={{
               background: "#FEF2F2",
               border: "1px solid #FCA5A5",
               borderRadius: "8px",
-              padding: "12px 16px",
+              padding: "10px 14px",
               color: "#B91C1C",
-              fontSize: "14px",
+              fontSize: "13px",
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              marginBottom: "20px",
+              marginBottom: "16px",
             }}
           >
-            <AlertCircle size={18} />
+            <AlertCircle size={16} />
             <span>{saveError}</span>
           </div>
         )}
@@ -226,30 +231,30 @@ export default function CompanySettingsPage() {
               background: "#F0FDF4",
               border: "1px solid #86EFAC",
               borderRadius: "8px",
-              padding: "12px 16px",
+              padding: "10px 14px",
               color: "#15803D",
-              fontSize: "14px",
+              fontSize: "13px",
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              marginBottom: "20px",
+              marginBottom: "16px",
             }}
           >
-            <Check size={18} />
+            <Check size={16} />
             <span>Company details successfully updated and saved.</span>
           </div>
         )}
 
         {/* TAB 1: COMPANY PROFILE */}
         {tab === "Company profile" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr .7fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.45fr .65fr", gap: 18, alignItems: "start" }}>
             <Card>
-              <CardBody>
+              <CardBody style={{ padding: 22 }}>
                 <SectionHeading
                   title="Organization details"
                   description="Used across employee documents, contracts, payroll records, and official communications"
                 />
-                <div className="col gap-16">
+                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                   <Field label="Legal company name">
                     <Input value={legalName} onChange={(e) => setLegalName(e.target.value)} />
                   </Field>
@@ -721,8 +726,8 @@ export default function CompanySettingsPage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="text-sm fw-600 text-2 mb-8" style={{ display: "block" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-2)", display: "block" }}>
         {label}
       </label>
       {children}

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useRef } from 'react';
-import { X, Send, Smile, Paperclip, Trash2, Heart, Hash, MessageSquare } from 'lucide-react';
+import { X, Send, Smile, Paperclip, Trash2, Heart, Hash, MessageSquare, Maximize2, Play } from 'lucide-react';
 import { ChatMessage, useChat } from '@/context/ChatContext';
 import { EmojiGifPicker } from './EmojiGifPicker';
+import { MediaLightbox, LightboxMediaItem } from './MediaLightbox';
 
 interface ThreadDrawerProps {
   parentMessage: ChatMessage;
@@ -15,6 +16,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
   const [replyText, setReplyText] = useState('');
   const [showPicker, setShowPicker] = useState(false);
   const [hoveredReplyId, setHoveredReplyId] = useState<string | null>(null);
+  const [lightboxMedia, setLightboxMedia] = useState<LightboxMediaItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSendReply = (e: React.FormEvent) => {
@@ -50,6 +52,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
     if (!files || files.length === 0) return;
     Array.from(files).forEach((file) => {
       const isImg = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
       const fileUrl = URL.createObjectURL(file);
       sendMessage(
         replyText.trim() || `Shared ${file.name}`,
@@ -58,7 +61,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
             id: `file-${Date.now()}-${Math.random()}`,
             name: file.name,
             url: fileUrl,
-            type: isImg ? 'image' : 'file',
+            type: isImg ? 'image' : isVideo ? 'video' : 'file',
             size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
           },
         ],
@@ -212,14 +215,72 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                         overflow: 'hidden',
                         border: '1px solid var(--card-border, #E4E4E7)',
                         background: '#FFFFFF',
+                        position: 'relative',
                       }}
                     >
                       {att.type === 'image' ? (
-                        <img
-                          src={att.url}
-                          alt={att.name}
-                          style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
-                        />
+                        <div
+                          onClick={() =>
+                            setLightboxMedia({
+                              url: att.url,
+                              name: att.name,
+                              type: 'image',
+                              size: att.size,
+                            })
+                          }
+                          style={{ position: 'relative', cursor: 'zoom-in' }}
+                        >
+                          <img
+                            src={att.url}
+                            alt={att.name}
+                            style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
+                          />
+                        </div>
+                      ) : att.type === 'video' ? (
+                        <div
+                          onClick={() =>
+                            setLightboxMedia({
+                              url: att.url,
+                              name: att.name,
+                              type: 'video',
+                              size: att.size,
+                            })
+                          }
+                          style={{ position: 'relative', cursor: 'pointer', background: '#09090B' }}
+                        >
+                          <video
+                            src={att.url}
+                            muted
+                            playsInline
+                            style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'rgba(0,0,0,0.28)',
+                              color: '#FFFFFF',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: '50%',
+                                background: 'rgba(255,255,255,0.2)',
+                                backdropFilter: 'blur(4px)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Play size={15} fill="#FFFFFF" />
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <a
                           href={att.url}
@@ -335,14 +396,61 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                               borderRadius: 8,
                               overflow: 'hidden',
                               border: '1px solid var(--card-border, #E4E4E7)',
+                              position: 'relative',
                             }}
                           >
                             {att.type === 'image' ? (
                               <img
                                 src={att.url}
                                 alt={att.name}
-                                style={{ width: '100%', maxHeight: 150, objectFit: 'cover', display: 'block' }}
+                                onClick={() =>
+                                  setLightboxMedia({
+                                    url: att.url,
+                                    name: att.name,
+                                    type: 'image',
+                                    size: att.size,
+                                  })
+                                }
+                                style={{
+                                  width: '100%',
+                                  maxHeight: 150,
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                  cursor: 'zoom-in',
+                                }}
                               />
+                            ) : att.type === 'video' ? (
+                              <div
+                                onClick={() =>
+                                  setLightboxMedia({
+                                    url: att.url,
+                                    name: att.name,
+                                    type: 'video',
+                                    size: att.size,
+                                  })
+                                }
+                                style={{ position: 'relative', cursor: 'pointer', background: '#09090B' }}
+                              >
+                                <video
+                                  src={att.url}
+                                  muted
+                                  playsInline
+                                  style={{ width: '100%', maxHeight: 150, objectFit: 'cover', display: 'block' }}
+                                />
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'rgba(0,0,0,0.3)',
+                                    color: '#FFFFFF',
+                                  }}
+                                >
+                                  <Play size={16} fill="#FFFFFF" />
+                                </div>
+                              </div>
                             ) : (
                               <a
                                 href={att.url}
@@ -599,6 +707,8 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
           </div>
         </form>
       </div>
+
+      <MediaLightbox item={lightboxMedia} onClose={() => setLightboxMedia(null)} />
     </aside>
   );
 }
