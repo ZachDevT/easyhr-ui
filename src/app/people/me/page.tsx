@@ -1585,9 +1585,11 @@ function ProfileContent() {
                     Health insurance, retirement savings, and allowances active for your profile.
                   </p>
                 </div>
-                <Link href="/benefits" className="btn-primary btn-sm" style={{ textDecoration: "none" }}>
-                  Benefits Portal
-                </Link>
+                {isHRAdmin && (
+                  <Link href="/benefits" className="btn-primary btn-sm" style={{ textDecoration: "none" }}>
+                    Benefits Administration
+                  </Link>
+                )}
               </div>
 
               {/* Active Enrollments */}

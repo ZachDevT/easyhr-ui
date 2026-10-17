@@ -316,7 +316,7 @@ export default function BenefitsPage() {
               Return to Dashboard
             </Link>
             <Link
-              href={`/people/${currentUser?.id || ""}`}
+              href="/people/me?tab=Benefits"
               className="btn-primary"
               style={{ textDecoration: "none", padding: "10px 20px" }}
             >

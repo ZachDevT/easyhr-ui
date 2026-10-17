@@ -29,6 +29,36 @@ export async function renderPdfDocument(html: string): Promise<Blob> {
       image.onload = () => resolve();
       image.onerror = () => resolve();
     })));
+
+    // html2canvas does not support CSS object-fit on <img> elements.
+    // If width/height or max-width/max-height are present, it stretches the image into the bounding box.
+    // We calculate the exact fitted dimensions preserving natural aspect ratio and apply them directly.
+    images.forEach((img) => {
+      if (img.classList.contains('logo') || img.closest('.signatures') || img.closest('.signature')) {
+        const naturalW = img.naturalWidth || 1;
+        const naturalH = img.naturalHeight || 1;
+        const aspect = naturalW / naturalH;
+        const maxW = img.classList.contains('logo') ? 180 : 180;
+        const maxH = img.classList.contains('logo') ? 58 : 54;
+
+        let targetW = naturalW;
+        let targetH = naturalH;
+        if (targetW > maxW) {
+          targetW = maxW;
+          targetH = targetW / aspect;
+        }
+        if (targetH > maxH) {
+          targetH = maxH;
+          targetW = targetH * aspect;
+        }
+
+        img.style.setProperty('width', `${Math.round(targetW)}px`, 'important');
+        img.style.setProperty('height', `${Math.round(targetH)}px`, 'important');
+        img.style.setProperty('max-width', `${Math.round(targetW)}px`, 'important');
+        img.style.setProperty('max-height', `${Math.round(targetH)}px`, 'important');
+        img.style.removeProperty('object-fit');
+      }
+    });
     const documentRoot = root.querySelector('.pdf-document') as HTMLElement;
     const fontFamilies = new Set(['Questrial', 'Inter']);
     documentRoot.querySelectorAll('font[face], [style]').forEach((element) => {
