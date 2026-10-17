@@ -22,8 +22,10 @@ import {
   Wallet,
   Sparkles,
   Edit2,
+  ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
+import { useRole } from "@/context/RoleContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
@@ -160,11 +162,61 @@ export default function EmployeeProfile() {
     }
   };
 
+  const { isHRAdmin, isManager, currentUser } = useRole();
+
   if (isLoading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
         <Loader2 className="animate-spin text-primary" size={36} />
       </div>
+    );
+  }
+
+  // Security check: non-admin, non-manager employees are only permitted to view their own profile (/people/me)
+  const isOwnProfile = employee && (
+    employee.id === currentUser.id ||
+    employee.workEmail?.toLowerCase() === currentUser.email?.toLowerCase()
+  );
+
+  if (!isHRAdmin && !isManager && !isOwnProfile) {
+    return (
+      <main style={{ padding: "64px 24px", maxWidth: 540, margin: "0 auto", textAlign: "center" }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: "#FEF2F2",
+            color: "#EF4444",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 20px",
+          }}
+        >
+          <ShieldAlert size={32} />
+        </div>
+        <h1 className="text-2xl fw-800 text-1 mb-12">Confidential Record</h1>
+        <p className="text-sm text-4 mb-24" style={{ lineHeight: 1.6 }}>
+          Detailed employment records, compensation, and personal records of colleagues are confidential to HR Administrators and Line Managers.
+        </p>
+        <div className="row gap-12 justify-center">
+          <Link
+            href="/people/me"
+            className="btn-primary"
+            style={{ textDecoration: "none", padding: "10px 20px", borderRadius: 20 }}
+          >
+            Go to My Profile
+          </Link>
+          <Link
+            href="/people"
+            className="btn-secondary"
+            style={{ textDecoration: "none", padding: "10px 20px", borderRadius: 20 }}
+          >
+            Return to Directory
+          </Link>
+        </div>
+      </main>
     );
   }
 
@@ -190,7 +242,6 @@ export default function EmployeeProfile() {
           </div>
         }
         subtitle={`${employee.jobTitle || "Team Member"} · ${employee.department}`}
-        icon={<UserRound size={28} />}
         actions={
           <div className="row gap-12 align-center">
             {employee.status === "onboarding" && (

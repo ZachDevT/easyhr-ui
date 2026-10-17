@@ -392,6 +392,15 @@ export default function ShiftSchedulingPage() {
                       {WEEK_DAYS.map((day, idx) => (
                         <div
                           key={day + idx}
+                          onClick={() => {
+                            setAssignmentForm({
+                              employeeId: member.id,
+                              scheduleId: schedules[0]?.id || "",
+                              effectiveFrom: new Date().toISOString().slice(0, 10),
+                            });
+                            setShowAssignmentModal(true);
+                          }}
+                          title="Click to assign or change shift"
                           style={{
                             padding: 12,
                             borderTop: "1px solid var(--border)",
@@ -400,9 +409,36 @@ export default function ShiftSchedulingPage() {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
+                            cursor: "pointer",
+                            transition: "background 0.15s ease",
                           }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-tint)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
                         >
-                          {(() => { const assignment = assignments.find((item) => item.employeeId === member.id); const schedule = schedules.find((item) => item.id === assignment?.scheduleId); const entry = schedule?.entries?.find((item) => item.dayOfWeek === idx); return assignment && entry ? <span style={{display:"block",padding:"6px 10px",borderRadius:8,fontSize:11,fontWeight:700,color:"var(--primary)",background:"var(--primary-tint)"}}>{entry.startTime}–{entry.endTime}</span> : <span className="text-xs text-5">{assignment ? "Off" : "Unassigned"}</span>; })()}
+                          {(() => {
+                            const assignment = assignments.find((item) => item.employeeId === member.id);
+                            const schedule = schedules.find((item) => item.id === assignment?.scheduleId);
+                            const entry = schedule?.entries?.find((item) => item.dayOfWeek === idx);
+                            return assignment && entry ? (
+                              <span
+                                style={{
+                                  display: "block",
+                                  padding: "6px 10px",
+                                  borderRadius: 8,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "var(--primary)",
+                                  background: "var(--primary-tint)",
+                                }}
+                              >
+                                {entry.startTime}–{entry.endTime}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-5" style={{ textDecoration: "underline dotted" }}>
+                                {assignment ? "Off" : "+ Assign"}
+                              </span>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -465,6 +501,85 @@ export default function ShiftSchedulingPage() {
               <option value="Africa/Lagos">Africa/Lagos (WAT, UTC+1)</option>
               <option value="America/New_York">America/New_York (EST, UTC-5)</option>
             </Select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+                Start Time *
+              </label>
+              <input
+                type="time"
+                value={form.startTime}
+                onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+                className="input"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+                End Time *
+              </label>
+              <input
+                type="time"
+                value={form.endTime}
+                onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+                className="input"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+              Unpaid Break (Minutes)
+            </label>
+            <input
+              type="number"
+              value={form.breakMinutes}
+              onChange={(e) => setForm({ ...form, breakMinutes: e.target.value })}
+              className="input"
+              min={0}
+              step={15}
+              placeholder="e.g. 60"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs fw-700 text-2 mb-6" style={{ display: "block" }}>
+              Working Days
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName, idx) => {
+                const isSelected = form.workDays.includes(idx);
+                return (
+                  <button
+                    key={dayName}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setForm({ ...form, workDays: form.workDays.filter((d) => d !== idx) });
+                      } else {
+                        setForm({ ...form, workDays: [...form.workDays, idx].sort() });
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px 0",
+                      borderRadius: 8,
+                      border: isSelected ? "1.5px solid var(--primary)" : "1px solid var(--border)",
+                      background: isSelected ? "var(--primary-tint)" : "white",
+                      color: isSelected ? "var(--primary)" : "var(--text-3)",
+                      fontWeight: isSelected ? 700 : 500,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {dayName}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>

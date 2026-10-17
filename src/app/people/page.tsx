@@ -10,6 +10,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { PeopleDirectorySkeleton } from "@/components/ui/Skeleton";
+import { useRole } from "@/context/RoleContext";
 
 import { AddHireModal } from "@/components/people/AddHireModal";
 
@@ -35,6 +36,7 @@ interface Employee {
 
 export default function PeopleDirectory() {
   const { getToken } = useAuth();
+  const { isHRAdmin, isManager, currentUser } = useRole();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<string[]>(["All"]);
   const [rawDepartments, setRawDepartments] = useState<{ id: string; name: string }[]>([]);
@@ -261,71 +263,116 @@ export default function PeopleDirectory() {
                     gap: 16,
                   }}
                 >
-                  {filtered.map((e) => (
-                    <Link
-                      key={e.id}
-                      href={`/people/${e.id}`}
-                      style={{
-                        display: "block",
-                        padding: 20,
-                        border: "1px solid var(--border)",
-                        borderRadius: 14,
-                        textDecoration: "none",
-                        color: "inherit",
-                        background: "white",
-                        transition: "all 0.2s",
-                      }}
-                      className="hover-lift"
-                    >
-                      <div className="row-between mb-16 align-start">
-                        <div className="row gap-12 align-center">
-                          <Avatar
-                            src={e.avatar}
-                            name={`${e.firstName} ${e.lastName}`}
-                            size="lg"
-                          />
-                          <div>
-                            <div className="text-base fw-800 text-1">
-                              {e.firstName} {e.lastName}
-                            </div>
-                            <div className="text-xs text-4 fw-600">
-                              {e.jobTitle || "Team Member"}
+                  {filtered.map((e) => {
+                    const isSelf = e.id === currentUser.id || e.workEmail?.toLowerCase() === currentUser.email?.toLowerCase();
+                    const canViewDetails = isHRAdmin || isManager || isSelf;
+                    const targetHref = isSelf ? "/people/me" : `/people/${e.id}`;
+
+                    const cardContent = (
+                      <>
+                        <div className="row-between mb-16 align-start">
+                          <div className="row gap-12 align-center">
+                            <Avatar
+                              src={e.avatar}
+                              name={`${e.firstName} ${e.lastName}`}
+                              size="lg"
+                            />
+                            <div>
+                              <div className="text-base fw-800 text-1">
+                                {e.firstName} {e.lastName}
+                                {isSelf && (
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      color: "var(--primary)",
+                                      background: "var(--primary-tint)",
+                                      padding: "2px 6px",
+                                      borderRadius: 6,
+                                    }}
+                                  >
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-4 fw-600">
+                                {e.jobTitle || "Team Member"}
+                              </div>
                             </div>
                           </div>
+                          {canViewDetails && <ChevronRight size={17} color="var(--text-5)" />}
                         </div>
-                        <ChevronRight size={17} color="var(--text-5)" />
-                      </div>
 
-                      <div className="col gap-8 text-xs text-4">
-                        <div className="row gap-8 align-center">
-                          <Building2 size={13} />
-                          <span>{e.department} {e.division ? `· ${e.division}` : ""}</span>
+                        <div className="col gap-8 text-xs text-4">
+                          <div className="row gap-8 align-center">
+                            <Building2 size={13} />
+                            <span>{e.department} {e.division ? `· ${e.division}` : ""}</span>
+                          </div>
+                          <div className="row gap-8 align-center">
+                            <MapPin size={13} />
+                            <span>{e.location || "Headquarters"}</span>
+                          </div>
+                          <div className="row gap-8 align-center">
+                            <Mail size={13} />
+                            <span>{e.workEmail}</span>
+                          </div>
                         </div>
-                        <div className="row gap-8 align-center">
-                          <MapPin size={13} />
-                          <span>{e.location || "Headquarters"}</span>
-                        </div>
-                        <div className="row gap-8 align-center">
-                          <Mail size={13} />
-                          <span>{e.workEmail}</span>
-                        </div>
-                      </div>
 
-                      <div style={{ marginTop: 14 }}>
-                        <StatusPill
-                          tone={
-                            e.status === "active"
-                              ? "success"
-                              : e.status === "onboarding"
-                              ? "warning"
-                              : "neutral"
-                          }
+                        <div style={{ marginTop: 14 }}>
+                          <StatusPill
+                            tone={
+                              e.status === "active"
+                                ? "success"
+                                : e.status === "onboarding"
+                                ? "warning"
+                                : "neutral"
+                            }
+                          >
+                            {e.status}
+                          </StatusPill>
+                        </div>
+                      </>
+                    );
+
+                    if (canViewDetails) {
+                      return (
+                        <Link
+                          key={e.id}
+                          href={targetHref}
+                          style={{
+                            display: "block",
+                            padding: 20,
+                            border: "1px solid var(--border)",
+                            borderRadius: 14,
+                            textDecoration: "none",
+                            color: "inherit",
+                            background: "white",
+                            transition: "all 0.2s",
+                          }}
+                          className="hover-lift"
                         >
-                          {e.status.charAt(0).toUpperCase() + e.status.slice(1)}
-                        </StatusPill>
+                          {cardContent}
+                        </Link>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={e.id}
+                        style={{
+                          display: "block",
+                          padding: 20,
+                          border: "1px solid var(--border)",
+                          borderRadius: 14,
+                          color: "inherit",
+                          background: "white",
+                        }}
+                      >
+                        {cardContent}
                       </div>
-                    </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardBody>

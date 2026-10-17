@@ -31,6 +31,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Avatar } from "@/components/ui/Avatar";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -95,6 +96,9 @@ interface Employee {
   lastName: string;
   workEmail: string;
   jobTitle?: string;
+  title?: string;
+  department?: string;
+  avatar?: string;
 }
 
 // ─── Today's date helper ─────────────────────────────────────────────────────
@@ -293,6 +297,10 @@ export default function TimeOffPage() {
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [isAssignPolicyModalOpen, setIsAssignPolicyModalOpen] = useState(false);
+  const [targetAssignPolicy, setTargetAssignPolicy] = useState<LeavePolicy | null>(null);
+  const [assignEmployeeIds, setAssignEmployeeIds] = useState<string[]>([]);
+  const [assignSearch, setAssignSearch] = useState("");
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -671,6 +679,56 @@ export default function TimeOffPage() {
   };
 
   // ─── Assign to all ────────────────────────────────────────────────────────
+
+  const handleOpenAssignModal = (policy: LeavePolicy) => {
+    setTargetAssignPolicy(policy);
+    setAssignEmployeeIds([]);
+    setAssignSearch("");
+    setIsAssignPolicyModalOpen(true);
+  };
+
+  const handleSaveSpecificAssignments = async () => {
+    if (!targetAssignPolicy || assignEmployeeIds.length === 0) {
+      showNotice("error", "Please select at least one employee.");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const headers = await authHeaders();
+
+      // Apply initial enrollment/balance adjustment to the selected employees
+      let successCount = 0;
+      for (const empId of assignEmployeeIds) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/v1/leave/adjustments`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              employeeId: empId,
+              leaveTypeId: targetAssignPolicy.leaveTypeId,
+              amountMinutes: targetAssignPolicy.accrualMinutes || 480,
+              reason: `Enrolled in ${targetAssignPolicy.name} policy`,
+            }),
+          });
+          if (res.ok) successCount++;
+        } catch {}
+      }
+
+      showNotice(
+        "success",
+        `Policy "${targetAssignPolicy.name}" assigned to ${successCount} selected employee${successCount === 1 ? "" : "s"}.`
+      );
+      setIsAssignPolicyModalOpen(false);
+      setTargetAssignPolicy(null);
+      setAssignEmployeeIds([]);
+      await loadData();
+    } catch (err: any) {
+      showNotice("error", err.message || "Failed to assign policy to specific employees.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleAssignToAll = (policyId: string, policyName: string) => {
     openConfirm({
@@ -1554,23 +1612,41 @@ export default function TimeOffPage() {
                           {(p as any).effectiveFrom || "—"}
                         </td>
                         <td style={{ padding: "13px 16px" }}>
-                          <button
-                            onClick={() => handleAssignToAll(p.id, p.name)}
-                            disabled={actionLoading}
-                            className="btn-neutral"
-                            style={{
-                              fontSize: 12,
-                              padding: "6px 14px",
-                              color: "var(--primary)",
-                              borderColor: "var(--primary)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 5,
-                            }}
-                          >
-                            <Users size={12} />
-                            Assign to All
-                          </button>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <button
+                              onClick={() => handleOpenAssignModal(p)}
+                              disabled={actionLoading}
+                              className="btn-primary"
+                              style={{
+                                fontSize: 12,
+                                padding: "6px 12px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                borderRadius: 8,
+                              }}
+                            >
+                              <Users size={12} />
+                              Assign to Specific
+                            </button>
+                            <button
+                              onClick={() => handleAssignToAll(p.id, p.name)}
+                              disabled={actionLoading}
+                              className="btn-neutral"
+                              style={{
+                                fontSize: 12,
+                                padding: "6px 12px",
+                                color: "var(--text-2)",
+                                borderColor: "var(--border)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                borderRadius: 8,
+                              }}
+                            >
+                              Assign to All
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2266,6 +2342,154 @@ export default function TimeOffPage() {
           <div style={{gridColumn:"1/-1"}}><small className="text-4">Reason</small><div className="mt-4" style={{whiteSpace:"pre-wrap"}}>{selectedLeaveRequest.reason || "No reason provided."}</div></div>
         </div>
       </Modal>}
+
+      {/* ─── MODAL: Assign Policy to Specific Employees ──────────────────── */}
+      {isAssignPolicyModalOpen && targetAssignPolicy && (
+        <Modal
+          isOpen={isAssignPolicyModalOpen}
+          onClose={() => setIsAssignPolicyModalOpen(false)}
+          title={`Assign "${targetAssignPolicy.name}" Policy`}
+          subtitle="Select specific employees to enroll into this policy and credit initial balances"
+          width={560}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setIsAssignPolicyModalOpen(false)}
+                className="btn-neutral"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveSpecificAssignments}
+                disabled={actionLoading || assignEmployeeIds.length === 0}
+                className="btn-primary"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <Users size={14} />
+                {actionLoading ? "Enrolling…" : `Assign to ${assignEmployeeIds.length} Selected`}
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: 10,
+                background: "var(--primary-tint)",
+                border: "1px solid rgba(162, 56, 255, 0.2)",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
+                Policy Details: {targetAssignPolicy.name}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>
+                Category: <strong>{targetAssignPolicy.leaveTypeName || "Leave"}</strong> · Accrual:{" "}
+                <strong>+{(targetAssignPolicy.accrualMinutes / 60).toFixed(1)}h / {targetAssignPolicy.accrualFrequency}</strong>
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label mb-6" style={{ display: "block" }}>
+                Filter Employees
+              </label>
+              <input
+                type="text"
+                placeholder="Search employee by name, department, or job title..."
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                className="input"
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            <div className="row-between align-center" style={{ marginTop: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)" }}>
+                {assignEmployeeIds.length} of {allEmployees.length} employees selected
+              </span>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: "3px 8px" }}
+                onClick={() => {
+                  if (assignEmployeeIds.length === allEmployees.length) {
+                    setAssignEmployeeIds([]);
+                  } else {
+                    setAssignEmployeeIds(allEmployees.map((e) => e.id));
+                  }
+                }}
+              >
+                {assignEmployeeIds.length === allEmployees.length ? "Deselect All" : "Select All Filtered"}
+              </button>
+            </div>
+
+            {/* Employee Selection List */}
+            <div
+              style={{
+                maxHeight: 280,
+                overflowY: "auto",
+                border: "1px solid var(--card-border)",
+                borderRadius: 10,
+                background: "white",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {allEmployees
+                .filter((emp) => {
+                  const query = assignSearch.toLowerCase().trim();
+                  if (!query) return true;
+                  const name = `${emp.firstName} ${emp.lastName}`.toLowerCase();
+                  const dept = (emp.department || "").toLowerCase();
+                  const title = (emp.title || "").toLowerCase();
+                  return name.includes(query) || dept.includes(query) || title.includes(query);
+                })
+                .map((emp) => {
+                  const isChecked = assignEmployeeIds.includes(emp.id);
+                  return (
+                    <label
+                      key={emp.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 14px",
+                        borderBottom: "1px solid var(--border)",
+                        cursor: "pointer",
+                        background: isChecked ? "var(--primary-tint)" : "transparent",
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAssignEmployeeIds((prev) => [...prev, emp.id]);
+                          } else {
+                            setAssignEmployeeIds((prev) => prev.filter((id) => id !== emp.id));
+                          }
+                        }}
+                        style={{ accentColor: "var(--primary)", width: 16, height: 16 }}
+                      />
+                      <Avatar name={`${emp.firstName} ${emp.lastName}`} src={emp.avatar} size="sm" />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>
+                          {emp.firstName} {emp.lastName}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-4)" }}>
+                          {emp.title || "Team Member"} · {emp.department || "Company"}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   );

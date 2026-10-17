@@ -12,8 +12,15 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  FileText,
+  ShieldAlert,
+  Image as ImageIcon,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
+import { useRole } from "@/context/RoleContext";
+import Link from "next/link";
 import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -69,6 +76,46 @@ export default function SupportDashboard() {
   const [newPriority, setNewPriority] = useState("normal");
   const [newMessage, setNewMessage] = useState("");
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+
+  // Attachment state for tickets and replies
+  const [ticketAttachments, setTicketAttachments] = useState<{ name: string; size: string; type: string; url: string }[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<{ name: string; size: string; type: string; url: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { isHRAdmin } = useRole();
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isReply: boolean = false) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      Array.from(files).forEach((file) => {
+        const sizeFormatted = file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const item = {
+            name: file.name,
+            size: sizeFormatted,
+            type: file.type.startsWith("image/") ? "image" : "document",
+            url: event.target?.result as string || "",
+          };
+          if (isReply) {
+            setReplyAttachments((prev) => [...prev, item]);
+          } else {
+            setTicketAttachments((prev) => [...prev, item]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      toast.success("Attachment added", "File attached to your support message.");
+    } catch {
+      toast.error("Upload error", "Unable to read selected file.");
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const fetchTickets = useCallback(async () => {
     setIsLoading(true);
@@ -211,14 +258,56 @@ export default function SupportDashboard() {
     }
   };
 
+  if (!isHRAdmin) {
+    return (
+      <main style={{ padding: "64px 24px", maxWidth: 540, margin: "0 auto", textAlign: "center" }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: "#FEF2F2",
+            color: "#EF4444",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 20px",
+          }}
+        >
+          <ShieldAlert size={32} />
+        </div>
+        <h1 className="text-2xl fw-800 text-1 mb-12">Platform Support Restricted</h1>
+        <p className="text-sm text-4 mb-24" style={{ lineHeight: 1.6 }}>
+          Direct platform engineering support and ticketing is reserved for Company HR Administrators. For internal workplace queries, please check Company Policies or reach out to your HR Team directly.
+        </p>
+        <div className="row gap-12 justify-center">
+          <Link
+            href="/policies"
+            className="btn-primary"
+            style={{ textDecoration: "none", padding: "10px 20px", borderRadius: 20 }}
+          >
+            View Company Policies
+          </Link>
+          <Link
+            href="/dashboard"
+            className="btn-secondary"
+            style={{ textDecoration: "none", padding: "10px 20px", borderRadius: 20 }}
+          >
+            Go to Dashboard
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <PageHeader
-        title="Support Tickets"
-        subtitle="Manage and respond to employee support inquiries."
+        title="EasyHR Platform Support"
+        subtitle="Direct technical and operations line with the EasyHR Engineering & Compliance team."
         actions={
           <Button variant="primary" onClick={() => setIsNewTicketModalOpen(true)}>
-            <Plus size={16} /> New Ticket
+            <Plus size={16} /> Open Engineering Ticket
           </Button>
         }
       />
@@ -478,6 +567,65 @@ export default function SupportDashboard() {
                 onChange={(e) => setReplyText(e.target.value)}
               />
 
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--primary)",
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    background: "var(--primary-tint)",
+                  }}
+                >
+                  <Paperclip size={13} />
+                  <span>Attach File / Screenshot</span>
+                  <input
+                    type="file"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={(e) => handleFileUpload(e, true)}
+                    accept="image/*,.pdf,.doc,.docx,.txt,.csv,.json"
+                  />
+                </label>
+              </div>
+
+              {replyAttachments.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                  {replyAttachments.map((att, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "5px 10px",
+                        borderRadius: 8,
+                        background: "var(--bg-page)",
+                        border: "1px solid var(--border)",
+                        fontSize: 12,
+                      }}
+                    >
+                      {att.type === "image" ? <ImageIcon size={13} color="var(--primary)" /> : <FileText size={13} color="var(--text-4)" />}
+                      <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>
+                        {att.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReplyAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#EF4444", padding: 0 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div
                 style={{
                   display: "flex",
@@ -570,6 +718,78 @@ export default function SupportDashboard() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
             />
+          </div>
+
+          <div>
+            <div className="row-between align-center mb-6">
+              <label
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  margin: 0,
+                }}
+              >
+                Attachments (Screenshots, Logs, Files)
+              </label>
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--primary)",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  background: "var(--primary-tint)",
+                }}
+              >
+                <Paperclip size={13} />
+                <span>Upload File</span>
+                <input
+                  type="file"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => handleFileUpload(e, false)}
+                  accept="image/*,.pdf,.doc,.docx,.txt,.csv,.json"
+                />
+              </label>
+            </div>
+
+            {ticketAttachments.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {ticketAttachments.map((att, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      background: "var(--bg-page)",
+                      border: "1px solid var(--border)",
+                      fontSize: 12,
+                    }}
+                  >
+                    {att.type === "image" ? <ImageIcon size={14} color="var(--primary)" /> : <FileText size={14} color="var(--text-4)" />}
+                    <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>
+                      {att.name}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--text-5)" }}>({att.size})</span>
+                    <button
+                      type="button"
+                      onClick={() => setTicketAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#EF4444", padding: 0 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div

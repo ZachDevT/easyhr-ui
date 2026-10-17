@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import { useRole } from "../../context/RoleContext";
 import { useCompany } from "../../context/CompanyContext";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useAuth } from "@clerk/nextjs";
+import { API_BASE_URL, getAuthHeaders } from "../../lib/api";
 import { Avatar } from "../ui/Avatar";
 import { EasyHRMark } from "../marketing/EasyHRLogo";
 
@@ -31,6 +32,7 @@ import { EasyHRMark } from "../marketing/EasyHRLogo";
 interface NavChild {
   label: string;
   href: string;
+  badge?: string | number;
 }
 
 interface NavParent {
@@ -54,6 +56,7 @@ export function Sidebar() {
   const { role, currentUser } = useRole();
   const { company } = useCompany();
   const { signOut } = useClerk();
+  const { getToken, isSignedIn } = useAuth();
   const pathname = usePathname();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -61,6 +64,56 @@ export function Sidebar() {
     dashboard: true,
     hiring: true,
   });
+
+  // Attention badge counters
+  const [pendingSignaturesCount, setPendingSignaturesCount] = useState<number>(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchAttentionCounts() {
+      if (!isSignedIn) return;
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const headers = getAuthHeaders(token);
+
+        // Fetch signatures
+        const sigUrl = role === "HR Admin" 
+          ? `${API_BASE_URL}/api/v1/signatures`
+          : `${API_BASE_URL}/api/v1/signatures/me`;
+        
+        const sigRes = await fetch(sigUrl, { credentials: "omit", headers });
+        if (sigRes.ok) {
+          const sigJson = await sigRes.json();
+          const sigList = Array.isArray(sigJson) ? sigJson : sigJson.data || [];
+          const count = sigList.filter((s: any) => s.status === "pending").length;
+          if (isMounted) setPendingSignaturesCount(count);
+        }
+
+        // Fetch pending requests for managers/admins
+        if (role === "Manager" || role === "HR Admin") {
+          const reqRes = await fetch(`${API_BASE_URL}/api/v1/leave/requests`, { credentials: "omit", headers });
+          if (reqRes.ok) {
+            const reqJson = await reqRes.json();
+            const reqList = Array.isArray(reqJson) ? reqJson : reqJson.data || [];
+            const count = reqList.filter((r: any) => 
+              role === "HR Admin" ? r.status === "Pending HR" : (r.status === "Pending Manager" || r.status === "pending")
+            ).length;
+            if (isMounted) setPendingRequestsCount(count);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch attention counts for sidebar", err);
+      }
+    }
+    fetchAttentionCounts();
+    const interval = setInterval(fetchAttentionCounts, 45000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isSignedIn, role, getToken]);
 
   // Fixed floating flyout state (never clipped by overflow:hidden!)
   const [flyoutState, setFlyoutState] = useState<FlyoutState | null>(null);
@@ -117,12 +170,17 @@ export function Sidebar() {
           id: "workspace",
           label: "Workspace",
           icon: <LayoutGrid size={17} strokeWidth={2.2} />,
+          badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
           children: [
             { label: "Overview", href: "/dashboard" },
             { label: "Company News", href: "/announcements" },
             { label: "Organization Chart", href: "/org-chart" },
             { label: "People Directory", href: "/people" },
-            { label: "My Signatures & Docs", href: "/my-signatures" },
+            { 
+              label: "My Signatures & Docs", 
+              href: "/my-signatures",
+              badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
+            },
             { label: "Company Handbook", href: "/policies" },
           ],
         },
@@ -147,9 +205,14 @@ export function Sidebar() {
           id: "dashboard",
           label: "Dashboard",
           icon: <LayoutGrid size={17} strokeWidth={2.2} />,
+          badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           children: [
             { label: "Overview", href: "/dashboard" },
-            { label: "Approvals Inbox", href: "/inbox" },
+            { 
+              label: "Approvals Inbox", 
+              href: "/inbox",
+              badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
+            },
             { label: "Company News", href: "/announcements" },
           ],
         },
@@ -168,9 +231,14 @@ export function Sidebar() {
           id: "organization",
           label: "People & Team",
           icon: <Users size={17} strokeWidth={2.2} />,
+          badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           children: [
             { label: "My Team", href: "/my-team" },
-            { label: "Team Requests", href: "/team-requests" },
+            { 
+              label: "Team Requests", 
+              href: "/team-requests",
+              badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
+            },
             { label: "People Directory", href: "/people" },
             { label: "Organization Chart", href: "/org-chart" },
           ],
@@ -194,9 +262,14 @@ export function Sidebar() {
         id: "dashboard",
         label: "Dashboard",
         icon: <LayoutGrid size={17} strokeWidth={2.2} />,
+        badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
         children: [
           { label: "Overview", href: "/dashboard" },
-          { label: "Approvals Inbox", href: "/inbox" },
+          { 
+            label: "Approvals Inbox", 
+            href: "/inbox",
+            badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
+          },
           { label: "Company News", href: "/announcements" },
           { label: "Company Reports", href: "/reports" },
         ],
@@ -250,9 +323,14 @@ export function Sidebar() {
         id: "records",
         label: "Documents & Legal",
         icon: <FolderOpen size={17} strokeWidth={2.2} />,
+        badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
         children: [
           { label: "Company Documents", href: "/documents" },
-          { label: "E-Signatures", href: "/signatures" },
+          { 
+            label: "E-Signatures", 
+            href: "/signatures",
+            badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
+          },
           { label: "Policies & Handbook", href: "/policies" },
         ],
       },
@@ -271,7 +349,7 @@ export function Sidebar() {
     ];
 
     return [{ sectionTitle: "MAIN", items: adminItems }];
-  }, [role, isManager]);
+  }, [role, isManager, pendingSignaturesCount, pendingRequestsCount]);
 
   // Auto-expand parent if current route is within it
   useEffect(() => {
@@ -774,6 +852,7 @@ export function Sidebar() {
                           color: isParentActive ? "#18181B" : "#71717A",
                           background: isParentActive ? "#F4F4F5" : "transparent",
                           transition: "all 0.15s ease",
+                          position: "relative",
                         }}
                         onMouseEnter={(e) => {
                           if (!isParentActive) e.currentTarget.style.background = "#FAFAFA";
@@ -784,6 +863,30 @@ export function Sidebar() {
                         title={item.label}
                       >
                         {item.icon}
+                        {item.badge !== undefined && (
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: 5,
+                              right: 6,
+                              minWidth: 16,
+                              height: 16,
+                              padding: "0 4px",
+                              borderRadius: 999,
+                              background: "#EF4444",
+                              color: "#FFFFFF",
+                              fontSize: 9.5,
+                              fontWeight: 700,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              lineHeight: 1,
+                              boxShadow: "0 1px 3px rgba(239, 68, 68, 0.4)",
+                            }}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       /* Expanded Parent Card with chevron */
@@ -816,11 +919,34 @@ export function Sidebar() {
                           <span>{item.label}</span>
                         </div>
 
-                        {hasChildren && (
-                          <span style={{ color: "#A1A1AA", display: "flex", alignItems: "center" }}>
-                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                          </span>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {item.badge !== undefined && (
+                            <span
+                              style={{
+                                minWidth: 18,
+                                height: 18,
+                                padding: "0 6px",
+                                borderRadius: 999,
+                                background: "#FEE2E2",
+                                color: "#DC2626",
+                                border: "1px solid #FECACA",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                          {hasChildren && (
+                            <span style={{ color: "#A1A1AA", display: "flex", alignItems: "center" }}>
+                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -875,7 +1001,9 @@ export function Sidebar() {
                                   boxShadow: isChildActive ? "0 1px 3px rgba(0,0,0,0.04)" : "none",
                                   textDecoration: "none",
                                   transition: "all 0.15s ease",
-                                  display: "block",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
                                   whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
@@ -893,7 +1021,29 @@ export function Sidebar() {
                                   }
                                 }}
                               >
-                                {child.label}
+                                <span>{child.label}</span>
+                                {child.badge !== undefined && (
+                                  <span
+                                    style={{
+                                      minWidth: 17,
+                                      height: 17,
+                                      padding: "0 5px",
+                                      borderRadius: 999,
+                                      background: "#EF4444",
+                                      color: "#FFFFFF",
+                                      fontSize: 9.5,
+                                      fontWeight: 700,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      lineHeight: 1,
+                                      marginLeft: 6,
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {child.badge}
+                                  </span>
+                                )}
                               </Link>
                             </div>
                           );
@@ -1129,6 +1279,9 @@ export function Sidebar() {
                       background: isChildActive ? "#F4F4F5" : "transparent",
                       textDecoration: "none",
                       transition: "all 0.12s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                       whiteSpace: "nowrap",
                     }}
                     onMouseEnter={(e) => {
@@ -1138,7 +1291,29 @@ export function Sidebar() {
                       if (!isChildActive) e.currentTarget.style.background = "transparent";
                     }}
                   >
-                    {child.label}
+                    <span>{child.label}</span>
+                    {child.badge !== undefined && (
+                      <span
+                        style={{
+                          minWidth: 16,
+                          height: 16,
+                          padding: "0 4px",
+                          borderRadius: 999,
+                          background: "#EF4444",
+                          color: "#FFFFFF",
+                          fontSize: 9.5,
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          lineHeight: 1,
+                          marginLeft: 6,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {child.badge}
+                      </span>
+                    )}
                   </Link>
                 </div>
               );

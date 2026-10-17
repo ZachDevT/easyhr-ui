@@ -52,7 +52,7 @@ export function PageHeader({
     <div style={containerStyle}>
       <div className="row-between align-start" style={{ paddingBottom: tabs.length > 0 ? 0 : 32 }}>
         <div className="row gap-16 align-center">
-          {icon && (
+          {icon && typeof title === 'string' && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {icon}
             </div>

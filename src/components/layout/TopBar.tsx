@@ -471,43 +471,45 @@ export function TopBar() {
               </div>
 
               <div style={{ padding: '8px 12px' }}>
-                <Link
-                  href="/support"
-                  onClick={() => setHelpOpen(false)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    transition: 'background 0.15s',
-                  }}
-                  className="hover:bg-primary-tint"
-                >
-                  <div
+                {isHRAdmin && (
+                  <Link
+                    href="/support"
+                    onClick={() => setHelpOpen(false)}
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      background: 'var(--primary-tint)',
-                      color: 'var(--primary)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      gap: 12,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      transition: 'background 0.15s',
                     }}
+                    className="hover:bg-primary-tint"
                   >
-                    <LifeBuoy size={16} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>HR Support Desk</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-5)', margin: 0 }}>
-                      Submit tickets or check status
-                    </p>
-                  </div>
-                  <ChevronRight size={14} className="text-4" />
-                </Link>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: 'var(--primary-tint)',
+                        color: 'var(--primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <LifeBuoy size={16} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>EasyHR Platform Support</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-5)', margin: 0 }}>
+                        Submit inquiry to EasyHR Engineering
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-4" />
+                  </Link>
+                )}
 
                 <Link
                   href="/policies"

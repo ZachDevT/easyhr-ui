@@ -56,7 +56,7 @@ interface TimesheetReview { id:string; employeeName:string; weekStart:string; we
 
 export default function TimeTrackingPage() {
   const { getToken, isSignedIn } = useAuth();
-  const { currentUser } = useRole();
+  const { currentUser, role, isHRAdmin, isManager } = useRole();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -157,12 +157,25 @@ export default function TimeTrackingPage() {
     fetchPunches();
   }, [fetchPunches]);
 
-  // Process punches into weekly timesheet rows
+  const isClockIn = (kind?: string) => {
+    if (!kind) return false;
+    const k = kind.toLowerCase();
+    return k === 'in' || k === 'clock_in';
+  };
+
+  const isClockOut = (kind?: string) => {
+    if (!kind) return false;
+    const k = kind.toLowerCase();
+    return k === 'out' || k === 'clock_out';
+  };
+
+  // Process punches into weekly timesheet rows with live movements & activities
   const timesheetData: DayEntry[] = useMemo(() => {
     return daysList.map((d) => {
       // Find punches matching this calendar date
       const dayPunches = punches
         .filter((p) => {
+          if (!p.occurredAt) return false;
           const pDate = new Date(p.occurredAt).toISOString().slice(0, 10);
           return pDate === d.iso;
         })
@@ -182,7 +195,7 @@ export default function TimeTrackingPage() {
         };
       }
 
-      // Pair in / out punches
+      // Pair in / out punches & map movements
       let totalMinutes = 0;
       const details: DayEntry['details'] = [];
       let startTimeStr = '';
@@ -190,7 +203,7 @@ export default function TimeTrackingPage() {
 
       for (let i = 0; i < dayPunches.length; i++) {
         const current = dayPunches[i];
-        if (current.kind === 'in') {
+        if (isClockIn(current.kind)) {
           const inTime = new Date(current.occurredAt);
           if (!startTimeStr) {
             startTimeStr = inTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -199,14 +212,17 @@ export default function TimeTrackingPage() {
           // Look for next matching punch
           const nextPunch = dayPunches[i + 1];
           let outTime: Date;
-          if (nextPunch && nextPunch.kind === 'out') {
+          let isOngoing = false;
+
+          if (nextPunch && isClockOut(nextPunch.kind)) {
             outTime = new Date(nextPunch.occurredAt);
             endTimeStr = outTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
             i++; // Skip paired out punch
           } else {
-            // Punch is still open
+            // Punch is still open / active today
             outTime = new Date();
-            endTimeStr = 'In Progress';
+            isOngoing = true;
+            endTimeStr = 'Currently In Progress';
           }
 
           const diffMins = Math.max(0, Math.round((outTime.getTime() - inTime.getTime()) / (1000 * 60)));
@@ -214,11 +230,13 @@ export default function TimeTrackingPage() {
 
           const hours = Math.floor(diffMins / 60);
           const mins = diffMins % 60;
+          const activityLabel = current.activity || (current.source === 'mobile' ? 'Mobile Check-in' : 'Production Work');
+
           details.push({
-            project: current.activity || 'Production',
+            project: activityLabel,
             hrs: `${hours}h ${String(mins).padStart(2, '0')}m`,
             time: `${inTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${
-              nextPunch ? outTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Active'
+              isOngoing ? 'Active now' : outTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
             }`,
             isBillable: current.isBillable ?? true,
           });
@@ -444,7 +462,36 @@ export default function TimeTrackingPage() {
                     Current Week
                   </button>
                 )}
-                <button className="btn-primary btn-sm" onClick={submitWeek} disabled={isSubmittingTimesheet||weekOffset!==0}>{isSubmittingTimesheet?'Submitting…':'Submit week'}</button>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '5px 12px',
+                    borderRadius: 20,
+                    background: '#ECFDF5',
+                    color: '#059669',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                  }}
+                  title="Your timesheet updates live from clock-in/out and activity changes"
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#10B981',
+                      boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)',
+                    }}
+                  />
+                  <span>Live Real-Time Sync</span>
+                </div>
+                {(isHRAdmin || isManager) && (
+                  <button className="btn-primary btn-sm" onClick={submitWeek} disabled={isSubmittingTimesheet||weekOffset!==0}>
+                    {isSubmittingTimesheet ? 'Submitting…' : 'Submit Review'}
+                  </button>
+                )}
               </div>
             </div>
 
