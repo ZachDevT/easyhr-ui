@@ -429,359 +429,428 @@ export function CompulsoryMyTimeWidget() {
 
   return (
     <Card style={{ overflow: 'visible', position: 'relative' }}>
-      <CardHeader title="My Time" icon={<Clock size={16} strokeWidth={2.5} />} />
-      <CardBody style={{ overflow: 'visible', position: 'relative' }}>
-        <div className="text-center">
-          <div className="clock-status">
-            <span className={isClocked ? 'clock-status-dot active' : 'clock-status-dot'} />
-            <p className="text-xs text-2">
-              {isClocked ? (
-                <span>
-                  Active: <strong>{selectedActivity.name}</strong>{' '}
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '2px 6px',
-                      borderRadius: 10,
-                      marginLeft: 4,
-                      background: selectedActivity.isBillable ? '#ecfdf5' : '#f1f5f9',
-                      color: selectedActivity.isBillable ? '#059669' : '#64748b',
-                    }}
-                  >
-                    {selectedActivity.isBillable ? 'Billable' : 'Non-billable'}
-                  </span>
-                </span>
-              ) : (
-                'Not clocked in'
-              )}
-            </p>
-          </div>
-
-          <p className="gradient-text mt-6 mb-4" style={{ fontSize: 32, letterSpacing: '-0.5px' }}>
-            {isClocked ? elapsedDuration : '0h 00m'}
-          </p>
-          <p className="text-xs text-5">
-            {isClocked
-              ? `Started at ${clockedAt ?? '9:00 AM'} · ${selectedActivity.name}`
-              : 'No active shift today'}
-          </p>
-
-          {/* Punch action bar with isolated relative positioning */}
-          <div
-            ref={dropdownRef}
-            className="mt-16"
-            style={{ position: 'relative', zIndex: 100 }}
+      <CardHeader
+        title="My Time"
+        icon={<Clock size={15} strokeWidth={2.3} />}
+        action={
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '3px 9px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 600,
+              background: isClocked ? '#ECFDF5' : '#F4F4F5',
+              color: isClocked ? '#059669' : '#71717A',
+              border: isClocked
+                ? '1px solid rgba(16, 185, 129, 0.22)'
+                : '1px solid var(--card-border, #E4E4E7)',
+            }}
           >
-            {/* Explicit Activity Selector Pill */}
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: isClocked ? '#10B981' : '#A1A1AA',
+                boxShadow: isClocked ? '0 0 0 3px rgba(16, 185, 129, 0.18)' : 'none',
+              }}
+            />
+            {isClocked ? 'Active Shift' : 'Off Clock'}
+          </span>
+        }
+      />
+      <CardBody style={{ overflow: 'visible', position: 'relative', padding: '14px 18px 16px 18px' }}>
+        {/* Signature Chrono & Activity Console */}
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'relative',
+            zIndex: 100,
+            background: '#FAF9F7',
+            border: '1px solid var(--card-border, #E4E4E7)',
+            borderRadius: 14,
+            padding: '14px 14px 12px 14px',
+          }}
+        >
+          {/* Top Row: Live Timer on Left + Single Activity Selector Pill on Right */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 10,
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: 'var(--text-3, #A1A1AA)',
+                  marginBottom: 2,
+                }}
+              >
+                {isClocked ? `Started ${clockedAt ?? '9:00 AM'}` : 'Session Timer'}
+              </div>
+              <div
+                className="gradient-text"
+                style={{
+                  fontSize: 28,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-title)',
+                  letterSpacing: '-0.03em',
+                  lineHeight: 1.1,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {isClocked ? elapsedDuration : '0h 00m'}
+              </div>
+            </div>
+
+            {/* Single Interactive Activity Switcher Pill (No Redundancy) */}
             <button
               type="button"
               onClick={() => setDropdownOpen((prev) => !prev)}
+              title="Switch activity type"
               style={{
-                width: '100%',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 12px',
-                marginBottom: 10,
-                borderRadius: 10,
+                gap: 6,
+                padding: '6px 10px',
+                borderRadius: 9,
                 border: dropdownOpen
-                  ? '1px solid var(--primary, #7C3AED)'
+                  ? '1px solid var(--primary, #A238FF)'
                   : '1px solid var(--card-border, #E4E4E7)',
-                background: '#FAF9F7',
+                background: '#FFFFFF',
                 cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(9, 9, 11, 0.03)',
                 transition: 'all 0.15s ease',
               }}
-              title="Choose punch activity type"
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: selectedActivity.color || 'var(--primary, #7C3AED)',
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 12, color: 'var(--text-4, #71717A)' }}>Activity:</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1, #18181B)' }}>
-                  {selectedActivity.name}
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: '2px 7px',
-                    borderRadius: 999,
-                    background: selectedActivity.isBillable ? '#ecfdf5' : '#f1f5f9',
-                    color: selectedActivity.isBillable ? '#059669' : '#64748b',
-                  }}
-                >
-                  {selectedActivity.isBillable ? 'Billable' : 'Non-billable'}
-                </span>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: selectedActivity.color || 'var(--primary, #A238FF)',
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--text-1, #18181B)',
+                }}
+              >
+                {selectedActivity.name}
+              </span>
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  padding: '1px 5px',
+                  borderRadius: 6,
+                  background: selectedActivity.isBillable ? '#ECFDF5' : '#F4F4F5',
+                  color: selectedActivity.isBillable ? '#059669' : '#71717A',
+                }}
+              >
+                {selectedActivity.isBillable ? 'Billable' : 'Non-bill'}
               </span>
               <ChevronDown
-                size={15}
-                strokeWidth={2.5}
+                size={13}
+                strokeWidth={2.4}
                 style={{
-                  color: 'var(--text-3, #71717A)',
+                  color: 'var(--text-3, #A1A1AA)',
                   transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.15s ease',
                 }}
               />
             </button>
+          </div>
 
-            <div className="row gap-8">
-              <button
-                type="button"
-                className="btn-primary w-full"
-                style={{
-                  flex: 1,
-                  padding: '12px 20px',
-                  fontSize: 14,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-                onClick={handleToggleClock}
-              >
-                <Clock size={16} strokeWidth={2} />
-                {isClocked
-                  ? `Clock out · ${selectedActivity.name}`
-                  : `Clock in · ${selectedActivity.name}`}
-              </button>
+          {/* Action Row: Primary Clock In/Out Button + Manual Log Trigger */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleToggleClock}
+              style={{
+                flex: 1,
+                height: 38,
+                padding: '0 14px',
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+              }}
+            >
+              <Clock size={14} strokeWidth={2.2} />
+              <span>{isClocked ? 'Clock Out' : 'Clock In'}</span>
+            </button>
 
-              <button
-                type="button"
-                className="btn-circle"
-                style={{ width: 44, height: 44, flexShrink: 0 }}
-                title="Select punch activity"
-                onClick={() => setDropdownOpen((prev) => !prev)}
-              >
-                <ChevronDown
-                  size={16}
-                  strokeWidth={2.5}
-                  style={{
-                    transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.15s ease',
-                  }}
-                />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setTimeEntryModal(true)}
+              title="Add Manual Time Entry"
+              style={{
+                height: 38,
+                padding: '0 11px',
+                borderRadius: 10,
+                border: '1px solid var(--card-border, #E4E4E7)',
+                background: '#FFFFFF',
+                color: 'var(--text-2, #52525B)',
+                fontSize: 12,
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <Plus size={13} strokeWidth={2.4} style={{ color: 'var(--primary, #A238FF)' }} />
+              <span>Manual</span>
+            </button>
+          </div>
 
-            {/* Dropdown Menu with absolute positioning and high z-index */}
-            {dropdownOpen && (
+          {/* Activity Dropdown Popover */}
+          {dropdownOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                left: 0,
+                background: '#FFFFFF',
+                border: '1px solid var(--card-border, #E4E4E7)',
+                borderRadius: 12,
+                boxShadow: '0 16px 36px -4px rgba(0,0,0,0.16), 0 4px 12px -2px rgba(0,0,0,0.06)',
+                zIndex: 1050,
+                textAlign: 'left',
+                overflow: 'hidden',
+              }}
+            >
               <div
                 style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 8px)',
-                  right: 0,
-                  left: 0,
-                  background: 'var(--card-bg, #ffffff)',
-                  border: '1px solid var(--card-border)',
-                  borderRadius: 12,
-                  boxShadow: '0 16px 36px -4px rgba(0,0,0,0.2), 0 4px 12px -2px rgba(0,0,0,0.08)',
-                  zIndex: 1050,
-                  textAlign: 'left',
-                  overflow: 'hidden',
+                  padding: '7px 12px',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--text-3, #A1A1AA)',
+                  background: '#FAF9F7',
+                  borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
                 }}
               >
+                Select Activity
+              </div>
+
+              <div style={{ maxHeight: 210, overflowY: 'auto', padding: 4 }}>
+                {activities.map((act) => {
+                  const isSelected =
+                    selectedActivity.name.toLowerCase() === act.name.toLowerCase();
+                  return (
+                    <button
+                      key={act.name}
+                      type="button"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: isSelected ? 'var(--primary-light, #F5EBFF)' : 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s ease',
+                      }}
+                      onClick={async () => {
+                        userSelectedActivityRef.current = act;
+                        setSelectedActivity(act);
+                        setDropdownOpen(false);
+                        try {
+                          localStorage.setItem(
+                            'easyhr_selected_clock_activity',
+                            JSON.stringify(act)
+                          );
+                        } catch {}
+
+                        if (
+                          isClocked &&
+                          act.name.toLowerCase() !== selectedActivity.name.toLowerCase()
+                        ) {
+                          toast.success(
+                            `Switched to ${act.name}`,
+                            `Active session updated to ${act.name} (${
+                              act.isBillable ? 'Billable' : 'Non-billable'
+                            }).`
+                          );
+                          if (isSignedIn) {
+                            try {
+                              const token = await getToken();
+                              if (token) {
+                                await fetch(`${API_BASE_URL}/api/v1/attendance/punches`, {
+                                  method: 'POST',
+                                  headers: getAuthHeaders(token),
+                                  body: JSON.stringify({
+                                    kind: 'clock_in',
+                                    activity: act.name,
+                                    isBillable: act.isBillable,
+                                    occurredAt: new Date().toISOString(),
+                                    source: 'web',
+                                  }),
+                                });
+                                loadPunches(false);
+                              }
+                            } catch {}
+                          }
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            background: act.color || 'var(--primary)',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: isSelected ? 600 : 500,
+                            color: isSelected ? 'var(--primary)' : 'var(--text-1)',
+                          }}
+                        >
+                          {act.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 9.5,
+                            fontWeight: 600,
+                            padding: '1px 6px',
+                            borderRadius: 6,
+                            background: act.isBillable ? '#ECFDF5' : '#F4F4F5',
+                            color: act.isBillable ? '#059669' : '#71717A',
+                          }}
+                        >
+                          {act.isBillable ? 'Billable' : 'Non-billable'}
+                        </span>
+                      </div>
+
+                      {isSelected && (
+                        <Check size={13} strokeWidth={2.6} style={{ color: 'var(--primary)' }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {isHRAdmin && (
                 <div
                   style={{
-                    padding: '8px 12px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    color: 'var(--text-5)',
-                    background: 'var(--primary-tint, #f8f7ff)',
-                    borderBottom: '1px solid var(--card-border)',
+                    padding: '6px 10px',
+                    background: '#FAF9F7',
+                    borderTop: '1px solid var(--border-subtle, #F0F0F3)',
                   }}
                 >
-                  Select Punch Activity
-                </div>
-
-                <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                  {activities.map((act) => {
-                    const isSelected =
-                      selectedActivity.name.toLowerCase() === act.name.toLowerCase();
-                    return (
-                      <button
-                        key={act.name}
-                        type="button"
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          background: isSelected ? 'var(--primary-tint, #f5f3ff)' : 'transparent',
-                          border: 'none',
-                          borderBottom: '1px solid var(--card-border)',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'background 0.15s',
-                        }}
-                        onClick={async () => {
-                          userSelectedActivityRef.current = act;
-                          setSelectedActivity(act);
-                          setDropdownOpen(false);
-                          try {
-                            localStorage.setItem(
-                              'easyhr_selected_clock_activity',
-                              JSON.stringify(act)
-                            );
-                          } catch {}
-
-                          // If already clocked in and switching to a different activity (e.g. Lunch), update active session
-                          if (
-                            isClocked &&
-                            act.name.toLowerCase() !== selectedActivity.name.toLowerCase()
-                          ) {
-                            toast.success(
-                              `Switched to ${act.name}`,
-                              `Active session updated to ${act.name} (${
-                                act.isBillable ? 'Billable' : 'Non-billable'
-                              }).`
-                            );
-                            if (isSignedIn) {
-                              try {
-                                const token = await getToken();
-                                if (token) {
-                                  await fetch(`${API_BASE_URL}/api/v1/attendance/punches`, {
-                                    method: 'POST',
-                                    headers: getAuthHeaders(token),
-                                    body: JSON.stringify({
-                                      kind: 'clock_in',
-                                      activity: act.name,
-                                      isBillable: act.isBillable,
-                                      occurredAt: new Date().toISOString(),
-                                      source: 'web',
-                                    }),
-                                  });
-                                  loadPunches(false);
-                                }
-                              } catch {}
-                            }
-                          }
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              background: act.color || 'var(--primary)',
-                              flexShrink: 0,
-                            }}
-                          />
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: isSelected ? 700 : 500,
-                              color: isSelected ? 'var(--primary)' : 'var(--text-1)',
-                            }}
-                          >
-                            {act.name}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: 10,
-                              background: act.isBillable ? '#ecfdf5' : '#f1f5f9',
-                              color: act.isBillable ? '#059669' : '#64748b',
-                            }}
-                          >
-                            {act.isBillable ? 'Billable' : 'Non-billable'}
-                          </span>
-                        </div>
-
-                        {isSelected && (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              background: 'rgba(124, 58, 237, 0.12)',
-                              color: 'var(--primary)',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Check size={12} strokeWidth={3} />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {isHRAdmin && (
-                  <div
+                  <Link
+                    href="/attendance?tab=activities"
                     style={{
-                      padding: '8px 12px',
-                      background: 'var(--card-bg)',
-                      borderTop: '1px solid var(--card-border)',
+                      display: 'block',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--primary)',
+                      textAlign: 'center',
+                      textDecoration: 'none',
                     }}
+                    onClick={() => setDropdownOpen(false)}
                   >
-                    <Link
-                      href="/attendance?tab=activities"
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '6px 0',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: 'var(--primary)',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                      }}
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      Configure Activities in Settings &rarr;
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="row mt-16 mb-6" style={{ justifyContent: 'center' }}>
-            <span className="text-5 text-xs">
-              Today &rarr; {dynamicTimeSummary.today}
-              {isClocked ? ` · ${selectedActivity.name} in progress` : ''}
-            </span>
-          </div>
-
-          <button
-            className="text-xs fw-700"
-            style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer' }}
-            onClick={() => setTimeEntryModal(true)}
-          >
-            + Add Manual Time Entry
-          </button>
+                    Configure Activities &rarr;
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="divider" style={{ margin: '20px 0 16px' }} />
+        {/* Bottom 3-Column Metrics Strip */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr auto',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--border-subtle, #F0F0F3)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)', marginBottom: 2 }}>
+              This Week
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-1, #18181B)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {dynamicTimeSummary.thisWeek}
+            </div>
+          </div>
 
-        <div className="row-between">
           <div>
-            <p className="text-xs text-5 mb-4">This Week</p>
-            <p className="text-sm text-1">{dynamicTimeSummary.thisWeek}</p>
+            <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)', marginBottom: 2 }}>
+              Pay Period
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-1, #18181B)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {dynamicTimeSummary.payPeriod}
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-5 mb-4">Pay Period</p>
-            <p className="text-sm text-1">{dynamicTimeSummary.payPeriod}</p>
-          </div>
-          <Link href="/time" className="btn-neutral btn-sm" style={{ textDecoration: 'none' }}>
-            My Timesheet
+
+          <Link
+            href="/time"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              height: 30,
+              padding: '0 10px',
+              borderRadius: 8,
+              border: '1px solid var(--card-border, #E4E4E7)',
+              background: '#FFFFFF',
+              color: 'var(--text-1, #18181B)',
+              fontSize: 11.5,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            <span>Timesheet</span>
+            <ChevronRight size={12} />
           </Link>
         </div>
       </CardBody>
@@ -918,7 +987,6 @@ export function CompulsoryMyTimeWidget() {
           Configure clock-in activity types for your organization. Mark activities as billable or non-billable to ensure accurate payroll calculation.
         </p>
 
-        {/* Existing activities list */}
         <div className="col gap-8 mb-20">
           {activities.map((act) => (
             <div
@@ -972,7 +1040,6 @@ export function CompulsoryMyTimeWidget() {
           ))}
         </div>
 
-        {/* Add new activity form */}
         <form onSubmit={handleCreateActivity} className="p-12 rounded-8" style={{ background: 'var(--primary-tint, #f8f7ff)', border: '1px solid var(--card-border)' }}>
           <p className="text-xs fw-700 mb-8" style={{ color: 'var(--primary)' }}>Add New Activity</p>
           <div className="row gap-8 mb-10">
@@ -1002,43 +1069,175 @@ export function CompulsoryMyTimeWidget() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 2. Compulsory Time Off Widget                                              */
+/* 2. Compulsory Time Off Widget (Bespoke EasyHR Leave Balance Bento)         */
 /* -------------------------------------------------------------------------- */
 
 export function CompulsoryTimeOffWidget() {
   const [modal, setModal] = useState(false);
+  const [selectedLeaveType, setSelectedLeaveType] = useState('Vacation');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [note, setNote] = useState('');
 
-  const balances = [
-    { type: 'Vacation', hoursUsed: 0 },
-    { type: 'Sick Leave', hoursUsed: 0 },
+  const leaveCards = [
+    {
+      type: 'Vacation',
+      available: '15d',
+      used: '0h used',
+      icon: <Palmtree size={14} strokeWidth={2.1} />,
+      accent: 'var(--primary, #A238FF)',
+      tint: 'var(--primary-light, #F5EBFF)',
+    },
+    {
+      type: 'Sick Leave',
+      available: '10d',
+      used: '0h used',
+      icon: <CalendarHeart size={14} strokeWidth={2.1} />,
+      accent: '#059669',
+      tint: '#ECFDF5',
+    },
+    {
+      type: 'Personal',
+      available: '5d',
+      used: '0h used',
+      icon: <Sun size={14} strokeWidth={2.1} />,
+      accent: '#2563EB',
+      tint: '#EFF6FF',
+    },
   ];
 
   return (
     <Card>
-      <CardHeader title="Time Off" icon={<CalendarDays size={16} strokeWidth={2.5} />} />
-      <CardBody>
-        <div className="row gap-16 mb-20">
-          {balances.map((b) => (
-            <div key={b.type} style={{ flex: 1, textAlign: 'center' }}>
-              {b.type === 'Vacation' ? (
-                <Palmtree size={28} strokeWidth={1.5} style={{ color: 'var(--primary)', margin: '0 auto' }} />
-              ) : (
-                <CalendarHeart size={28} strokeWidth={1.5} style={{ color: 'var(--primary)', margin: '0 auto' }} />
-              )}
-              <p className="text-xs text-2 mt-8">{b.type}</p>
-              <p className="text-xs text-5 mt-4">{b.hoursUsed}h used (YTD)</p>
-            </div>
-          ))}
-          <button className="btn-circle"><ChevronRight size={15} strokeWidth={2} /></button>
+      <CardHeader
+        title="Time Off"
+        icon={<CalendarDays size={15} strokeWidth={2.3} />}
+        action={
+          <Link
+            href="/time-off"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: 'var(--text-3, #71717A)',
+              textDecoration: 'none',
+            }}
+          >
+            <span>Balances</span>
+            <ChevronRight size={12} />
+          </Link>
+        }
+      />
+      <CardBody style={{ padding: '14px 18px 16px 18px' }}>
+        {/* 3-Column Leave Balance Mini-Bento */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          {leaveCards.map((item) => {
+            const isActive = selectedLeaveType === item.type;
+            return (
+              <button
+                key={item.type}
+                type="button"
+                onClick={() => {
+                  setSelectedLeaveType(item.type);
+                  setModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  padding: '10px 10px',
+                  borderRadius: 12,
+                  border: isActive
+                    ? '1px solid rgba(162, 56, 255, 0.28)'
+                    : '1px solid var(--card-border, #E4E4E7)',
+                  background: isActive ? '#FAF9F7' : '#FFFFFF',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease',
+                }}
+                title={`Request ${item.type}`}
+              >
+                <div
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 7,
+                    background: item.tint,
+                    color: item.accent,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 8,
+                  }}
+                >
+                  {item.icon}
+                </div>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-title)',
+                    color: 'var(--text-1, #18181B)',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {item.available}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'var(--text-2, #52525B)',
+                    marginTop: 3,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    width: '100%',
+                  }}
+                >
+                  {item.type}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--text-3, #A1A1AA)',
+                    marginTop: 1,
+                  }}
+                >
+                  {item.used}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
+        {/* Action Button */}
         <button
+          type="button"
           className="btn-secondary w-full"
-          style={{ padding: '12px 24px', fontSize: 14 }}
+          style={{
+            height: 38,
+            padding: '0 16px',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 7,
+          }}
           onClick={() => setModal(true)}
         >
-          <CalendarPlus size={16} strokeWidth={2.5} />
-          Request Time Off
+          <CalendarPlus size={15} strokeWidth={2.2} />
+          <span>Request Time Off</span>
         </button>
       </CardBody>
 
@@ -1048,30 +1247,65 @@ export function CompulsoryTimeOffWidget() {
         title="Request Time Off"
         footer={
           <>
-            <button className="btn-neutral" onClick={() => setModal(false)}>Cancel</button>
-            <button className="btn-primary" onClick={() => { setModal(false); toast.success("Time-off requested", "Request sent to your manager for review."); }}>Submit Request</button>
+            <button className="btn-neutral" onClick={() => setModal(false)}>
+              Cancel
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setModal(false);
+                toast.success(
+                  'Time-off requested',
+                  `${selectedLeaveType} request submitted to your manager for approval.`
+                );
+              }}
+            >
+              Submit Request
+            </button>
           </>
         }
       >
-        <div>
-          <label className="form-label">Leave Type*</label>
-          <Select>
-            {timeOffBalances.map((b) => <option key={b.type}>{b.type}</option>)}
-          </Select>
-        </div>
-        <div className="grid-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="form-label">Start Date*</label>
-            <Input type="date" />
+            <label className="form-label">Leave Category *</label>
+            <Select
+              value={selectedLeaveType}
+              onChange={(e) => setSelectedLeaveType(e.target.value)}
+            >
+              {timeOffBalances.map((b) => (
+                <option key={b.type} value={b.type}>
+                  {b.type}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="grid-2 gap-12">
+            <div>
+              <label className="form-label">Start Date *</label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">End Date *</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
           </div>
           <div>
-            <label className="form-label">End Date*</label>
-            <Input type="date" />
+            <label className="form-label">Note to Manager</label>
+            <Textarea
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add context or handover details for your team..."
+            />
           </div>
-        </div>
-        <div>
-          <label className="form-label">Note to Manager</label>
-          <Textarea rows={3} placeholder="Reason for leave..." />
         </div>
       </Modal>
     </Card>

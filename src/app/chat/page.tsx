@@ -53,6 +53,7 @@ import { ThreadDrawer } from '@/components/chat/ThreadDrawer';
 import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
 import { RichMessageContent, PollCard } from '@/components/chat/RichMessageContent';
+import { WysiwygChatEditor, WysiwygEditorRef } from '@/components/chat/WysiwygChatEditor';
 
 export default function GroupChatPage() {
   const {
@@ -108,7 +109,6 @@ export default function GroupChatPage() {
 
   // Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionAnchorIdx, setMentionAnchorIdx] = useState<number>(-1);
 
   // Staged file attachments
   const [uploadedAttachments, setUploadedAttachments] = useState<
@@ -123,7 +123,7 @@ export default function GroupChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<WysiwygEditorRef>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -223,47 +223,10 @@ export default function GroupChatPage() {
     return allEmployees.filter((e) => !memberSet.has(String(e.id)));
   }, [activeChannel, allEmployees]);
 
-  // Handle text input and @mentions
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setInputText(val);
-
-    const cursor = e.target.selectionStart;
-    const lastAtPos = val.lastIndexOf('@', cursor - 1);
-    if (lastAtPos !== -1 && !/\s/.test(val.slice(lastAtPos + 1, cursor))) {
-      setMentionQuery(val.slice(lastAtPos + 1, cursor).toLowerCase());
-      setMentionAnchorIdx(lastAtPos);
-    } else {
-      setMentionQuery(null);
-    }
-
-    setTyping(val.length > 0);
-  };
-
+  // Handle @mention selection via live WYSIWYG editor
   const handleSelectMention = (empName: string) => {
-    if (mentionAnchorIdx === -1) return;
-    const before = inputText.slice(0, mentionAnchorIdx);
-    const after = inputText.slice(textareaRef.current?.selectionStart || inputText.length);
-    setInputText(`${before}@${empName} ${after}`);
+    editorRef.current?.insertMention(empName);
     setMentionQuery(null);
-    textareaRef.current?.focus();
-  };
-
-  const applyFormat = (prefix: string, suffix: string = prefix, placeholder: string = 'text') => {
-    const el = textareaRef.current;
-    if (!el) {
-      setInputText((prev) => `${prev}${prefix}${placeholder}${suffix}`);
-      return;
-    }
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = inputText.slice(start, end) || placeholder;
-    const next = inputText.slice(0, start) + prefix + selected + suffix + inputText.slice(end);
-    setInputText(next);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-    }, 0);
   };
 
   const buildPollObject = (): ChatPoll | null => {
@@ -301,6 +264,7 @@ export default function GroupChatPage() {
       undefined,
       newPoll
     );
+    editorRef.current?.clear();
     setInputText('');
     setUploadedAttachments([]);
     setStagedPoll(null);
@@ -314,7 +278,7 @@ export default function GroupChatPage() {
     if (!newPoll) return;
     setStagedPoll(newPoll);
     resetPollBuilder();
-    textareaRef.current?.focus();
+    editorRef.current?.focus();
   };
 
   const handleSend = (e?: React.FormEvent) => {
@@ -329,6 +293,7 @@ export default function GroupChatPage() {
       stagedPoll || undefined
     );
 
+    editorRef.current?.clear();
     setInputText('');
     setUploadedAttachments([]);
     setStagedPoll(null);
@@ -2332,15 +2297,11 @@ export default function GroupChatPage() {
                   <EmojiGifPicker
                     initialTab={pickerTab}
                     onSelectEmoji={(emoji) => {
-                      setInputText((prev) => prev + emoji);
-                      textareaRef.current?.focus();
+                      editorRef.current?.insertEmoji(emoji);
                     }}
                     onSelectAnimatedEmoji={(code) => {
-                      setInputText(
-                        (prev) => `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}[:anim:${code}:] `
-                      );
+                      editorRef.current?.insertAnimatedEmoji(code);
                       setShowPicker(false);
-                      textareaRef.current?.focus();
                     }}
                     onSelectGif={(gifUrl) => {
                       setUploadedAttachments((prev) => [
@@ -2353,7 +2314,7 @@ export default function GroupChatPage() {
                         },
                       ]);
                       setShowPicker(false);
-                      textareaRef.current?.focus();
+                      editorRef.current?.focus();
                     }}
                     onClose={() => setShowPicker(false)}
                   />
@@ -2750,7 +2711,10 @@ export default function GroupChatPage() {
                             <button
                               key={emp.id}
                               type="button"
-                              onClick={() => handleSelectMention(fullName)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectMention(fullName);
+                              }}
                               style={{
                                 width: '100%',
                                 display: 'flex',
@@ -2799,7 +2763,7 @@ export default function GroupChatPage() {
                   </div>
                 )}
 
-                {/* Slack-Inspired Rich Text & Media Composer Container */}
+                {/* Slack-Inspired Live WYSIWYG Rich Text & Media Composer Container */}
                 <form
                   onSubmit={handleSend}
                   style={{
@@ -2810,114 +2774,17 @@ export default function GroupChatPage() {
                     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                   }}
                 >
-                  {/* Top WYSIWYG / Rich Text Formatting Toolbar */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '5px 10px',
-                      borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
-                      background: '#FFFFFF',
+                  {/* Live ContentEditable WYSIWYG Editor (No separate preview box) */}
+                  <WysiwygChatEditor
+                    ref={editorRef}
+                    placeholder={`Write a message to #${activeChannel.name}... (type @ to mention, select Bold/Italic/Lists to type live, or add animated emojis & GIFs)`}
+                    onChange={(serialized) => {
+                      setInputText(serialized);
+                      setTyping(serialized.length > 0);
                     }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                      {[
-                        {
-                          icon: <Bold size={13.5} />,
-                          title: 'Bold (**text**)',
-                          fn: () => applyFormat('**', '**', 'bold'),
-                        },
-                        {
-                          icon: <Italic size={13.5} />,
-                          title: 'Italic (_text_)',
-                          fn: () => applyFormat('_', '_', 'italic'),
-                        },
-                        {
-                          icon: <Strikethrough size={13.5} />,
-                          title: 'Strikethrough (~~text~~)',
-                          fn: () => applyFormat('~~', '~~', 'strikethrough'),
-                        },
-                        { divider: true },
-                        {
-                          icon: <Link2 size={13.5} />,
-                          title: 'Insert Link ([label](url))',
-                          fn: () => applyFormat('[', '](https://)', 'link text'),
-                        },
-                        {
-                          icon: <ListOrdered size={13.5} />,
-                          title: 'Numbered List',
-                          fn: () => applyFormat('\n1. ', '', 'List item'),
-                        },
-                        {
-                          icon: <List size={13.5} />,
-                          title: 'Bulleted List',
-                          fn: () => applyFormat('\n• ', '', 'List item'),
-                        },
-                        {
-                          icon: <Quote size={13.5} />,
-                          title: 'Blockquote (> quote)',
-                          fn: () => applyFormat('\n> ', '', 'Quote'),
-                        },
-                        { divider: true },
-                        {
-                          icon: <Code size={13.5} />,
-                          title: 'Inline Code (`code`)',
-                          fn: () => applyFormat('`', '`', 'code'),
-                        },
-                        {
-                          icon: <FileCode size={13.5} />,
-                          title: 'Code Block (```code```)',
-                          fn: () => applyFormat('\n```\n', '\n```\n', 'code snippet'),
-                        },
-                      ].map((item, idx) =>
-                        item.divider ? (
-                          <div
-                            key={idx}
-                            style={{
-                              width: 1,
-                              height: 15,
-                              background: 'var(--border-subtle, #F0F0F3)',
-                              margin: '0 4px',
-                            }}
-                          />
-                        ) : (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={item.fn}
-                            title={item.title}
-                            style={{
-                              width: 26,
-                              height: 26,
-                              borderRadius: 6,
-                              border: 'none',
-                              background: 'transparent',
-                              color: 'var(--text-2, #52525B)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#F4F4F5';
-                              e.currentTarget.style.color = 'var(--text-1, #18181B)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                              e.currentTarget.style.color = 'var(--text-2, #52525B)';
-                            }}
-                          >
-                            {item.icon}
-                          </button>
-                        )
-                      )}
-                    </div>
-
-                    <span style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)' }}>
-                      Mix text, animated emojis & GIFs · Shift+Enter for new line
-                    </span>
-                  </div>
+                    onSubmit={handleSend}
+                    onMentionQueryChange={setMentionQuery}
+                  />
 
                   {/* Staged Attachments (GIFs, Images, Videos, Files) & Staged Poll */}
                   {(uploadedAttachments.length > 0 || stagedPoll) && (
@@ -2927,7 +2794,7 @@ export default function GroupChatPage() {
                         flexWrap: 'wrap',
                         alignItems: 'center',
                         gap: 8,
-                        padding: '8px 12px 4px 12px',
+                        padding: '4px 12px 8px 12px',
                       }}
                     >
                       {stagedPoll && (
@@ -3059,67 +2926,6 @@ export default function GroupChatPage() {
                     </div>
                   )}
 
-                  {/* Textarea Input */}
-                  <div style={{ padding: '8px 12px 6px 12px' }}>
-                    <textarea
-                      ref={textareaRef}
-                      rows={2}
-                      placeholder={`Write a message to #${activeChannel.name}... (type @ to mention, add animated emojis after text, or mix with a GIF)`}
-                      value={inputText}
-                      onChange={handleInputChange}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        background: 'transparent',
-                        outline: 'none',
-                        resize: 'none',
-                        fontSize: 13.5,
-                        color: 'var(--text-1, #18181B)',
-                        padding: 0,
-                        lineHeight: 1.45,
-                      }}
-                    />
-
-                    {/* Live Inline Preview when Animated Emojis or Rich Formatting are used */}
-                    {/\[:anim:[a-z0-9_]+:\]|\*\*|_.*_|~~|`|^>|^•|^\d+\./m.test(inputText) && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          padding: '6px 10px',
-                          borderRadius: 8,
-                          background: '#FFFFFF',
-                          border: '1px dashed var(--card-border, #E4E4E7)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          fontSize: 13,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em',
-                            color: 'var(--primary, #A238FF)',
-                            flexShrink: 0,
-                          }}
-                        >
-                          Live Preview:
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <RichMessageContent content={inputText} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Bottom Action Bar: Attach, Mention, Emojis, Animated Emojis, GIF, Poll, Send */}
                   <div
                     style={{
@@ -3165,11 +2971,9 @@ export default function GroupChatPage() {
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setInputText((prev) => prev + '@');
-                          setMentionQuery('');
-                          setMentionAnchorIdx(inputText.length);
-                          textareaRef.current?.focus();
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          editorRef.current?.triggerAtMention();
                         }}
                         style={{
                           width: 28,
@@ -3504,8 +3308,7 @@ export default function GroupChatPage() {
                 type="button"
                 onClick={() => {
                   const fullName = `${selectedProfileMember.firstName} ${selectedProfileMember.lastName}`.trim();
-                  setInputText((prev) => `${prev}@${fullName} `);
-                  textareaRef.current?.focus();
+                  editorRef.current?.insertMention(fullName);
                 }}
                 style={{
                   flex: 1,

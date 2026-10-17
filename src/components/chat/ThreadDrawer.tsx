@@ -25,6 +25,7 @@ import { ChatMessage, useChat } from '@/context/ChatContext';
 import { EmojiGifPicker, PickerTab } from './EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from './MediaLightbox';
 import { RichMessageContent, PollCard } from './RichMessageContent';
+import { WysiwygChatEditor, WysiwygEditorRef } from './WysiwygChatEditor';
 import { useRole } from '@/context/RoleContext';
 
 interface ThreadDrawerProps {
@@ -58,24 +59,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
   >([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const replyInputRef = useRef<HTMLTextAreaElement>(null);
-
-  const applyFormat = (prefix: string, suffix: string = prefix) => {
-    const el = replyInputRef.current;
-    if (!el) {
-      setReplyText((prev) => `${prev}${prefix}text${suffix}`);
-      return;
-    }
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = replyText.slice(start, end) || 'text';
-    const next = replyText.slice(0, start) + prefix + selected + suffix + replyText.slice(end);
-    setReplyText(next);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-    }, 0);
-  };
+  const replyEditorRef = useRef<WysiwygEditorRef>(null);
 
   const handleSendReply = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -85,18 +69,18 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
       stagedAttachments.length > 0 ? stagedAttachments : undefined,
       parentMessage.id
     );
+    replyEditorRef.current?.clear();
     setReplyText('');
     setStagedAttachments([]);
   };
 
   const handleSelectEmoji = (emoji: string) => {
-    setReplyText((prev) => prev + emoji);
+    replyEditorRef.current?.insertEmoji(emoji);
   };
 
   const handleSelectAnimatedEmoji = (code: string) => {
-    setReplyText((prev) => `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}[:anim:${code}:] `);
+    replyEditorRef.current?.insertAnimatedEmoji(code);
     setShowPicker(false);
-    replyInputRef.current?.focus();
   };
 
   const handleSelectGif = (gifUrl: string) => {
@@ -110,7 +94,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
       },
     ]);
     setShowPicker(false);
-    replyInputRef.current?.focus();
+    replyEditorRef.current?.focus();
   };
 
   const handleThreadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,8 +116,6 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
       ]);
     });
   };
-
-  const hasAnimatedOrFormatting = /\[:anim:[a-z0-9_]+:\]|\*\*|_.*_|~~|`|^>|^•/m.test(replyText);
 
   return (
     <aside
@@ -695,47 +677,14 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
             overflow: 'hidden',
           }}
         >
-          {/* Mini Formatting Bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              padding: '5px 8px',
-              borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
-              background: '#FFFFFF',
-            }}
-          >
-            {[
-              { icon: <Bold size={12.5} />, title: 'Bold', fn: () => applyFormat('**') },
-              { icon: <Italic size={12.5} />, title: 'Italic', fn: () => applyFormat('_') },
-              { icon: <Strikethrough size={12.5} />, title: 'Strikethrough', fn: () => applyFormat('~~') },
-              { icon: <Code size={12.5} />, title: 'Inline Code', fn: () => applyFormat('`') },
-              { icon: <List size={12.5} />, title: 'Bullet List', fn: () => applyFormat('\n• ', '') },
-              { icon: <Quote size={12.5} />, title: 'Quote', fn: () => applyFormat('\n> ', '') },
-            ].map((btn, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={btn.fn}
-                title={btn.title}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 5,
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--text-2, #52525B)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                {btn.icon}
-              </button>
-            ))}
-          </div>
+          {/* Live WYSIWYG Thread Editor (No separate preview box) */}
+          <WysiwygChatEditor
+            ref={replyEditorRef}
+            compact
+            placeholder="Reply in thread... (mix text, emojis & GIFs)"
+            onChange={(serialized) => setReplyText(serialized)}
+            onSubmit={handleSendReply}
+          />
 
           {/* Staged GIF / File Attachments */}
           {stagedAttachments.length > 0 && (
@@ -744,7 +693,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: 6,
-                padding: '8px 10px 4px 10px',
+                padding: '4px 10px 8px 10px',
               }}
             >
               {stagedAttachments.map((att) => (
@@ -817,47 +766,6 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                   )}
                 </div>
               ))}
-            </div>
-          )}
-
-          <textarea
-            ref={replyInputRef}
-            rows={2}
-            placeholder="Reply in thread... (mix text, emojis & GIFs)"
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendReply(e);
-              }
-            }}
-            style={{
-              width: '100%',
-              padding: '8px 12px 6px 12px',
-              fontSize: 12.5,
-              border: 'none',
-              background: 'transparent',
-              outline: 'none',
-              resize: 'none',
-              color: 'var(--text-1, #18181B)',
-            }}
-          />
-
-          {/* Live Inline Preview for Animated Emojis & Rich Formatting */}
-          {hasAnimatedOrFormatting && (
-            <div
-              style={{
-                margin: '0 10px 8px 10px',
-                padding: '6px 10px',
-                borderRadius: 8,
-                background: '#FFFFFF',
-                border: '1px dashed var(--card-border, #E4E4E7)',
-                fontSize: 12,
-                color: 'var(--text-1, #18181B)',
-              }}
-            >
-              <RichMessageContent content={replyText} />
             </div>
           )}
 

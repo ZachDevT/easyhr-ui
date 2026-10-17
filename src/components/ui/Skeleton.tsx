@@ -25,7 +25,9 @@ export function Skeleton({ className = "", style, width, height, radius }: Skele
 }
 
 /**
- * DashboardSkeleton mimics the exact layout of /dashboard
+ * DashboardSkeleton mimics the exact 3-column layout of /dashboard
+ * Left column: Compulsory My Time + Compulsory Time Off (fixed height, independent)
+ * Middle & Right columns: Celebrations, Holidays, Welcome New Hires
  */
 export function DashboardSkeleton() {
   return (
@@ -35,79 +37,238 @@ export function DashboardSkeleton() {
         <div className="row gap-16" style={{ alignItems: "center" }}>
           <Skeleton width={84} height={84} radius="50%" />
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Skeleton width={220} height={32} radius={8} />
-            <Skeleton width={160} height={16} radius={6} />
+            <Skeleton width={210} height={32} radius={8} />
+            <Skeleton width={155} height={15} radius={6} />
           </div>
         </div>
         <div className="row gap-10">
-          <Skeleton width={110} height={38} radius={8} />
-          <Skeleton width={140} height={38} radius={8} />
+          <Skeleton width={104} height={36} radius={999} />
+          <Skeleton width={120} height={36} radius={999} />
+          <Skeleton width={145} height={36} radius={999} />
         </div>
       </div>
 
-      {/* Main Grid: Left Compulsory (360px) + Right Optional */}
-      <div className="dash-grid" style={{ gridTemplateColumns: "360px 1fr", gap: 24 }}>
-        {/* Left Column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Main 3-Column Dashboard Grid */}
+      <div
+        className="dash-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "340px 1fr 1fr",
+          gap: 20,
+          alignItems: "start",
+        }}
+      >
+        {/* Left Column: My Time + Time Off */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {/* My Time Widget Skeleton */}
-          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24 }}>
-            <div className="row-between mb-20">
-              <Skeleton width={120} height={18} />
-              <Skeleton width={70} height={22} radius={12} />
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div className="row-between">
+              <div className="row gap-8">
+                <Skeleton width={18} height={18} radius={5} />
+                <Skeleton width={76} height={16} radius={5} />
+              </div>
+              <Skeleton width={82} height={22} radius={999} />
             </div>
-            <div style={{ display: "flex", justifyContent: "center", margin: "24px 0" }}>
-              <Skeleton width={150} height={150} radius="50%" />
+
+            {/* Inner Chrono Console Shimmer */}
+            <div
+              style={{
+                background: "#FAF9F7",
+                border: "1px solid var(--card-border, #E4E4E7)",
+                borderRadius: 14,
+                padding: 14,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <div className="row-between" style={{ alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Skeleton width={78} height={10} radius={4} />
+                  <Skeleton width={108} height={28} radius={6} />
+                </div>
+                <Skeleton width={126} height={28} radius={9} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Skeleton height={38} radius={10} style={{ flex: 1 }} />
+                <Skeleton width={78} height={38} radius={10} />
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <Skeleton height={42} radius={10} />
-              <Skeleton height={42} radius={10} />
+
+            {/* Bottom Metrics Strip Shimmer */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr auto",
+                gap: 8,
+                paddingTop: 10,
+                borderTop: "1px solid #F0F0F3",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <Skeleton width={54} height={10} />
+                <Skeleton width={68} height={15} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <Skeleton width={58} height={10} />
+                <Skeleton width={68} height={15} />
+              </div>
+              <Skeleton width={82} height={30} radius={8} />
             </div>
           </div>
 
           {/* Time Off Widget Skeleton */}
-          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24 }}>
-            <div className="row-between mb-16">
-              <Skeleton width={130} height={18} />
-              <Skeleton width={80} height={16} />
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div className="row-between">
+              <div className="row gap-8">
+                <Skeleton width={18} height={18} radius={5} />
+                <Skeleton width={74} height={16} radius={5} />
+              </div>
+              <Skeleton width={64} height={14} radius={5} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Skeleton height={70} radius={12} />
-              <Skeleton height={70} radius={12} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    border: "1px solid var(--card-border, #E4E4E7)",
+                    borderRadius: 12,
+                    padding: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <Skeleton width={26} height={26} radius={7} />
+                  <Skeleton width={40} height={16} radius={4} />
+                  <Skeleton width={56} height={11} radius={4} />
+                  <Skeleton width={44} height={9} radius={4} />
+                </div>
+              ))}
             </div>
+            <Skeleton width="100%" height={38} radius={10} />
           </div>
         </div>
 
-        {/* Right Column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Quick Action Ribbon */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-                <Skeleton width={36} height={36} radius={10} />
-                <Skeleton width={90} height={14} />
-                <Skeleton width={50} height={22} />
+        {/* Middle Column: Celebrations + Company Holidays */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div className="row-between">
+              <Skeleton width={165} height={17} />
+              <Skeleton width={68} height={24} radius={999} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Skeleton width={42} height={26} radius={999} />
+              <Skeleton width={76} height={26} radius={999} />
+              <Skeleton width={114} height={26} radius={999} />
+            </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 0" }}>
+                <Skeleton width={36} height={36} radius="50%" />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Skeleton width="55%" height={13} />
+                  <Skeleton width="38%" height={11} />
+                </div>
+                <Skeleton width={46} height={18} radius={6} />
               </div>
             ))}
           </div>
 
-          {/* Large Card Shimmer */}
-          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-            <div className="row-between mb-12">
-              <Skeleton width={180} height={20} />
-              <Skeleton width={80} height={16} />
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div className="row-between">
+              <Skeleton width={135} height={17} />
+              <Skeleton width={54} height={22} radius={6} />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {[1, 2, 3].map((i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderBottom: i === 3 ? "none" : "1px solid #F3F4F6" }}>
-                  <Skeleton width={44} height={44} radius="50%" />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <Skeleton width="40%" height={15} />
-                    <Skeleton width="70%" height={12} />
-                  </div>
-                  <Skeleton width={80} height={24} radius={12} />
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 0" }}>
+                <Skeleton width={32} height={32} radius={8} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+                  <Skeleton width="60%" height={13} />
+                  <Skeleton width="35%" height={11} />
                 </div>
-              ))}
+                <Skeleton width={54} height={20} radius={999} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Column: Welcome New Hires */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div className="row-between">
+              <Skeleton width={145} height={17} />
+              <Skeleton width={80} height={14} />
             </div>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 0",
+                  borderBottom: i === 3 ? "none" : "1px solid #F4F4F5",
+                }}
+              >
+                <Skeleton width={38} height={38} radius="50%" />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Skeleton width="58%" height={13} />
+                  <Skeleton width="72%" height={11} />
+                </div>
+                <Skeleton width={52} height={20} radius={6} />
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -116,59 +277,234 @@ export function DashboardSkeleton() {
 }
 
 /**
- * ProfileMeSkeleton mimics /people/me
+ * ProfileTabShimmer renders a tailored skeleton for each tab inside /people/me or /people/[id]
+ */
+export function ProfileTabShimmer({ tab = "Personal" }: { tab?: string }) {
+  if (tab === "Job") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.18s ease" }}>
+        <div className="row-between">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <Skeleton width={210} height={20} />
+            <Skeleton width={300} height={13} />
+          </div>
+          <Skeleton width={110} height={30} radius={8} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} style={{ padding: 14, borderRadius: 12, border: "1px solid #E4E4E7", display: "flex", flexDirection: "column", gap: 8 }}>
+              <Skeleton width={28} height={28} radius={7} />
+              <Skeleton width="60%" height={11} />
+              <Skeleton width="80%" height={16} />
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: 18, borderRadius: 14, border: "1px solid #E4E4E7", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <Skeleton width={95} height={11} />
+              <Skeleton width="75%" height={16} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (tab === "Documents") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 18, animation: "fadeIn 0.18s ease" }}>
+        <div className="row-between">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <Skeleton width={230} height={20} />
+            <Skeleton width={310} height={13} />
+          </div>
+          <Skeleton width={135} height={34} radius={9} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} height={64} radius={12} />
+          ))}
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div key={i} style={{ padding: 14, borderRadius: 12, border: "1px solid #E4E4E7", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Skeleton width={38} height={38} radius={9} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <Skeleton width={180} height={14} />
+                <Skeleton width={120} height={11} />
+              </div>
+            </div>
+            <Skeleton width={90} height={28} radius={8} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (tab === "Time Off" || tab === "Benefits" || tab === "Performance") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20, animation: "fadeIn 0.18s ease" }}>
+        <div className="row-between">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <Skeleton width={200} height={20} />
+            <Skeleton width={280} height={13} />
+          </div>
+          <Skeleton width={130} height={34} radius={9} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} style={{ padding: 16, borderRadius: 12, border: "1px solid #E4E4E7", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="row-between">
+                <Skeleton width={32} height={32} radius={8} />
+                <Skeleton width={56} height={20} radius={999} />
+              </div>
+              <Skeleton width="65%" height={22} />
+              <Skeleton width="45%" height={12} />
+              <Skeleton width="100%" height={6} radius={999} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Skeleton width={150} height={15} />
+          {[1, 2].map((i) => (
+            <Skeleton key={i} height={58} radius={12} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Default (Personal / Pay Info / Emergency / Timesheet)
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.18s ease" }}>
+      <div className="row-between">
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Skeleton width={210} height={20} />
+          <Skeleton width={320} height={13} />
+        </div>
+        <Skeleton width={105} height={34} radius={9} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} style={{ padding: 14, borderRadius: 12, border: "1px solid #E4E4E7", display: "flex", flexDirection: "column", gap: 8 }}>
+            <Skeleton width={85} height={11} />
+            <Skeleton width="80%" height={15} />
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: 16, borderRadius: 12, border: "1px solid #E4E4E7", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} height={54} radius={10} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ProfileMeSkeleton mimics the exact redesigned Executive Employee Profile Header & Layout of /people/me & /people/[id]
  */
 export function ProfileMeSkeleton() {
   return (
     <div style={{ height: "100%", overflowY: "auto", background: "var(--bg-page)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease" }}>
-      {/* Banner Shimmer */}
-      <div style={{ margin: "24px 24px 0 24px" }}>
-        <div style={{ background: "linear-gradient(135deg, #A238FF15 0%, #2D144B15 100%)", border: "1px solid #E5E7EB", borderRadius: 16, padding: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 28 }}>
-            <Skeleton width={100} height={100} radius="50%" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Skeleton width={240} height={28} />
-              <Skeleton width={160} height={16} />
+      {/* Executive Employee Profile Header Card Shimmer */}
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 16,
+          border: "1px solid var(--card-border, #E4E4E7)",
+          overflow: "hidden",
+          marginBottom: 20,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ height: 4, background: "var(--gradient)" }} />
+        <div
+          style={{
+            padding: "20px 24px 18px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <Skeleton width={76} height={76} radius="50%" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Skeleton width={190} height={22} radius={6} />
+                <Skeleton width={64} height={20} radius={999} />
+                <Skeleton width={72} height={20} radius={6} />
+              </div>
+              <Skeleton width={220} height={15} radius={5} />
+              <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
+                <Skeleton width={95} height={13} radius={4} />
+                <Skeleton width={110} height={13} radius={4} />
+                <Skeleton width={140} height={13} radius={4} />
+              </div>
             </div>
           </div>
-          {/* Tab bar shimmer */}
-          <div style={{ display: "flex", gap: 12, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
-            {[80, 60, 90, 80, 100, 75, 90].map((w, idx) => (
-              <Skeleton key={idx} width={w} height={32} radius={20} />
-            ))}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Skeleton width={112} height={34} radius={9} />
+            <Skeleton width={104} height={34} radius={9} />
           </div>
+        </div>
+
+        {/* Bottom Integrated Navigation Tabs Shimmer */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 20px",
+            background: "#FAF9F7",
+            borderTop: "1px solid var(--card-border, #E4E4E7)",
+          }}
+        >
+          {[82, 64, 94, 82, 102, 80, 88, 78, 92].map((w, idx) => (
+            <Skeleton key={idx} width={w} height={26} radius={7} />
+          ))}
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 48, padding: "24px" }}>
+      {/* Main Grid: Left Vitals (270px) + Right Tab Content (1fr) */}
+      <div style={{ display: "grid", gridTemplateColumns: "270px 1fr", gap: 20, alignItems: "start" }}>
         {/* Left Vitals Column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-            <Skeleton width={80} height={16} />
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Skeleton width={20} height={20} radius={6} />
-                <Skeleton width="75%" height={14} />
-              </div>
-            ))}
-          </div>
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid var(--card-border, #E4E4E7)",
+            borderRadius: 14,
+            padding: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <Skeleton width={95} height={13} />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Skeleton width={28} height={28} radius={7} />
+              <Skeleton width="72%" height={14} />
+            </div>
+          ))}
+          <div style={{ height: 1, background: "#F0F0F3", margin: "4px 0" }} />
+          <Skeleton width={115} height={13} />
+          <Skeleton width="100%" height={56} radius={10} />
         </div>
 
         {/* Right Content Column */}
-        <div style={{ background: "white", border: "1px solid var(--card-border)", borderRadius: 16, padding: 32 }}>
-          <div className="row-between mb-24">
-            <Skeleton width={180} height={24} />
-            <Skeleton width={90} height={32} radius={8} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <Skeleton width={100} height={13} />
-                <Skeleton height={38} radius={8} />
-              </div>
-            ))}
-          </div>
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid var(--card-border, #E4E4E7)",
+            borderRadius: 14,
+            padding: 28,
+          }}
+        >
+          <ProfileTabShimmer tab="Personal" />
         </div>
       </div>
     </div>
@@ -230,7 +566,6 @@ export function CompanySettingsSkeleton() {
 export function DepartmentsSkeleton() {
   return (
     <div style={{ padding: "32px 40px", animation: "fadeIn 0.2s ease", display: "flex", flexDirection: "column", gap: 32 }}>
-      {/* Stat Ribbon Skeleton */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {[1, 2, 3, 4].map((i) => (
           <div key={i} style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -244,7 +579,6 @@ export function DepartmentsSkeleton() {
         ))}
       </div>
 
-      {/* Header filter row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <Skeleton width={200} height={24} />
@@ -253,7 +587,6 @@ export function DepartmentsSkeleton() {
         <Skeleton width={280} height={40} radius={12} />
       </div>
 
-      {/* Grid of Department Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -285,7 +618,6 @@ export function DepartmentsSkeleton() {
 export function HiringSkeleton() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", animation: "fadeIn 0.2s ease" }}>
-      {/* Toolbar Skeleton */}
       <div style={{ padding: 32, borderBottom: "1px solid var(--border)", background: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", gap: 24 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -300,7 +632,6 @@ export function HiringSkeleton() {
         <Skeleton width={110} height={44} radius={8} />
       </div>
 
-      {/* Kanban Columns Skeleton */}
       <div style={{ padding: "32px 48px", display: "flex", gap: 24, overflowX: "auto" }}>
         {[1, 2, 3, 4, 5].map((col) => (
           <div key={col} style={{ minWidth: 300, width: 300, background: "#F3F4F6", padding: 16, borderRadius: 12, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -342,7 +673,6 @@ export function HiringSkeleton() {
 export function PeopleDirectorySkeleton() {
   return (
     <div style={{ padding: "0 24px 32px", animation: "fadeIn 0.2s ease" }}>
-      {/* Top filter row skeleton */}
       <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <Skeleton width={140} height={20} />
@@ -352,7 +682,6 @@ export function PeopleDirectorySkeleton() {
           </div>
         </div>
 
-        {/* Employee Cards Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -383,7 +712,6 @@ export function PeopleDirectorySkeleton() {
 export function OnboardingPortalSkeleton() {
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 24, animation: "fadeIn 0.2s ease" }}>
-      {/* Banner Skeleton */}
       <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <Skeleton width={72} height={72} radius="50%" />
@@ -398,10 +726,8 @@ export function OnboardingPortalSkeleton() {
         </div>
       </div>
 
-      {/* Grid with main form and sidebar */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 32, alignItems: "flex-start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Stepper bar */}
           <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 20, display: "flex", justifyContent: "space-between" }}>
             {[1, 2, 3, 4].map((i) => (
               <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1 }}>
@@ -411,7 +737,6 @@ export function OnboardingPortalSkeleton() {
             ))}
           </div>
 
-          {/* Form card */}
           <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 40, display: "flex", flexDirection: "column", gap: 24 }}>
             <Skeleton width={220} height={24} />
             <Skeleton width={320} height={14} />
@@ -427,7 +752,6 @@ export function OnboardingPortalSkeleton() {
           </div>
         </div>
 
-        {/* Sidebar widgets */}
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
             <Skeleton width={140} height={18} />
@@ -452,7 +776,6 @@ export function OnboardingPortalSkeleton() {
 export function AttendanceSkeleton() {
   return (
     <div style={{ animation: "fadeIn 0.2s ease" }}>
-      {/* Top action / punch bar skeleton */}
       <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: "20px 24px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <Skeleton width={48} height={48} radius="50%" />
@@ -467,7 +790,6 @@ export function AttendanceSkeleton() {
         </div>
       </div>
 
-      {/* Stats Ribbon skeleton */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", gap: 16, background: "white", border: "1px solid var(--border)", borderRadius: 100, padding: "8px 24px" }}>
           <Skeleton width={90} height={18} />
@@ -481,7 +803,6 @@ export function AttendanceSkeleton() {
         </div>
       </div>
 
-      {/* Grid of employee attendance cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -509,6 +830,169 @@ export function AttendanceSkeleton() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * ModulePageSkeleton: Universal executive shimmer skeleton for workspace pages
+ * Supports 'bento', 'table', or 'split' variants
+ */
+export function ModulePageSkeleton({ variant = "bento" }: { variant?: "bento" | "table" | "split" }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, animation: "fadeIn 0.2s ease" }}>
+      {/* PageHeader Shimmer */}
+      <div
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid var(--card-border, #E4E4E7)",
+          borderRadius: 16,
+          padding: "18px 22px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Skeleton width={42} height={42} radius={11} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <Skeleton width={190} height={20} radius={6} />
+            <Skeleton width={280} height={13} radius={5} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Skeleton width={110} height={34} radius={9} />
+          <Skeleton width={130} height={34} radius={9} />
+        </div>
+      </div>
+
+      {/* 4-Column KPI Ribbon */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 14,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <div className="row-between">
+              <Skeleton width={95} height={12} />
+              <Skeleton width={28} height={28} radius={8} />
+            </div>
+            <Skeleton width={70} height={26} />
+            <Skeleton width={120} height={11} />
+          </div>
+        ))}
+      </div>
+
+      {variant === "split" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20 }}>
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <Skeleton width="100%" height={36} radius={9} />
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} width="100%" height={58} radius={11} />
+            ))}
+          </div>
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--card-border, #E4E4E7)",
+              borderRadius: 16,
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <Skeleton width={220} height={22} />
+            <Skeleton width="100%" height={140} radius={12} />
+            <Skeleton width="100%" height={180} radius={12} />
+          </div>
+        </div>
+      ) : variant === "table" ? (
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid var(--card-border, #E4E4E7)",
+            borderRadius: 16,
+            padding: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          <div className="row-between">
+            <Skeleton width={240} height={34} radius={9} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Skeleton width={90} height={32} radius={8} />
+              <Skeleton width={90} height={32} radius={8} />
+            </div>
+          </div>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 0",
+                borderBottom: i === 6 ? "none" : "1px solid #F4F4F5",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Skeleton width={36} height={36} radius={9} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Skeleton width={160} height={14} />
+                  <Skeleton width={110} height={11} />
+                </div>
+              </div>
+              <Skeleton width={90} height={22} radius={999} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid var(--card-border, #E4E4E7)",
+                borderRadius: 16,
+                padding: 20,
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
+              <div className="row-between">
+                <Skeleton width={40} height={40} radius={10} />
+                <Skeleton width={68} height={22} radius={999} />
+              </div>
+              <Skeleton width="75%" height={18} />
+              <Skeleton width="90%" height={12} />
+              <Skeleton width="60%" height={12} />
+              <Skeleton width="100%" height={34} radius={9} style={{ marginTop: 4 }} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

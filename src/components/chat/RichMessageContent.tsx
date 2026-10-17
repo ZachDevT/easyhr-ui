@@ -17,15 +17,37 @@ import { Employee } from '@/data/employees';
  * - URLs (https://...)
  */
 function renderInlineTokens(text: string, keyPrefix = 'in'): React.ReactNode[] {
-  // Split by animated emoji token, bold, italic, strike, inline code, @mention, or URL
   const tokenRegex =
-    /(\[:anim:[a-z0-9_]+:\]|\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|_[A-Za-z0-9][^_]*_|@[A-Za-z]+(?:\s[A-Za-z]+)?|https?:\/\/[^\s]+)/g;
+    /(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\[:anim:[a-z0-9_]+:\]|\*\*[\s\S]+?\*\*|~~[\s\S]+?~~|`[^`]+`|_[^_\n]+_|@[A-Za-z]+(?:\s[A-Za-z]+)?|https?:\/\/[^\s]+)/g;
 
   const parts = text.split(tokenRegex);
 
   return parts.map((part, idx) => {
     const key = `${keyPrefix}-${idx}`;
     if (!part) return null;
+
+    // 0. Markdown Link [label](url)
+    if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+      const splitIdx = part.indexOf('](');
+      const label = part.slice(1, splitIdx);
+      const url = part.slice(splitIdx + 2, -1);
+      return (
+        <a
+          key={key}
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            color: 'var(--primary, #A238FF)',
+            textDecoration: 'underline',
+            textUnderlineOffset: 2,
+            fontWeight: 500,
+          }}
+        >
+          {label}
+        </a>
+      );
+    }
 
     // 1. Inline Animated Emoji [:anim:CODE:]
     if (part.startsWith('[:anim:') && part.endsWith(':]')) {

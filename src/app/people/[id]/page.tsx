@@ -32,6 +32,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { toast } from "@/components/ui/Toast";
 import { EditEmployeeModal } from "@/components/people/EditEmployeeModal";
+import { ProfileMeSkeleton } from "@/components/ui/Skeleton";
 
 interface EmployeeProfileData {
   id: string;
@@ -165,11 +166,7 @@ export default function EmployeeProfile() {
   const { isHRAdmin, isManager, currentUser } = useRole();
 
   if (isLoading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-        <Loader2 className="animate-spin text-primary" size={36} />
-      </div>
-    );
+    return <ProfileMeSkeleton />;
   }
 
   // Security check: non-admin, non-manager employees are only permitted to view their own profile (/people/me)
