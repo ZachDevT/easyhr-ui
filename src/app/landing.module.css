@@ -76,9 +76,11 @@
   font-size: 10px;
 }
 .hero h1 {
+  font-family: var(--font-title);
   font-size: clamp(52px, 6vw, 88px);
-  line-height: 0.96;
-  letter-spacing: -0.065em;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
   margin: 28px 0 22px;
   max-width: 780px;
 }

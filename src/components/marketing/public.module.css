@@ -47,14 +47,13 @@
 .navLink {
   padding: 8px 14px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 600;
-  font-family: 'Enzyme', sans-serif;
+  font-family: var(--font-body);
   letter-spacing: -0.01em;
   color: #4b4654;
   text-decoration: none;
   transition: color 0.15s, background 0.15s;
-  -webkit-text-stroke: 0.25px currentColor;
 }
 .navLink:hover {
   color: #1a1520;
