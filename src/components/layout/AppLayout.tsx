@@ -15,7 +15,7 @@ const KNOWN_APP_PREFIXES = [
   '/offboarding', '/onboarding', '/employee-relations',
   '/signatures', '/my-signatures', '/departments', '/org-chart', '/reports',
   '/team-requests', '/my-team', '/inbox', '/messaging', '/company-settings',
-  '/support', '/total-rewards', '/engagement', '/time', '/announcements'
+  '/support', '/total-rewards', '/engagement', '/time', '/announcements', '/chat'
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

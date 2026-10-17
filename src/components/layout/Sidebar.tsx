@@ -19,6 +19,8 @@ import {
   LogOut,
   ArrowRight,
   CornerDownLeft,
+  MessageSquare,
+  Hash,
 } from "lucide-react";
 import { useRole } from "../../context/RoleContext";
 import { useCompany } from "../../context/CompanyContext";
@@ -64,6 +66,13 @@ export function Sidebar() {
     dashboard: true,
     hiring: true,
   });
+
+  // Automatically collapse sidebar into icons-only mode when entering chat
+  useEffect(() => {
+    if (pathname?.startsWith('/chat')) {
+      setCollapsed(true);
+    }
+  }, [pathname]);
 
   // Attention badge counters
   const [pendingSignaturesCount, setPendingSignaturesCount] = useState<number>(0);
@@ -173,6 +182,7 @@ export function Sidebar() {
           badge: pendingSignaturesCount > 0 ? pendingSignaturesCount : undefined,
           children: [
             { label: "Overview", href: "/dashboard" },
+            { label: "Group Chats", href: "/chat" },
             { label: "Company News", href: "/announcements" },
             { label: "Organization Chart", href: "/org-chart" },
             { label: "People Directory", href: "/people" },
@@ -208,6 +218,7 @@ export function Sidebar() {
           badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           children: [
             { label: "Overview", href: "/dashboard" },
+            { label: "Group Chats", href: "/chat" },
             { 
               label: "Approvals Inbox", 
               href: "/inbox",
@@ -265,6 +276,7 @@ export function Sidebar() {
         badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
         children: [
           { label: "Overview", href: "/dashboard" },
+          { label: "Group Chats", href: "/chat" },
           { 
             label: "Approvals Inbox", 
             href: "/inbox",
