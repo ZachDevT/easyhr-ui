@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
+import { useCompany } from '@/context/CompanyContext';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { employees as initialEmployees, Employee } from '@/data/employees';
 
@@ -51,24 +52,29 @@ export interface ChatMessage {
   replyCount?: number;
   replies?: ChatMessage[];
   pinned?: boolean;
+  saved?: boolean;
+  clientMsgId?: string;
 }
 
 export interface ChatChannel {
   id: string;
-  name: string; // e.g. "general", "design-system", "engineering"
+  name: string;
   topic?: string;
   description?: string;
   isPrivate: boolean;
   departmentRestricted?: boolean;
-  department?: string; // e.g. "Engineering", "Design", "Sales"
+  department?: string;
   createdById: string;
   createdBy: string;
   createdAt: string;
   adminIds: string[];
   memberIds: string[];
-  pendingRequestUserIds: string[]; // users requesting to join private/restricted channel
+  pendingRequestUserIds: string[];
   avatar?: string;
   unreadCount?: number;
+  channelType?: string;
+  isArchived?: boolean;
+  isMuted?: boolean;
 }
 
 interface ChatContextType {
@@ -84,12 +90,12 @@ interface ChatContextType {
     attachments?: ChatAttachment[],
     threadParentId?: string,
     poll?: ChatPoll
-  ) => void;
-  votePoll: (messageId: string, optionId: string) => void;
-  closePoll: (messageId: string) => void;
-  deleteMessage: (messageId: string, threadParentId?: string) => void;
-  togglePinMessage: (messageId: string) => void;
-  toggleReaction: (messageId: string, emoji: string, threadParentId?: string) => void;
+  ) => Promise<void>;
+  votePoll: (messageId: string, optionId: string) => Promise<void>;
+  closePoll: (messageId: string) => Promise<void>;
+  deleteMessage: (messageId: string, threadParentId?: string) => Promise<void>;
+  togglePinMessage: (messageId: string) => Promise<void>;
+  toggleReaction: (messageId: string, emoji: string, threadParentId?: string) => Promise<void>;
   createChannel: (input: {
     name: string;
     description?: string;
@@ -97,15 +103,19 @@ interface ChatContextType {
     departmentRestricted: boolean;
     department?: string;
     memberIds?: string[];
-  }) => ChatChannel;
-  requestToJoinChannel: (channelId: string) => void;
-  approveJoinRequest: (channelId: string, userId: string) => void;
-  rejectJoinRequest: (channelId: string, userId: string) => void;
-  addMemberToChannel: (channelId: string, userId: string) => void;
-  removeMemberFromChannel: (channelId: string, userId: string) => void;
+  }) => Promise<ChatChannel>;
+  requestToJoinChannel: (channelId: string) => Promise<void>;
+  approveJoinRequest: (channelId: string, userId: string) => Promise<void>;
+  rejectJoinRequest: (channelId: string, userId: string) => Promise<void>;
+  addMemberToChannel: (channelId: string, userId: string) => Promise<void>;
+  removeMemberFromChannel: (channelId: string, userId: string) => Promise<void>;
   typingUsers: string[];
   setTyping: (isTyping: boolean) => void;
   allEmployees: Employee[];
+  uploadAttachment: (file: File) => Promise<ChatAttachment | null>;
+  isRealtimeConnected: boolean;
+  refreshChannels: () => Promise<void>;
+  refreshMessages: () => Promise<void>;
 }
 
 const STORAGE_KEY_CHANNELS = 'easyhr_chat_channels_v3';
@@ -139,65 +149,49 @@ const DEFAULT_CHANNELS: ChatChannel[] = [
     adminIds: ['1', 'user'],
     memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
     pendingRequestUserIds: [],
-    unreadCount: 2,
   },
   {
-    id: 'ch-design',
-    name: 'design-system',
-    topic: 'Product UI/UX design, Figma updates & design token critiques',
-    description: 'All things product design, typography, components, and user experience.',
+    id: 'ch-random',
+    name: 'random',
+    topic: 'Non-work banter, water cooler chats, memes & celebrations',
+    description: 'Casual chat for the entire team.',
     isPrivate: false,
-    departmentRestricted: true,
-    department: 'Design',
-    createdById: '1',
-    createdBy: 'Sarah Johnson',
-    createdAt: '2026-01-05T09:30:00Z',
-    adminIds: ['1', 'user'],
-    memberIds: ['1', '2', '4', 'user'],
+    departmentRestricted: false,
+    createdById: '2',
+    createdBy: 'Michael Chen',
+    createdAt: '2026-01-02T10:00:00Z',
+    adminIds: ['2'],
+    memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
     pendingRequestUserIds: [],
   },
   {
-    id: 'ch-engineering',
-    name: 'engineering-core',
-    topic: 'Sprint commits, architectural decisions, PR reviews & CI/CD alerts',
-    description: 'Technical discussions and core system engineering.',
-    isPrivate: true,
+    id: 'ch-dev-talk',
+    name: 'dev-talk',
+    topic: 'Engineering discussions, architecture & release syncs',
+    description: 'Technical discussion channel for engineering teams.',
+    isPrivate: false,
     departmentRestricted: true,
     department: 'Engineering',
     createdById: '2',
-    createdBy: 'James Mwangi',
-    createdAt: '2026-01-10T11:00:00Z',
-    adminIds: ['2', '1'],
-    memberIds: ['2', '3', '1'],
-    pendingRequestUserIds: ['5'],
-  },
-  {
-    id: 'ch-people-ops',
-    name: 'people-operations',
-    topic: 'Onboarding coordination, culture initiatives & employee engagement',
-    description: 'Human Resources and People Operations coordination hub.',
-    isPrivate: false,
-    departmentRestricted: true,
-    department: 'Human Resources',
-    createdById: '1',
-    createdBy: 'Sarah Johnson',
-    createdAt: '2026-01-08T10:00:00Z',
-    adminIds: ['1', 'user'],
-    memberIds: ['1', '3', '5', 'user'],
+    createdBy: 'Michael Chen',
+    createdAt: '2026-01-03T11:00:00Z',
+    adminIds: ['2'],
+    memberIds: ['2', 'user'],
     pendingRequestUserIds: [],
   },
   {
-    id: 'ch-leadership',
-    name: 'leadership-private',
-    topic: 'Quarterly OKRs, compensation reviews & executive strategy',
-    description: 'Confidential executive room. Request access or ask an admin to invite you.',
-    isPrivate: true,
-    departmentRestricted: false,
-    createdById: '1',
-    createdBy: 'Sarah Johnson',
-    createdAt: '2026-01-02T10:00:00Z',
-    adminIds: ['1'],
-    memberIds: ['1'],
+    id: 'ch-design-team',
+    name: 'design-team',
+    topic: 'UI/UX design reviews, Figma shares & brand assets',
+    description: 'Design team work-in-progress and critiques.',
+    isPrivate: false,
+    departmentRestricted: true,
+    department: 'Design',
+    createdById: '4',
+    createdBy: 'Emily Davis',
+    createdAt: '2026-01-03T14:00:00Z',
+    adminIds: ['4'],
+    memberIds: ['4', 'user'],
     pendingRequestUserIds: [],
   },
 ];
@@ -208,299 +202,657 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     channelId: 'ch-general',
     senderId: '1',
     senderName: 'Sarah Johnson',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    senderRole: 'HR Director',
-    content: "Good morning team! Welcome to our new workspace channels. Feel free to start threads on any topic, share files or specifications, and mention colleagues with @name.",
-    createdAt: '09:30 AM',
-    pinned: true,
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    senderRole: 'Head of People',
+    content: 'Welcome to the EasyHR Workspace Chat! 👋 Feel free to join departmental channels or drop updates here.',
+    createdAt: '09:00 AM',
     reactions: {
-      '🚀': { emoji: '🚀', count: 4, users: ['2', '3', '4', 'user'] },
-      '👏': { emoji: '👏', count: 3, users: ['2', 'user', '5'] },
+      '🎉': { emoji: '🎉', count: 4, users: ['2', '3', '4', 'user'] },
+      '❤️': { emoji: '❤️', count: 2, users: ['2', 'user'] },
     },
-    replyCount: 3,
-    replies: [
-      {
-        id: 'reply-1',
-        channelId: 'ch-general',
-        senderId: '2',
-        senderName: 'James Mwangi',
-        senderAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-        senderRole: 'Senior Software Engineer',
-        content: 'The thread drawer and file previews are super clean. Great upgrade for cross-department syncs!',
-        createdAt: '09:34 AM',
-        reactions: { '💯': { emoji: '💯', count: 2, users: ['1', 'user'] } },
-      },
-      {
-        id: 'reply-2',
-        channelId: 'ch-general',
-        senderId: '3',
-        senderName: 'Elena Rostova',
-        senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-        senderRole: 'Lead Product Designer',
-        content: 'We just moved all UI review notes into #design-system as well.',
-        createdAt: '09:41 AM',
-      },
-      {
-        id: 'reply-3',
-        channelId: 'ch-general',
-        senderId: '1',
-        senderName: 'Sarah Johnson',
-        senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-        senderRole: 'HR Director',
-        content: 'Awesome! Let me know if any department needs a dedicated private room.',
-        createdAt: '09:45 AM',
-      },
-    ],
+    replyCount: 1,
+    pinned: true,
   },
   {
     id: 'msg-2',
     channelId: 'ch-general',
     senderId: '2',
-    senderName: 'James Mwangi',
-    senderAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    senderRole: 'Senior Software Engineer',
-    content: "Quick update for the Q4 product release: @Sarah Johnson and I finalized the shift scheduling & timesheet movement logs. Please review the latest build before Friday's demo.",
-    createdAt: '10:18 AM',
+    senderName: 'Michael Chen',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    senderRole: 'Lead Engineer',
+    content: 'Excited to have this integrated! Testing real-time threads and reaction synchronization.',
+    createdAt: '09:15 AM',
     reactions: {
-      '🔥': { emoji: '🔥', count: 3, users: ['1', '3', 'user'] },
-      '✅': { emoji: '✅', count: 2, users: ['1', '4'] },
+      '🚀': { emoji: '🚀', count: 3, users: ['1', '4', 'user'] },
     },
-    replyCount: 1,
-    replies: [
-      {
-        id: 'reply-4',
-        channelId: 'ch-general',
-        senderId: '1',
-        senderName: 'Sarah Johnson',
-        senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-        senderRole: 'HR Director',
-        content: 'Reviewed and verified! The punch movement breakdown on the timesheet looks spot on.',
-        createdAt: '10:24 AM',
-      },
-    ],
-  },
-  {
-    id: 'msg-3',
-    channelId: 'ch-general',
-    senderId: '3',
-    senderName: 'Elena Rostova',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-    senderRole: 'Lead Product Designer',
-    content: "Here is the updated workspace architecture & design system preview for the upcoming sprint [:anim:1f680:] [:anim:1f525:]",
-    createdAt: '11:05 AM',
-    attachments: [
-      {
-        id: 'att-1',
-        name: 'workspace-architecture-v2.png',
-        url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=900&q=80',
-        type: 'image',
-        size: '1.4 MB',
-      },
-      {
-        id: 'att-2',
-        name: 'q4-product-walkthrough.mp4',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        type: 'video',
-        size: '4.2 MB',
-      },
-    ],
-    reactions: { '❤️': { emoji: '❤️', count: 4, users: ['1', '2', 'user', '4'] } },
     replyCount: 0,
-    replies: [],
-  },
-  {
-    id: 'msg-poll-1',
-    channelId: 'ch-general',
-    senderId: '1',
-    senderName: 'Sarah Johnson',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    senderRole: 'HR Director',
-    content: 'Team, please cast your vote for our Q4 All-Hands & Engineering Offsite format [:anim:1f389:]',
-    createdAt: '11:22 AM',
-    poll: {
-      id: 'poll-101',
-      question: 'Preferred format & schedule for the Q4 Product & Culture Town Hall?',
-      allowMultiple: false,
-      anonymous: false,
-      closed: false,
-      options: [
-        { id: 'opt-1', text: 'Friday Afternoon — Hybrid HQ + Live Stream', voterIds: ['1', '2', '3', 'user'] },
-        { id: 'opt-2', text: 'Thursday Morning — Executive Keynote + Breakouts', voterIds: ['4', '5'] },
-        { id: 'opt-3', text: 'Wednesday Full-Day — Offsite Retreat & Demo Day', voterIds: ['6'] },
-      ],
-    },
-    reactions: { '🙌': { emoji: '🙌', count: 3, users: ['2', '3', 'user'] } },
-    replyCount: 0,
-    replies: [],
-  },
-  {
-    id: 'msg-4',
-    channelId: 'ch-design',
-    senderId: '3',
-    senderName: 'Elena Rostova',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-    senderRole: 'Lead Product Designer',
-    content: "Updated typography tokens: Fraunces for display headings and Questrial/Gilroy geometric sans for clean body readability.",
-    createdAt: '11:15 AM',
-    pinned: true,
-    reactions: { '✨': { emoji: '✨', count: 3, users: ['1', '2', 'user'] } },
-    replyCount: 1,
-    replies: [
-      {
-        id: 'reply-5',
-        channelId: 'ch-design',
-        senderId: '1',
-        senderName: 'Sarah Johnson',
-        senderAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-        senderRole: 'HR Director',
-        content: 'Much cleaner and super legible across all dashboard cards.',
-        createdAt: '11:20 AM',
-      },
-    ],
   },
 ];
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-export function ChatProvider({ children }: { children: React.ReactNode }) {
-  const { currentUser, isHRAdmin } = useRole();
-  const { getToken, isSignedIn } = useAuth();
+// Helper to convert backend message format to frontend ChatMessage
+function mapBackendMessage(bm: any): ChatMessage {
+  const reactions: Record<string, ChatReaction> = {};
+  if (bm.reactions && typeof bm.reactions === 'object') {
+    for (const [emoji, users] of Object.entries(bm.reactions)) {
+      if (Array.isArray(users)) {
+        reactions[emoji] = {
+          emoji,
+          count: users.length,
+          users: users.map(String),
+        };
+      }
+    }
+  }
+
+  let formattedPoll: ChatPoll | undefined;
+  if (bm.poll && bm.poll.question) {
+    formattedPoll = {
+      id: bm.id,
+      question: bm.poll.question,
+      options: (bm.poll.options || []).map((opt: any) => ({
+        id: opt.id,
+        text: opt.text,
+        voterIds: (opt.voterIds || []).map(String),
+      })),
+      allowMultiple: Boolean(bm.poll.allowMultiple),
+      anonymous: Boolean(bm.poll.isAnonymous),
+      closed: Boolean(bm.poll.closed),
+    };
+  }
+
+  const attachments: ChatAttachment[] = (bm.attachments || []).map((att: any) => {
+    let url = att.url || '';
+    if (url && !url.startsWith('http')) {
+      url = `${API_BASE_URL}${url}`;
+    }
+    const sizeMB = att.size ? `${(att.size / (1024 * 1024)).toFixed(1)} MB` : undefined;
+    return {
+      id: att.id,
+      name: att.name || 'Attachment',
+      url,
+      type: att.type === 'image' ? 'image' : att.type === 'video' ? 'video' : 'file',
+      size: sizeMB,
+      mimeType: att.mimeType,
+    };
+  });
+
+  let displayTime = bm.timestamp;
+  if (displayTime) {
+    try {
+      const d = new Date(displayTime);
+      if (!isNaN(d.getTime())) {
+        displayTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    } catch {
+      // keep raw
+    }
+  }
+
+  return {
+    id: bm.id,
+    channelId: bm.channelId,
+    senderId: String(bm.senderId),
+    senderName: bm.senderName || 'Workspace Member',
+    senderAvatar: bm.senderAvatar || '',
+    senderRole: bm.senderRole || 'Team Member',
+    content: bm.content || '',
+    createdAt: displayTime || 'Just now',
+    attachments,
+    poll: formattedPoll,
+    reactions,
+    replyCount: bm.threadCount || 0,
+    pinned: Boolean(bm.pinned),
+    saved: Boolean(bm.saved),
+    clientMsgId: bm.clientMsgId,
+  };
+}
+
+// Helper to convert backend channel format to frontend ChatChannel
+function mapBackendChannel(bc: any): ChatChannel {
+  return {
+    id: bc.id,
+    name: bc.name,
+    topic: bc.topic,
+    description: bc.description,
+    isPrivate: Boolean(bc.isPrivate),
+    departmentRestricted: Boolean(bc.departmentRestriction),
+    department: bc.departmentRestriction || undefined,
+    createdById: String(bc.createdBy || ''),
+    createdBy: 'Workspace',
+    createdAt: bc.createdAt || new Date().toISOString(),
+    adminIds: bc.createdBy ? [String(bc.createdBy)] : [],
+    memberIds: (bc.memberIds || []).map(String),
+    pendingRequestUserIds: (bc.pendingRequestUserIds || []).map(String),
+    unreadCount: bc.unreadCount || 0,
+    channelType: bc.channelType,
+    isArchived: Boolean(bc.isArchived),
+    isMuted: Boolean(bc.isMuted),
+  };
+}
+
+export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { getToken } = useAuth();
+  const { currentUser } = useRole();
+  const { company } = useCompany();
+
   const [channels, setChannels] = useState<ChatChannel[]>(DEFAULT_CHANNELS);
   const [activeChannelId, setActiveChannelId] = useState<string>('ch-general');
   const [allMessages, setAllMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
   const [activeThread, setActiveThread] = useState<ChatMessage | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [allEmployees, setAllEmployees] = useState<Employee[]>(initialEmployees);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
 
-  // Fetch real company employees and merge with initialEmployees fallback
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastEventIdRef = useRef<string>('');
+
+  // 1. Fetch Organization Employees for member pickers and profile drawer
   useEffect(() => {
     let isMounted = true;
-    async function loadEmployees() {
-      if (!isSignedIn) return;
+    const fetchEmployees = async () => {
       try {
         const token = await getToken();
         if (!token) return;
         const res = await fetch(`${API_BASE_URL}/api/v1/employees`, {
-          credentials: 'omit',
           headers: getAuthHeaders(token),
         });
         if (res.ok) {
-          const json = await res.json();
-          const list = Array.isArray(json) ? json : json.data || [];
-          if (isMounted && list.length > 0) {
-            const mapped: Employee[] = list.map((e: any) => ({
-              id: String(e.id || e._id),
-              firstName: e.firstName || e.first_name || 'Team',
-              lastName: e.lastName || e.last_name || 'Member',
-              email: e.email || '',
+          const data = await res.json();
+          const items = Array.isArray(data) ? data : data.employees || data.items || [];
+          if (isMounted && items.length > 0) {
+            const formatted = items.map((e: any) => ({
+              id: String(e.id),
+              firstName: e.firstName || e.first_name || '',
+              lastName: e.lastName || e.last_name || '',
+              email: e.workEmail || e.work_email || e.email || '',
               phone: e.phone || '',
-              title: e.jobTitle || e.title || e.role || 'Team Member',
-              department: e.department?.name || e.department || 'General',
-              location: e.location || e.workLocation || 'Headquarters',
-              status: 'Active',
-              startDate: e.hireDate || e.startDate || '2025-01-01',
-              avatar: e.avatarUrl || e.avatar || '',
-              salary: e.salary || 0,
+              avatar: e.avatarUrl || e.avatar_url || '',
+              department: e.department || 'General',
+              title: e.jobTitle || e.job_title || 'Team Member',
+              division: e.division || '',
+              location: e.location || '',
+              hireDate: e.hiredOn || e.hired_on || '2024-01-01',
+              status: e.status === 'active' ? 'Active' : e.status || 'Active',
             }));
-            // Combine mapped real employees with initialEmployees so seeded messages always resolve avatars/profiles
-            const existingIds = new Set(mapped.map((m) => String(m.id)));
-            const combined = [
-              ...mapped,
-              ...initialEmployees.filter((ie) => !existingIds.has(String(ie.id))),
-            ];
-            setAllEmployees(combined);
+            setAllEmployees(formatted);
           }
         }
       } catch {
-        // Fallback to initialEmployees silently
+        // Fall back to initialEmployees on network error
       }
-    }
-    loadEmployees();
+    };
+    fetchEmployees();
     return () => {
       isMounted = false;
     };
-  }, [isSignedIn, getToken]);
+  }, [getToken]);
 
-  // Load from local storage
-  useEffect(() => {
+  // 2. Fetch Channels from Backend
+  const refreshChannels = useCallback(async () => {
     try {
-      const savedChannels = localStorage.getItem(STORAGE_KEY_CHANNELS);
-      if (savedChannels) {
-        const parsed = JSON.parse(savedChannels);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setChannels(parsed);
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels`, {
+        headers: getAuthHeaders(token),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const serverChannels = (data.channels || []).map(mapBackendChannel);
+        if (serverChannels.length > 0) {
+          setChannels(serverChannels);
+          // If activeChannel is not in the list, set to the first channel
+          setActiveChannelId((prev) => {
+            if (serverChannels.some((c: ChatChannel) => c.id === prev)) {
+              return prev;
+            }
+            return serverChannels[0].id;
+          });
         }
       }
-      const savedMessages = localStorage.getItem(STORAGE_KEY_MESSAGES);
-      if (savedMessages) {
-        const parsedMsg = JSON.parse(savedMessages);
-        if (Array.isArray(parsedMsg) && parsedMsg.length > 0) {
-          setAllMessages(parsedMsg);
-        }
-      }
-    } catch {}
-  }, []);
+    } catch {
+      // Keep existing channels fallback
+    }
+  }, [getToken]);
 
-  // Ensure currentUser.id is always a member of public channels (and HR Admin is in default channels)
   useEffect(() => {
-    if (!currentUser?.id) return;
-    const myId = String(currentUser.id);
-    setChannels((prev) =>
-      prev.map((ch) => {
-        if (!ch.isPrivate && !ch.departmentRestricted) {
-          if (!ch.memberIds.includes(myId)) {
-            return { ...ch, memberIds: [...ch.memberIds, myId] };
+    refreshChannels();
+  }, [refreshChannels]);
+
+  // 3. Fetch Messages for Active Channel
+  const refreshMessages = useCallback(async () => {
+    if (!activeChannelId) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/chat/messages?channelId=${encodeURIComponent(activeChannelId)}&includeThreads=false&limit=100`,
+        {
+          headers: getAuthHeaders(token),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const serverMsgs = (data.messages || []).map(mapBackendMessage);
+        setAllMessages((prev) => {
+          // Merge with any other channel messages already cached
+          const otherChannels = prev.filter((m) => m.channelId !== activeChannelId);
+          return [...otherChannels, ...serverMsgs];
+        });
+
+        // Mark channel as read
+        fetch(`${API_BASE_URL}/api/v1/chat/channels/${encodeURIComponent(activeChannelId)}/read`, {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            lastMessageId: serverMsgs.length > 0 ? serverMsgs[serverMsgs.length - 1].id : '',
+          }),
+        }).catch(() => {});
+      }
+    } catch {
+      // Keep cached messages
+    }
+  }, [activeChannelId, getToken]);
+
+  useEffect(() => {
+    refreshMessages();
+  }, [refreshMessages]);
+
+  // 4. Server-Sent Events (SSE) Real-Time Subscription
+  useEffect(() => {
+    let isCancelled = false;
+    let sse: EventSource | null = null;
+
+    const connectSSE = async () => {
+      try {
+        const token = await getToken();
+        if (!token || isCancelled) return;
+
+        const subdomain = company?.subdomain || 'app';
+        let sseUrl = `${API_BASE_URL}/api/v1/chat/events?token=${encodeURIComponent(token)}&workspace=${encodeURIComponent(subdomain)}`;
+        if (lastEventIdRef.current) {
+          sseUrl += `&afterEventId=${encodeURIComponent(lastEventIdRef.current)}`;
+        }
+
+        sse = new EventSource(sseUrl);
+        eventSourceRef.current = sse;
+
+        sse.onopen = () => {
+          if (!isCancelled) setIsRealtimeConnected(true);
+        };
+
+        sse.onerror = () => {
+          if (!isCancelled) {
+            setIsRealtimeConnected(false);
+            sse?.close();
+            // Retry after 4 seconds
+            setTimeout(connectSSE, 4000);
           }
+        };
+
+        // Message Created
+        sse.addEventListener('message.created', (e: MessageEvent) => {
+          try {
+            if (e.lastEventId) lastEventIdRef.current = e.lastEventId;
+            const data = JSON.parse(e.data);
+            const newMsg = mapBackendMessage(data);
+
+            setAllMessages((prev) => {
+              // Reconcile optimistic message
+              const exists = prev.some((m) => m.id === newMsg.id || (newMsg.clientMsgId && m.clientMsgId === newMsg.clientMsgId));
+              if (exists) {
+                return prev.map((m) => (m.clientMsgId && m.clientMsgId === newMsg.clientMsgId ? newMsg : m));
+              }
+              return [...prev, newMsg];
+            });
+
+            // Update channel last message & unread count
+            setChannels((prev) =>
+              prev.map((c) => {
+                if (c.id === newMsg.channelId) {
+                  const isCurrent = c.id === activeChannelId;
+                  return {
+                    ...c,
+                    unreadCount: isCurrent ? 0 : (c.unreadCount || 0) + 1,
+                  };
+                }
+                return c;
+              })
+            );
+          } catch {}
+        });
+
+        // Thread Reply Created
+        sse.addEventListener('thread.reply_created', (e: MessageEvent) => {
+          try {
+            if (e.lastEventId) lastEventIdRef.current = e.lastEventId;
+            const data = JSON.parse(e.data);
+            const replyMsg = mapBackendMessage(data);
+
+            setAllMessages((prev) =>
+              prev.map((m) => {
+                if (m.id === replyMsg.channelId || m.id === data.replyToId) {
+                  const updatedReplies = [...(m.replies || []), replyMsg];
+                  return {
+                    ...m,
+                    replyCount: (m.replyCount || 0) + 1,
+                    replies: updatedReplies,
+                  };
+                }
+                return m;
+              })
+            );
+
+            setActiveThread((current) => {
+              if (current && (current.id === data.replyToId || current.id === replyMsg.channelId)) {
+                return {
+                  ...current,
+                  replyCount: (current.replyCount || 0) + 1,
+                  replies: [...(current.replies || []), replyMsg],
+                };
+              }
+              return current;
+            });
+          } catch {}
+        });
+
+        // Message Updated
+        sse.addEventListener('message.updated', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setAllMessages((prev) =>
+              prev.map((m) => (m.id === data.id ? { ...m, content: data.content } : m))
+            );
+          } catch {}
+        });
+
+        // Message Deleted
+        sse.addEventListener('message.deleted', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setAllMessages((prev) => prev.filter((m) => m.id !== data.messageId));
+            setActiveThread((curr) => (curr && curr.id === data.messageId ? null : curr));
+          } catch {}
+        });
+
+        // Reaction Added / Removed
+        sse.addEventListener('message.reaction_added', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            const { messageId, emoji, reactions } = data;
+            const formatted = reactions ? mapBackendMessage({ id: messageId, reactions }).reactions : undefined;
+            if (formatted) {
+              setAllMessages((prev) =>
+                prev.map((m) => (m.id === messageId ? { ...m, reactions: formatted } : m))
+              );
+            }
+          } catch {}
+        });
+        sse.addEventListener('message.reaction_removed', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            const { messageId, emoji, reactions } = data;
+            const formatted = reactions ? mapBackendMessage({ id: messageId, reactions }).reactions : undefined;
+            if (formatted) {
+              setAllMessages((prev) =>
+                prev.map((m) => (m.id === messageId ? { ...m, reactions: formatted } : m))
+              );
+            }
+          } catch {}
+        });
+
+        // Poll Updated
+        sse.addEventListener('message.poll_updated', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            const { messageId, poll } = data;
+            if (poll) {
+              const mappedPoll: ChatPoll = {
+                id: messageId,
+                question: poll.question,
+                options: (poll.options || []).map((o: any) => ({
+                  id: o.id,
+                  text: o.text,
+                  voterIds: (o.voterIds || []).map(String),
+                })),
+                allowMultiple: Boolean(poll.allowMultiple),
+                anonymous: Boolean(poll.isAnonymous),
+                closed: Boolean(poll.closed),
+              };
+              setAllMessages((prev) =>
+                prev.map((m) => (m.id === messageId ? { ...m, poll: mappedPoll } : m))
+              );
+            }
+          } catch {}
+        });
+
+        // Pin Toggled
+        sse.addEventListener('message.pinned', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setAllMessages((prev) =>
+              prev.map((m) => (m.id === data.messageId ? { ...m, pinned: true } : m))
+            );
+          } catch {}
+        });
+        sse.addEventListener('message.unpinned', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setAllMessages((prev) =>
+              prev.map((m) => (m.id === data.messageId ? { ...m, pinned: false } : m))
+            );
+          } catch {}
+        });
+
+        // Typing Indicators
+        sse.addEventListener('typing.started', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.channelId === activeChannelId && String(data.employeeId) !== String(currentUser?.id)) {
+              setTypingUsers((prev) => {
+                const name = data.userName || 'Someone';
+                return prev.includes(name) ? prev : [...prev, name];
+              });
+            }
+          } catch {}
+        });
+        sse.addEventListener('typing.stopped', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.channelId === activeChannelId) {
+              setTypingUsers((prev) => prev.filter((u) => u !== data.userName));
+            }
+          } catch {}
+        });
+
+        // Channel Events
+        sse.addEventListener('channel.created', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            const ch = mapBackendChannel(data);
+            setChannels((prev) => (prev.some((c) => c.id === ch.id) ? prev : [...prev, ch]));
+          } catch {}
+        });
+        sse.addEventListener('channel.updated', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            const ch = mapBackendChannel(data);
+            setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, ...ch } : c)));
+          } catch {}
+        });
+        sse.addEventListener('channel.archived', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setChannels((prev) =>
+              prev.map((c) => (c.id === data.channelId ? { ...c, isArchived: true } : c))
+            );
+          } catch {}
+        });
+        sse.addEventListener('channel.deleted', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setChannels((prev) => prev.filter((c) => c.id !== data.channelId));
+          } catch {}
+        });
+        sse.addEventListener('channel.member_joined', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setChannels((prev) =>
+              prev.map((c) => {
+                if (c.id === data.channelId) {
+                  const mIds = c.memberIds.includes(String(data.employeeId))
+                    ? c.memberIds
+                    : [...c.memberIds, String(data.employeeId)];
+                  return { ...c, memberIds: mIds };
+                }
+                return c;
+              })
+            );
+          } catch {}
+        });
+        sse.addEventListener('channel.member_left', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setChannels((prev) =>
+              prev.map((c) => {
+                if (c.id === data.channelId) {
+                  return { ...c, memberIds: c.memberIds.filter((id) => id !== String(data.employeeId)) };
+                }
+                return c;
+              })
+            );
+          } catch {}
+        });
+        sse.addEventListener('channel.join_requested', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setChannels((prev) =>
+              prev.map((c) => {
+                if (c.id === data.channelId) {
+                  const reqs = c.pendingRequestUserIds.includes(String(data.employeeId))
+                    ? c.pendingRequestUserIds
+                    : [...c.pendingRequestUserIds, String(data.employeeId)];
+                  return { ...c, pendingRequestUserIds: reqs };
+                }
+                return c;
+              })
+            );
+          } catch {}
+        });
+        sse.addEventListener('channel.join_reviewed', (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            setChannels((prev) =>
+              prev.map((c) => {
+                if (c.id === data.channelId) {
+                  const rem = c.pendingRequestUserIds.filter((id) => id !== String(data.employeeId));
+                  const mIds = data.approved && !c.memberIds.includes(String(data.employeeId))
+                    ? [...c.memberIds, String(data.employeeId)]
+                    : c.memberIds;
+                  return { ...c, pendingRequestUserIds: rem, memberIds: mIds };
+                }
+                return c;
+              })
+            );
+          } catch {}
+        });
+      } catch {
+        // SSE connection failure handled by onerror retry
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      isCancelled = true;
+      if (sse) sse.close();
+    };
+  }, [getToken, company, activeChannelId, currentUser]);
+
+  // Derived Active Channel
+  const activeChannel = useMemo(() => {
+    return channels.find((c) => c.id === activeChannelId) || channels[0] || null;
+  }, [channels, activeChannelId]);
+
+  // Messages for Active Channel
+  const messages = useMemo(() => {
+    return allMessages.filter((m) => m.channelId === activeChannelId);
+  }, [allMessages, activeChannelId]);
+
+  // 5. Attachment Upload to Backend Storage
+  const uploadAttachment = useCallback(
+    async (file: File): Promise<ChatAttachment | null> => {
+      try {
+        const token = await getToken();
+        if (!token) return null;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('channelId', activeChannelId);
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/chat/attachments`, {
+          method: 'POST',
+          headers: getAuthHeaders(token),
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          let url = data.url || '';
+          if (url && !url.startsWith('http')) {
+            url = `${API_BASE_URL}${url}`;
+          }
+          const sizeMB = data.size ? `${(data.size / (1024 * 1024)).toFixed(1)} MB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+          return {
+            id: data.id,
+            name: data.name || file.name,
+            url,
+            type: data.type === 'image' ? 'image' : data.type === 'video' ? 'video' : 'file',
+            size: sizeMB,
+            mimeType: data.mimeType || file.type,
+          };
         }
-        if ((ch.id === 'ch-design' || ch.id === 'ch-people-ops') && !ch.memberIds.includes(myId)) {
-          return { ...ch, memberIds: [...ch.memberIds, myId] };
-        }
-        return ch;
-      })
-    );
-  }, [currentUser?.id, isHRAdmin]);
+      } catch {
+        // Fall back to local object URL
+      }
 
-  // Save to local storage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_CHANNELS, JSON.stringify(channels));
-    } catch {}
-  }, [channels]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(allMessages));
-    } catch {}
-  }, [allMessages]);
-
-  const handleSelectChannel = useCallback((id: string) => {
-    setActiveChannelId(id);
-    setChannels((prev) =>
-      prev.map((c) => (c.id === id && c.unreadCount ? { ...c, unreadCount: 0 } : c))
-    );
-  }, []);
-
-  const activeChannel = useMemo(
-    () => channels.find((c) => c.id === activeChannelId) || channels[0] || null,
-    [channels, activeChannelId]
+      // Local fallback
+      const isImg = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+      return {
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+        type: isImg ? 'image' : isVideo ? 'video' : 'file',
+        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        mimeType: file.type,
+      };
+    },
+    [getToken, activeChannelId]
   );
 
-  const currentChannelMessages = useMemo(
-    () => allMessages.filter((m) => m.channelId === activeChannelId),
-    [allMessages, activeChannelId]
-  );
-
-  // Send message, reply, or poll
+  // 6. Send Message with Optimistic UI & Server Synchronization
   const sendMessage = useCallback(
-    (content: string, attachments?: ChatAttachment[], threadParentId?: string, poll?: ChatPoll) => {
-      if (!content.trim() && (!attachments || attachments.length === 0) && !poll) return;
-
+    async (
+      content: string,
+      attachments?: ChatAttachment[],
+      threadParentId?: string,
+      poll?: ChatPoll
+    ) => {
       const myId = String(currentUser?.id || 'user');
-      const myName = `${currentUser?.firstName || 'User'} ${currentUser?.lastName || ''}`.trim();
+      const myName = `${currentUser?.firstName || 'Current'} ${currentUser?.lastName || 'User'}`.trim();
       const myAvatar = currentUser?.avatar || '';
+      const clientMsgId = `cmsg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      const newMsg: ChatMessage = {
-        id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      // Optimistic Message
+      const optimisticMsg: ChatMessage = {
+        id: clientMsgId,
         channelId: activeChannelId,
         senderId: myId,
         senderName: myName,
@@ -513,13 +865,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         reactions: {},
         replyCount: 0,
         replies: [],
+        clientMsgId,
       };
 
       if (threadParentId) {
         setAllMessages((prev) =>
           prev.map((m) => {
             if (m.id === threadParentId) {
-              const updatedReplies = [...(m.replies || []), newMsg];
+              const updatedReplies = [...(m.replies || []), optimisticMsg];
               const updated = {
                 ...m,
                 replyCount: updatedReplies.length,
@@ -534,66 +887,161 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           })
         );
       } else {
-        setAllMessages((prev) => [...prev, newMsg]);
+        setAllMessages((prev) => [...prev, optimisticMsg]);
+      }
+
+      // Backend API Call
+      try {
+        const token = await getToken();
+        if (token) {
+          const bodyPayload: any = {
+            channelId: activeChannelId,
+            content,
+            replyToId: threadParentId,
+            clientMsgId,
+          };
+
+          if (attachments && attachments.length > 0) {
+            bodyPayload.attachmentIds = attachments.map((a) => a.id).filter((id) => id && !id.startsWith('att-') && !id.startsWith('file-'));
+            bodyPayload.attachments = attachments.map((a) => ({
+              id: a.id,
+              name: a.name,
+              url: a.url,
+              type: a.type,
+              mimeType: a.mimeType,
+            }));
+          }
+
+          if (poll) {
+            bodyPayload.poll = {
+              question: poll.question,
+              options: poll.options.map((opt) => ({ text: opt.text })),
+              allowMultiple: poll.allowMultiple,
+              isAnonymous: poll.anonymous,
+            };
+          }
+
+          const res = await fetch(`${API_BASE_URL}/api/v1/chat/messages`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+              'Idempotency-Key': clientMsgId,
+            },
+            body: JSON.stringify(bodyPayload),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const serverMsg = mapBackendMessage(data);
+
+            setAllMessages((prev) =>
+              prev.map((m) => (m.clientMsgId === clientMsgId ? serverMsg : m))
+            );
+
+            if (threadParentId) {
+              setActiveThread((curr) => {
+                if (curr && curr.id === threadParentId) {
+                  return {
+                    ...curr,
+                    replies: (curr.replies || []).map((r) => (r.clientMsgId === clientMsgId ? serverMsg : r)),
+                  };
+                }
+                return curr;
+              });
+            }
+          }
+        }
+      } catch {
+        // Optimistic message remains visible
       }
     },
-    [activeChannelId, currentUser, activeThread]
+    [activeChannelId, currentUser, activeThread, getToken]
   );
 
-  // Vote on a poll option
+  // 7. Vote on Poll
   const votePoll = useCallback(
-    (messageId: string, optionId: string) => {
+    async (messageId: string, optionId: string) => {
       const myId = String(currentUser?.id || 'user');
+
+      // Optimistic update
       setAllMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId || !m.poll || m.poll.closed) return m;
           const allowMultiple = m.poll.allowMultiple;
           const updatedOptions = m.poll.options.map((opt) => {
-            const hasVoted = opt.voterIds.includes(myId) || (myId !== 'user' && opt.voterIds.includes('user'));
+            const hasVoted = opt.voterIds.includes(myId);
             if (opt.id === optionId) {
-              if (hasVoted) {
-                return {
-                  ...opt,
-                  voterIds: opt.voterIds.filter((v) => v !== myId && v !== 'user'),
-                };
-              }
               return {
                 ...opt,
-                voterIds: [...opt.voterIds.filter((v) => v !== 'user'), myId],
+                voterIds: hasVoted ? opt.voterIds.filter((v) => v !== myId) : [...opt.voterIds, myId],
               };
             } else if (!allowMultiple) {
               return {
                 ...opt,
-                voterIds: opt.voterIds.filter((v) => v !== myId && v !== 'user'),
+                voterIds: opt.voterIds.filter((v) => v !== myId),
               };
             }
             return opt;
           });
           return {
             ...m,
-            poll: {
-              ...m.poll,
-              options: updatedOptions,
-            },
+            poll: { ...m.poll, options: updatedOptions },
           };
         })
       );
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/messages/${encodeURIComponent(messageId)}/poll/vote`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              channelId: activeChannelId,
+              optionId,
+            }),
+          });
+        }
+      } catch {}
     },
-    [currentUser]
+    [currentUser, getToken, activeChannelId]
   );
 
-  // Close a poll
-  const closePoll = useCallback((messageId: string) => {
-    setAllMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId && m.poll ? { ...m, poll: { ...m.poll, closed: !m.poll.closed } } : m
-      )
-    );
-  }, []);
+  // 8. Close Poll
+  const closePoll = useCallback(
+    async (messageId: string) => {
+      setAllMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.poll ? { ...m, poll: { ...m.poll, closed: !m.poll.closed } } : m
+        )
+      );
 
-  // Delete message
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/messages/${encodeURIComponent(messageId)}/poll/close`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              channelId: activeChannelId,
+            }),
+          });
+        }
+      } catch {}
+    },
+    [getToken, activeChannelId]
+  );
+
+  // 9. Delete Message
   const deleteMessage = useCallback(
-    (messageId: string, threadParentId?: string) => {
+    async (messageId: string, threadParentId?: string) => {
       if (threadParentId) {
         setAllMessages((prev) =>
           prev.map((m) => {
@@ -618,20 +1066,49 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           setActiveThread(null);
         }
       }
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/messages/${encodeURIComponent(messageId)}?channelId=${encodeURIComponent(activeChannelId)}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(token),
+          });
+        }
+      } catch {}
     },
-    [activeThread]
+    [activeThread, getToken, activeChannelId]
   );
 
-  // Pin or unpin message
-  const togglePinMessage = useCallback((messageId: string) => {
-    setAllMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? { ...m, pinned: !m.pinned } : m))
-    );
-  }, []);
+  // 10. Toggle Pin
+  const togglePinMessage = useCallback(
+    async (messageId: string) => {
+      setAllMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, pinned: !m.pinned } : m))
+      );
 
-  // Toggle reaction emoji
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/messages/${encodeURIComponent(messageId)}/pin`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              channelId: activeChannelId,
+            }),
+          });
+        }
+      } catch {}
+    },
+    [getToken, activeChannelId]
+  );
+
+  // 11. Toggle Reaction
   const toggleReaction = useCallback(
-    (messageId: string, emoji: string, threadParentId?: string) => {
+    async (messageId: string, emoji: string, threadParentId?: string) => {
       const myId = String(currentUser?.id || 'user');
 
       const updateReactions = (reactions: Record<string, ChatReaction> = {}) => {
@@ -679,65 +1156,108 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         );
       } else {
         setAllMessages((prev) =>
-          prev.map((m) => {
-            if (m.id === messageId) {
-              const updated = { ...m, reactions: updateReactions(m.reactions) };
-              if (activeThread?.id === messageId) {
-                setActiveThread(updated);
-              }
-              return updated;
-            }
-            return m;
-          })
+          prev.map((m) => (m.id === messageId ? { ...m, reactions: updateReactions(m.reactions) } : m))
         );
       }
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/messages/${encodeURIComponent(messageId)}/reactions`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              channelId: activeChannelId,
+              emoji,
+            }),
+          });
+        }
+      } catch {}
     },
-    [currentUser, activeThread]
+    [currentUser, activeThread, getToken, activeChannelId]
   );
 
-  // Create channel
+  // 12. Create Channel
   const createChannel = useCallback(
-    (input: {
+    async (input: {
       name: string;
       description?: string;
       isPrivate: boolean;
       departmentRestricted: boolean;
       department?: string;
       memberIds?: string[];
-    }): ChatChannel => {
+    }): Promise<ChatChannel> => {
+      const cleanName = input.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const myId = String(currentUser?.id || 'user');
-      const myName = `${currentUser?.firstName || 'User'} ${currentUser?.lastName || ''}`.trim();
+      const initialMemberIds = Array.from(new Set([myId, ...(input.memberIds || [])]));
 
-      const newChan: ChatChannel = {
-        id: `ch-${Date.now()}`,
-        name: input.name.toLowerCase().replace(/\s+/g, '-'),
-        description: input.description || '',
-        topic: input.description || `Team collaboration in #${input.name.toLowerCase().replace(/\s+/g, '-')}`,
+      const optimisticChannel: ChatChannel = {
+        id: `ch-${cleanName}-${Date.now().toString(36).slice(2, 6)}`,
+        name: cleanName,
+        topic: input.description || 'Welcome to #' + cleanName,
+        description: input.description,
         isPrivate: input.isPrivate,
         departmentRestricted: input.departmentRestricted,
         department: input.department,
         createdById: myId,
-        createdBy: myName,
+        createdBy: `${currentUser?.firstName || 'Current'} ${currentUser?.lastName || 'User'}`.trim(),
         createdAt: new Date().toISOString(),
         adminIds: [myId],
-        memberIds: Array.from(new Set([myId, ...(input.memberIds || [])])),
+        memberIds: initialMemberIds,
         pendingRequestUserIds: [],
+        unreadCount: 0,
       };
 
-      setChannels((prev) => [...prev, newChan]);
-      setActiveChannelId(newChan.id);
-      return newChan;
+      setChannels((prev) => [...prev, optimisticChannel]);
+      setActiveChannelId(optimisticChannel.id);
+
+      try {
+        const token = await getToken();
+        if (token) {
+          const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: cleanName,
+              description: input.description || '',
+              topic: input.description || '',
+              isPrivate: input.isPrivate,
+              channelType: input.isPrivate ? 'private' : input.department ? 'department' : 'public',
+              departmentRestriction: input.department || '',
+              memberIds: initialMemberIds,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const serverChannel = mapBackendChannel(data);
+            setChannels((prev) =>
+              prev.map((c) => (c.id === optimisticChannel.id ? serverChannel : c))
+            );
+            setActiveChannelId(serverChannel.id);
+            return serverChannel;
+          }
+        }
+      } catch {}
+
+      return optimisticChannel;
     },
-    [currentUser]
+    [currentUser, getToken]
   );
 
-  // Request to join a private/department channel
+  // 13. Join Channel Request
   const requestToJoinChannel = useCallback(
-    (channelId: string) => {
+    async (channelId: string) => {
       const myId = String(currentUser?.id || 'user');
       setChannels((prev) =>
         prev.map((c) => {
-          if (c.id === channelId && !c.memberIds.includes(myId) && !c.pendingRequestUserIds.includes(myId)) {
+          if (c.id === channelId && !c.pendingRequestUserIds.includes(myId)) {
             return {
               ...c,
               pendingRequestUserIds: [...c.pendingRequestUserIds, myId],
@@ -746,85 +1266,189 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           return c;
         })
       );
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/channels/${encodeURIComponent(channelId)}/request-join`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+          });
+        }
+      } catch {}
     },
-    [currentUser]
+    [currentUser, getToken]
   );
 
-  // Approve join request (Channel admin only)
-  const approveJoinRequest = useCallback((channelId: string, userId: string) => {
-    setChannels((prev) =>
-      prev.map((c) => {
-        if (c.id === channelId) {
-          return {
-            ...c,
-            pendingRequestUserIds: c.pendingRequestUserIds.filter((u) => u !== userId),
-            memberIds: Array.from(new Set([...c.memberIds, userId])),
-          };
-        }
-        return c;
-      })
-    );
-  }, []);
+  // 14. Approve Join Request
+  const approveJoinRequest = useCallback(
+    async (channelId: string, userId: string) => {
+      setChannels((prev) =>
+        prev.map((c) => {
+          if (c.id === channelId) {
+            return {
+              ...c,
+              pendingRequestUserIds: c.pendingRequestUserIds.filter((id) => id !== userId),
+              memberIds: c.memberIds.includes(userId) ? c.memberIds : [...c.memberIds, userId],
+            };
+          }
+          return c;
+        })
+      );
 
-  // Reject join request
-  const rejectJoinRequest = useCallback((channelId: string, userId: string) => {
-    setChannels((prev) =>
-      prev.map((c) => {
-        if (c.id === channelId) {
-          return {
-            ...c,
-            pendingRequestUserIds: c.pendingRequestUserIds.filter((u) => u !== userId),
-          };
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/channels/${encodeURIComponent(channelId)}/review-request`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              requesterId: userId,
+              approved: true,
+            }),
+          });
         }
-        return c;
-      })
-    );
-  }, []);
+      } catch {}
+    },
+    [getToken]
+  );
 
-  // Add member directly
-  const addMemberToChannel = useCallback((channelId: string, userId: string) => {
-    setChannels((prev) =>
-      prev.map((c) => {
-        if (c.id === channelId && !c.memberIds.includes(userId)) {
-          return {
-            ...c,
-            memberIds: [...c.memberIds, userId],
-            pendingRequestUserIds: c.pendingRequestUserIds.filter((u) => u !== userId),
-          };
+  // 15. Reject Join Request
+  const rejectJoinRequest = useCallback(
+    async (channelId: string, userId: string) => {
+      setChannels((prev) =>
+        prev.map((c) => {
+          if (c.id === channelId) {
+            return {
+              ...c,
+              pendingRequestUserIds: c.pendingRequestUserIds.filter((id) => id !== userId),
+            };
+          }
+          return c;
+        })
+      );
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/channels/${encodeURIComponent(channelId)}/review-request`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              requesterId: userId,
+              approved: false,
+            }),
+          });
         }
-        return c;
-      })
-    );
-  }, []);
+      } catch {}
+    },
+    [getToken]
+  );
 
-  // Remove member
-  const removeMemberFromChannel = useCallback((channelId: string, userId: string) => {
-    setChannels((prev) =>
-      prev.map((c) => {
-        if (c.id === channelId) {
-          return {
-            ...c,
-            memberIds: c.memberIds.filter((m) => m !== userId),
-            adminIds: c.adminIds.filter((a) => a !== userId),
-          };
+  // 16. Add Member
+  const addMemberToChannel = useCallback(
+    async (channelId: string, userId: string) => {
+      setChannels((prev) =>
+        prev.map((c) => {
+          if (c.id === channelId && !c.memberIds.includes(userId)) {
+            return {
+              ...c,
+              memberIds: [...c.memberIds, userId],
+            };
+          }
+          return c;
+        })
+      );
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/channels/${encodeURIComponent(channelId)}/members`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              employeeId: userId,
+            }),
+          });
         }
-        return c;
-      })
-    );
-  }, []);
+      } catch {}
+    },
+    [getToken]
+  );
 
+  // 17. Remove Member
+  const removeMemberFromChannel = useCallback(
+    async (channelId: string, userId: string) => {
+      setChannels((prev) =>
+        prev.map((c) => {
+          if (c.id === channelId) {
+            return {
+              ...c,
+              memberIds: c.memberIds.filter((id) => id !== userId),
+            };
+          }
+          return c;
+        })
+      );
+
+      try {
+        const token = await getToken();
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/v1/chat/channels/${encodeURIComponent(channelId)}/members/${encodeURIComponent(userId)}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(token),
+          });
+        }
+      } catch {}
+    },
+    [getToken]
+  );
+
+  // 18. Typing Indicator Dispatch with Throttling
   const setTyping = useCallback(
     (isTyping: boolean) => {
-      const myName = currentUser?.firstName || 'Someone';
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+
+      const sendTypingToBackend = async (typing: boolean) => {
+        try {
+          const token = await getToken();
+          if (token && activeChannelId) {
+            await fetch(`${API_BASE_URL}/api/v1/chat/typing`, {
+              method: 'POST',
+              headers: {
+                ...getAuthHeaders(token),
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                channelId: activeChannelId,
+                isTyping: typing,
+              }),
+            });
+          }
+        } catch {}
+      };
+
+      sendTypingToBackend(isTyping);
+
       if (isTyping) {
-        if (!typingUsers.includes(myName)) {
-          setTypingUsers((prev) => [...prev, myName]);
-        }
-      } else {
-        setTypingUsers((prev) => prev.filter((u) => u !== myName));
+        typingTimerRef.current = setTimeout(() => {
+          sendTypingToBackend(false);
+        }, 4000);
       }
     },
-    [currentUser, typingUsers]
+    [getToken, activeChannelId]
   );
 
   return (
@@ -832,8 +1456,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       value={{
         channels,
         activeChannel,
-        setActiveChannelId: handleSelectChannel,
-        messages: currentChannelMessages,
+        setActiveChannelId,
+        messages,
         allMessages,
         activeThread,
         setActiveThread,
@@ -852,17 +1476,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         typingUsers,
         setTyping,
         allEmployees,
+        uploadAttachment,
+        isRealtimeConnected,
+        refreshChannels,
+        refreshMessages,
       }}
     >
       {children}
     </ChatContext.Provider>
   );
-}
+};
 
-export function useChat() {
+export const useChat = () => {
   const context = useContext(ChatContext);
   if (!context) {
     throw new Error('useChat must be used within a ChatProvider');
   }
   return context;
-}
+};

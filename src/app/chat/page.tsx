@@ -77,6 +77,7 @@ export default function GroupChatPage() {
     typingUsers,
     setTyping,
     allEmployees,
+    uploadAttachment,
   } = useChat();
 
   const { currentUser, role, isHRAdmin } = useRole();
@@ -301,25 +302,16 @@ export default function GroupChatPage() {
     setMentionQuery(null);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const isImg = file.type.startsWith('image/');
-      const isVideo = file.type.startsWith('video/');
-      const fileUrl = URL.createObjectURL(file);
-      setUploadedAttachments((prev) => [
-        ...prev,
-        {
-          id: `file-${Date.now()}-${Math.random()}`,
-          name: file.name,
-          url: fileUrl,
-          type: isImg ? 'image' : isVideo ? 'video' : 'file',
-          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        },
-      ]);
-    });
+    for (const file of Array.from(files)) {
+      const att = await uploadAttachment(file);
+      if (att) {
+        setUploadedAttachments((prev) => [...prev, att]);
+      }
+    }
   };
 
   const toggleSection = (key: string) => {

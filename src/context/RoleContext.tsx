@@ -54,7 +54,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   const currentUser: Employee = {
     ...currentHRAdmin,
-    id: userProfile?.id || clerkUser?.id || 'user',
+    id: userProfile?.employeeId || userProfile?.id || clerkUser?.id || 'user',
     firstName: realFirstName,
     lastName: realLastName,
     email: realEmail,
