@@ -1,8 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { useRole } from '@/context/RoleContext';
 import { useCompany } from '@/context/CompanyContext';
 import { useWidgets, MAX_WIDGETS } from '@/context/WidgetContext';
@@ -102,25 +101,32 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="row gap-10">
-          <Link 
-            href="/people/me?tab=Personal"
-            className="btn-neutral" 
-            style={{ padding: '8px 20px', display: 'inline-flex', alignItems: 'center' }}
-          >
-            Edit Profile
-          </Link>
+        <div className="row gap-10" style={{ alignItems: 'center' }}>
           <button 
-            className="btn-neutral"
+            type="button"
+            className="btn-primary"
             onClick={() => setPickerOpen(true)}
-            style={{ padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: 6,
+              padding: '7px 16px',
+              borderRadius: 9999,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(162, 56, 255, 0.18)',
+            }}
+            title="Add new widget"
           >
-            Widget Library
+            <Plus size={15} strokeWidth={2.5} />
+            <span>Add Widget</span>
           </button>
           <button 
             className={isEditing ? "btn-primary" : "widget-manage-btn"} 
             onClick={() => setIsEditing(!isEditing)} 
-            style={{ padding: '8px 16px' }}
+            style={{ padding: '7px 16px', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}
           >
             {isEditing ? 'Done Editing' : 'Manage Widgets'}
             {!isEditing && <span className="limit-chip" style={{ marginLeft: 6 }}>{activeWidgets.length}/{MAX_WIDGETS}</span>}
