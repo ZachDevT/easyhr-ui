@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
-  Globe2,
   AlertCircle,
   Eye,
   EyeOff,
@@ -23,15 +22,6 @@ function clerkError(error: unknown): ClerkErrorLike {
   return typeof error === 'object' && error !== null ? error as ClerkErrorLike : {};
 }
 
-function authTimeout<T>(request: Promise<T>): Promise<T> {
-  return Promise.race([
-    request,
-    new Promise<never>((_, reject) => window.setTimeout(
-      () => reject(new Error('The Clerk security check did not finish. Refresh the page, then try Chrome with extensions disabled.')),
-      15_000,
-    )),
-  ]);
-}
 
 type VerificationStage = 'first_factor' | 'second_factor' | null;
 type VerificationMode = 'email_code' | 'totp' | 'phone_code' | 'backup_code';
@@ -266,21 +256,6 @@ function SignInContent() {
     }
   };
 
-  const signInWithGoogle = async () => {
-    setIsSubmitting(true);
-    try {
-      const { error: ssoError } = await authTimeout(signIn.sso({
-        strategy: 'oauth_google',
-        redirectCallbackUrl: '/sso-callback',
-        redirectUrl: '/dashboard',
-      }));
-      if (ssoError) throw ssoError;
-    } catch (err: unknown) {
-      const details = clerkError(err);
-      setError(details.errors?.[0]?.message || details.message || 'Google sign-in failed.');
-      setIsSubmitting(false);
-    }
-  };
 
   // Render Verification View if challenge is active
   if (verificationStage !== null) {
@@ -560,11 +535,6 @@ function SignInContent() {
           </div>
         </div>
       )}
-      <button type="button" disabled={isSubmitting || fetchStatus === 'fetching'} onClick={signInWithGoogle} className={s.secondaryButton}
-        style={{opacity:(isSubmitting || fetchStatus === 'fetching')?0.7:1,cursor:(isSubmitting || fetchStatus === 'fetching')?'not-allowed':'pointer'}}>
-        <Globe2 size={17}/> {isSubmitting ? 'Redirecting to Google...' : 'Continue with Google'}
-      </button>
-      <div className={s.divider}>or continue with email</div>
       <form onSubmit={handleSignIn}>
         <AuthField label="Work email">
           <input type="email" placeholder="amina@company.com" value={emailAddress} onChange={(e)=>setEmailAddress(e.target.value)} required/>
