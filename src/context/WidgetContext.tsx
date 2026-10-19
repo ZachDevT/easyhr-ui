@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import { useCompany } from './CompanyContext';
 import { OPTIONAL_WIDGETS } from '../components/widgets';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 
@@ -21,6 +22,7 @@ const WidgetContext = createContext<WidgetContextType | undefined>(undefined);
 
 export function WidgetProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn } = useAuth();
+  const { company } = useCompany();
   const [activeWidgets, setActiveWidgetsState] = useState<string[]>(() =>
     OPTIONAL_WIDGETS.filter((w) => w.default).map((w) => w.id)
   );
@@ -40,7 +42,19 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
 
   // Sync with backend preferences
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !company) return;
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (
+        path.startsWith("/company/register") ||
+        path.startsWith("/auth") ||
+        path.startsWith("/careers") ||
+        path === "/workspace-not-found" ||
+        path === "/"
+      ) {
+        return;
+      }
+    }
 
     let isMounted = true;
     async function loadBackendPreferences() {
@@ -69,7 +83,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [isSignedIn, getToken]);
+  }, [isSignedIn, getToken, company?.id]);
 
   // Persist helper
   const persistWidgets = useCallback(async (widgets: string[]) => {

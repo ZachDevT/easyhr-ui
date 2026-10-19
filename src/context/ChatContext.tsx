@@ -296,6 +296,18 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [getToken]);
 
+const isSetupOrPublicRoute = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return (
+    path.startsWith('/company/register') ||
+    path.startsWith('/auth') ||
+    path.startsWith('/careers') ||
+    path === '/workspace-not-found' ||
+    path === '/'
+  );
+};
+
   // Ensure active channel unread count is always 0
   useEffect(() => {
     if (!activeChannelId) return;
@@ -308,6 +320,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
     const fetchEmployees = async () => {
+      if (!company?.id || isSetupOrPublicRoute()) return;
       try {
         const token = await getToken();
         if (!token) return;
@@ -343,10 +356,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isMounted = false;
     };
-  }, [getToken]);
+  }, [getToken, company?.id]);
 
   // 2. Fetch Channels from Backend
   const refreshChannels = useCallback(async () => {
+    if (!company?.id || isSetupOrPublicRoute()) {
+      setIsLoadingChannels(false);
+      return;
+    }
     try {
       setIsLoadingChannels(true);
       const token = await getToken();
@@ -374,7 +391,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoadingChannels(false);
     }
-  }, [getToken]);
+  }, [getToken, company?.id]);
 
   useEffect(() => {
     refreshChannels();
@@ -382,7 +399,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 3. Fetch Messages for Active Channel
   const refreshMessages = useCallback(async () => {
-    if (!activeChannelId || activeChannelId === 'ch-general') return;
+    if (!activeChannelId || activeChannelId === 'ch-general' || !company?.id || isSetupOrPublicRoute()) {
+      setIsLoadingMessages(false);
+      return;
+    }
     try {
       setIsLoadingMessages(true);
       const token = await getToken();
@@ -420,7 +440,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [activeChannelId, getToken]);
+  }, [activeChannelId, getToken, company?.id]);
 
   useEffect(() => {
     refreshMessages();
@@ -430,8 +450,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isCancelled = false;
     let sse: EventSource | null = null;
+    let retryTimeout: NodeJS.Timeout | null = null;
 
     const connectSSE = async () => {
+      if (!company?.id || isSetupOrPublicRoute()) return;
       try {
         const token = await getToken();
         if (!token || isCancelled) return;
@@ -453,8 +475,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!isCancelled) {
             setIsRealtimeConnected(false);
             sse?.close();
-            // Retry after 4 seconds
-            setTimeout(connectSSE, 4000);
+            // Retry only if company is loaded and not on a setup/public route
+            if (company?.id && !isSetupOrPublicRoute()) {
+              retryTimeout = setTimeout(connectSSE, 6000);
+            }
           }
         };
 
@@ -813,9 +837,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       isCancelled = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
       if (sse) sse.close();
+      eventSourceRef.current = null;
     };
-  }, [getToken, company, activeChannelId, currentUser]);
+  }, [getToken, company?.id, company?.subdomain, activeChannelId, currentUser]);
 
   // Derived Active Channel
   const activeChannel = useMemo(() => {

@@ -52,6 +52,17 @@ export function extractSubdomain(hostname: string): string | null {
 export function getWorkspaceSubdomain(): string | null {
   if (typeof window === "undefined") return null;
 
+  // On registration, onboarding, and auth pages, do NOT infer the uncreated workspace
+  const path = window.location.pathname;
+  if (
+    path.startsWith("/company/register") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/careers") ||
+    path === "/workspace-not-found"
+  ) {
+    return null;
+  }
+
   // 1. Direct from current browser hostname
   const sub = extractSubdomain(window.location.hostname);
   if (sub) return sub;

@@ -3,6 +3,7 @@
 import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useCompany } from "./CompanyContext";
 import { toast } from "@/components/ui/Toast";
 
 export type Candidate = {
@@ -80,6 +81,7 @@ const BACKEND_TO_STAGE: Record<string, string> = {
 
 export function HRProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn } = useAuth();
+  const { company } = useCompany();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,9 +97,22 @@ export function HRProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchCandidates = useCallback(async () => {
-    if (!isSignedIn) {
+    if (!isSignedIn || !company) {
       setIsLoading(false);
       return;
+    }
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (
+        path.startsWith("/company/register") ||
+        path.startsWith("/auth") ||
+        path.startsWith("/careers") ||
+        path === "/workspace-not-found" ||
+        path === "/"
+      ) {
+        setIsLoading(false);
+        return;
+      }
     }
     try {
       const token = await getToken();
@@ -138,7 +153,7 @@ export function HRProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken, isSignedIn]);
+  }, [getToken, isSignedIn, company?.id]);
 
   useEffect(() => {
     fetchCandidates();
