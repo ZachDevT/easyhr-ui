@@ -43,12 +43,15 @@ import {
   Receipt,
   Printer,
   Eye,
+  HelpCircle,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useCompany } from "@/context/CompanyContext";
 import { useRole } from "@/context/RoleContext";
 import { usePayroll } from "@/context/PayrollContext";
 import { formatMoney, CompensationModel, PayrollCalculationResult } from "@/utils/payrollEngine";
+import { PayrollGuideModal } from "@/components/payroll/PayrollGuideModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -159,6 +162,7 @@ function ProfileContent() {
 
   // Payslips & Compensation Engine state
   const [selectedPayslipModal, setSelectedPayslipModal] = useState<PayrollCalculationResult | null>(null);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isBonusPenaltyModalOpen, setIsBonusPenaltyModalOpen] = useState(false);
   const [isSavingBonusPenalty, setIsSavingBonusPenalty] = useState(false);
   const [bonusPenaltyForm, setBonusPenaltyForm] = useState({
@@ -1503,6 +1507,45 @@ function ProfileContent() {
                   )}
                 </div>
 
+                {/* Plain-English Explainer Banner */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    marginBottom: 14,
+                    fontSize: 12,
+                    color: "#475569",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Sparkles size={14} style={{ color: "var(--primary, #2563EB)", flexShrink: 0 }} />
+                    <span>
+                      <strong>How this works:</strong> Approved bonuses increase your Gross Pay, while authorized penalties reduce Gross Pay before statutory taxes and pension are calculated.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsGuideOpen(true)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--primary, #2563EB)",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      paddingLeft: 12,
+                    }}
+                  >
+                    Learn more →
+                  </button>
+                </div>
+
                 <div style={{
                   borderRadius: 10,
                   border: "1px solid var(--card-border, #E4E4E7)",
@@ -1638,38 +1681,63 @@ function ProfileContent() {
                   >
                     <Receipt size={18} />
                   </div>
-                  <h3 className="text-xl fw-700 text-1 m-0">Payslips</h3>
+                  <div>
+                    <h3 className="text-xl fw-700 text-1 m-0">Payslips</h3>
+                    <p className="text-xs text-4 m-0" style={{ marginTop: 2 }}>
+                      Monthly compensation breakdown, statutory deductions, and finalized pay statements.
+                    </p>
+                  </div>
                 </div>
 
-                {isHRAdmin && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCompensationForm({
-                          compensationModel: empComp.compensationModel,
-                          hourlyRate: String(empComp.hourlyRate || 18500),
-                          baseSalary: String(empComp.baseSalary || 3200000),
-                          dailyRate: String(empComp.dailyRate || 145000),
-                          currency: empComp.currency || "UGX",
-                          isExemptFromOvertime: Boolean(empComp.isExemptFromOvertime),
-                        });
-                        setIsEditCompensationOpen(true);
-                      }}
-                      className="btn-neutral btn-sm"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
-                    >
-                      <Edit2 size={13} /> Edit Compensation Model
-                    </button>
-                    <Link
-                      href="/payroll"
-                      className="btn-primary btn-sm"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, textDecoration: "none" }}
-                    >
-                      <DollarSign size={13} /> Payroll System
-                    </Link>
-                  </div>
-                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsGuideOpen(true)}
+                    className="btn-neutral btn-sm"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      background: "#EFF6FF",
+                      borderColor: "#BFDBFE",
+                      color: "#1D4ED8",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <HelpCircle size={14} /> How this works (Guide)
+                  </button>
+
+                  {isHRAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCompensationForm({
+                            compensationModel: empComp.compensationModel,
+                            hourlyRate: String(empComp.hourlyRate || 18500),
+                            baseSalary: String(empComp.baseSalary || 3200000),
+                            dailyRate: String(empComp.dailyRate || 145000),
+                            currency: empComp.currency || "UGX",
+                            isExemptFromOvertime: Boolean(empComp.isExemptFromOvertime),
+                          });
+                          setIsEditCompensationOpen(true);
+                        }}
+                        className="btn-neutral btn-sm"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
+                      >
+                        <Edit2 size={13} /> Edit Compensation Model
+                      </button>
+                      <Link
+                        href="/payroll"
+                        className="btn-primary btn-sm"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, textDecoration: "none" }}
+                      >
+                        <DollarSign size={13} /> Payroll System
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Card 1: Calculation Formula */}
@@ -1739,6 +1807,89 @@ function ProfileContent() {
                     <div style={{ color: "var(--text-3, #64748B)" }}>
                       Total Bonuses and Total Penalties = please see details in Job section &gt; One time Bonuses &amp; Penalties table.
                     </div>
+
+                    {/* Visual Equation Flow for Non-HR Users */}
+                    <div
+                      style={{
+                        marginTop: 14,
+                        padding: "14px 16px",
+                        background: "#FFFFFF",
+                        borderRadius: 10,
+                        border: "1px solid #E2E8F0",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#64748B" }}>
+                          Visual Calculation Flow
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsGuideOpen(true)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--primary, #2563EB)",
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: 0,
+                          }}
+                        >
+                          <HelpCircle size={13} /> Plain-English Guide
+                        </button>
+                      </div>
+
+                      {/* Stage 1: How Gross Earnings are calculated */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
+                        <div style={{ background: "#F1F5F9", padding: "6px 10px", borderRadius: 6, border: "1px solid #E2E8F0" }}>
+                          <strong style={{ color: "#1E293B" }}>⏱️ Productive Pay</strong>
+                          <span style={{ fontSize: 10.5, color: "#64748B", display: "block" }}>Hours × Rate</span>
+                        </div>
+                        <span style={{ fontWeight: 800, color: "#94A3B8" }}>+</span>
+                        <div style={{ background: "#F0FDF4", padding: "6px 10px", borderRadius: 6, border: "1px solid #BBF7D0" }}>
+                          <strong style={{ color: "#166534" }}>🎁 Bonuses</strong>
+                          <span style={{ fontSize: 10.5, color: "#16A34A", display: "block" }}>Job tab rewards</span>
+                        </div>
+                        <span style={{ fontWeight: 800, color: "#94A3B8" }}>+</span>
+                        <div style={{ background: "#EFF6FF", padding: "6px 10px", borderRadius: 6, border: "1px solid #BFDBFE" }}>
+                          <strong style={{ color: "#1E40AF" }}>⚡ Overtime &amp; Special</strong>
+                          <span style={{ fontSize: 10.5, color: "#2563EB", display: "block" }}>1.5× rate / Holidays</span>
+                        </div>
+                        <span style={{ fontWeight: 800, color: "#94A3B8" }}>−</span>
+                        <div style={{ background: "#FEF2F2", padding: "6px 10px", borderRadius: 6, border: "1px solid #FECACA" }}>
+                          <strong style={{ color: "#991B1B" }}>📉 Penalties</strong>
+                          <span style={{ fontSize: 10.5, color: "#DC2626", display: "block" }}>Lawful adjustments</span>
+                        </div>
+                        <span style={{ fontWeight: 800, color: "#94A3B8" }}>=</span>
+                        <div style={{ background: "#F8FAFC", padding: "6px 12px", borderRadius: 6, border: "2px solid #CBD5E1" }}>
+                          <strong style={{ color: "#0F172A", fontSize: 12.5 }}>Gross Total</strong>
+                          <span style={{ fontSize: 10.5, color: "#64748B", display: "block" }}>Total Earned</span>
+                        </div>
+                      </div>
+
+                      {/* Stage 2: Deductions to Net Take-Home Pay */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12, paddingTop: 6, borderTop: "1px dashed #E2E8F0" }}>
+                        <div style={{ background: "#F8FAFC", padding: "6px 10px", borderRadius: 6, border: "1px solid #E2E8F0" }}>
+                          <strong style={{ color: "#0F172A" }}>Gross Total</strong>
+                        </div>
+                        <span style={{ fontWeight: 800, color: "#94A3B8" }}>−</span>
+                        <div style={{ background: "#FEF2F2", padding: "6px 10px", borderRadius: 6, border: "1px solid #FECACA" }}>
+                          <strong style={{ color: "#991B1B" }}>🏛️ Statutory Deductions</strong>
+                          <span style={{ fontSize: 10.5, color: "#DC2626", display: "block" }}>PAYE Tax + 5% NSSF Pension</span>
+                        </div>
+                        <span style={{ fontWeight: 800, color: "#94A3B8" }}>=</span>
+                        <div style={{ background: "#ECFDF5", padding: "6px 14px", borderRadius: 6, border: "2px solid #10B981" }}>
+                          <strong style={{ color: "#065F46", fontSize: 13 }}>💰 Take-Home Net Pay</strong>
+                          <span style={{ fontSize: 10.5, color: "#059669", display: "block" }}>Directly deposited to your bank</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1794,19 +1945,46 @@ function ProfileContent() {
                           fontWeight: 600,
                         }}
                       >
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Month of payment</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Year of payment</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Productive hours, %</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Currency (calculated)</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Pay Rate</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total monthly compensation</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Bonuses</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Penalties</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Higher Rates</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Allowances</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Gross</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Deductions</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Net Pay</th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Month / Year</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#94A3B8" }}>Pay Period</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Productive hours, %</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#94A3B8" }}>Clocked vs sched</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Pay Rate</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#94A3B8" }}>Hourly or base</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Total monthly compensation</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#94A3B8" }}>Hours × Rate</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Total Bonuses</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#16A34A" }}>Job tab additions</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Total Penalties</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#DC2626" }}>Authorized deductions</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Total Higher Rates</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#2563EB" }}>Overtime &amp; Holidays</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Gross</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#94A3B8" }}>Total earnings</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Deductions</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#DC2626" }}>PAYE + 5% Pension</div>
+                        </th>
+                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                          <div>Net Pay</div>
+                          <div style={{ fontSize: 10, fontWeight: 400, color: "#16A34A" }}>Take-home payout</div>
+                        </th>
                         <th style={{ padding: "12px 16px", whiteSpace: "nowrap", textAlign: "right" }}>Actions</th>
                       </tr>
                     </thead>
@@ -2908,13 +3086,75 @@ function ProfileContent() {
               </div>
 
               <div style={{ textAlign: "right" }}>
-                <Badge variant="success">PAYSLIP FINALIZED</Badge>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                  <Badge variant="success">PAYSLIP FINALIZED</Badge>
+                  <button
+                    type="button"
+                    onClick={() => setIsGuideOpen(true)}
+                    className="btn-neutral btn-sm"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 11,
+                      padding: "3px 8px",
+                      color: "#1D4ED8",
+                      background: "#EFF6FF",
+                      borderColor: "#BFDBFE",
+                    }}
+                  >
+                    <HelpCircle size={12} /> How it works
+                  </button>
+                </div>
                 <div style={{ fontSize: 12, color: "#64748B", marginTop: 8 }}>
                   Period: {getMonthName(selectedPayslipModal.periodMonth)} 1 – 31, {selectedPayslipModal.periodYear}
                 </div>
                 <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
                   Pay Date: {selectedPayslipModal.periodYear}-{String(selectedPayslipModal.periodMonth).padStart(2, "0")}-31
                 </div>
+              </div>
+            </div>
+
+            {/* Plain-English 3-Box Big Picture: Earnings - Deductions = Net Take-Home */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto 1fr auto 1.25fr",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 20,
+                background: "#F8FAFC",
+                padding: "12px 16px",
+                borderRadius: 12,
+                border: "1px solid #E2E8F0",
+              }}
+            >
+              <div style={{ background: "#FFFFFF", padding: "10px 14px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 10.5, color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>1. Gross Earnings</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)", marginTop: 2 }}>
+                  {formatMoney(selectedPayslipModal.grossPay, selectedPayslipModal.currency)}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#94A3B8" }}>Base + Bonuses + OT</div>
+              </div>
+
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#94A3B8", textAlign: "center" }}>−</div>
+
+              <div style={{ background: "#FEF2F2", padding: "10px 14px", borderRadius: 8, border: "1px solid #FECACA" }}>
+                <div style={{ fontSize: 10.5, color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>2. Statutory Deductions</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#DC2626", marginTop: 2 }}>
+                  -{formatMoney(selectedPayslipModal.employeeDeductions, selectedPayslipModal.currency)}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#EF4444" }}>PAYE Tax + 5% Pension</div>
+              </div>
+
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#94A3B8", textAlign: "center" }}>=</div>
+
+              <div style={{ background: "#ECFDF5", padding: "10px 16px", borderRadius: 8, border: "2px solid #10B981" }}>
+                <div style={{ fontSize: 10.5, color: "#065F46", fontWeight: 700, textTransform: "uppercase" }}>3. Net Take-Home Pay</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#059669", marginTop: 2 }}>
+                  {formatMoney(selectedPayslipModal.netPay, selectedPayslipModal.currency)}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#10B981" }}>Deposited into your bank</div>
               </div>
             </div>
 
@@ -3421,6 +3661,13 @@ function ProfileContent() {
           </form>
         </Modal>
       )}
+
+      {/* MODAL: PAYROLL PLAIN-ENGLISH GUIDE */}
+      <PayrollGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+        isEmployeeView={!isHRAdmin}
+      />
     </div>
   );
 }
