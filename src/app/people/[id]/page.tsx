@@ -23,9 +23,16 @@ import {
   Sparkles,
   Edit2,
   ShieldAlert,
+  Calculator,
+  Receipt,
+  Plus,
+  Eye,
+  Printer,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useRole } from "@/context/RoleContext";
+import { usePayroll } from "@/context/PayrollContext";
+import { formatMoney, PayrollCalculationResult } from "@/utils/payrollEngine";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
@@ -33,6 +40,7 @@ import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimi
 import { toast } from "@/components/ui/Toast";
 import { EditEmployeeModal } from "@/components/people/EditEmployeeModal";
 import { ProfileMeSkeleton } from "@/components/ui/Skeleton";
+import { Modal } from "@/components/ui/Modal";
 
 interface EmployeeProfileData {
   id: string;
@@ -88,6 +96,38 @@ export default function EmployeeProfile() {
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [managers, setManagers] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
+
+  const {
+    getEmployeeCompensation,
+    getEmployeeCompensationDetails,
+    getEmployeeBonusesPenalties,
+    addBonusPenalty,
+    deleteBonusPenalty,
+    updateBonusPenaltyStatus,
+  } = usePayroll();
+
+  const [selectedPayslipModal, setSelectedPayslipModal] = useState<PayrollCalculationResult | null>(null);
+  const [isBonusPenaltyModalOpen, setIsBonusPenaltyModalOpen] = useState(false);
+  const [isSavingBonusPenalty, setIsSavingBonusPenalty] = useState(false);
+  const [bonusPenaltyForm, setBonusPenaltyForm] = useState({
+    type: "bonus" as "bonus" | "penalty",
+    category: "Performance Bonus",
+    amount: "",
+    periodMonth: 10,
+    periodYear: 2026,
+    reason: "",
+  });
+
+  const empId = params?.id || 'emp-bushu';
+  const fallbackFullName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : 'Bushu Hamuli Zacharie';
+  const empComp = getEmployeeCompensation(empId, fallbackFullName);
+  const employeeBonusesPenalties = getEmployeeBonusesPenalties(empId);
+  const compensationRows = getEmployeeCompensationDetails(empId);
+
+  const getMonthName = (m: number) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[m - 1] || `Month ${m}`;
+  };
 
   useEffect(() => {
     getToken().then((token) => {
@@ -527,6 +567,201 @@ export default function EmployeeProfile() {
               </Card>
             )}
 
+            {/* Payroll Compensation, Formula & Payslips (HR Access) */}
+            <Card>
+              <CardBody>
+                <div className="row-between mb-16 align-center">
+                  <SectionHeading
+                    title="Compensation & Payslips"
+                    description={`Contracted model: ${empComp.compensationModel.toUpperCase()} · ${empComp.currency || 'UGX'}`}
+                  />
+                  <div className="row gap-8">
+                    <button
+                      type="button"
+                      className="btn-primary btn-sm"
+                      onClick={() => setIsBonusPenaltyModalOpen(true)}
+                      style={{ fontSize: 12 }}
+                    >
+                      <Plus size={13} className="mr-4" /> Add Bonus / Penalty
+                    </button>
+                    <Link
+                      href="/payroll"
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 12, textDecoration: "none" }}
+                    >
+                      <Receipt size={13} className="mr-4" /> Payroll Engine
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Calculation Formula Card */}
+                <div
+                  style={{
+                    background: "#FAFBFB",
+                    borderRadius: 10,
+                    border: "1px solid #E2E8F0",
+                    padding: "14px 18px",
+                    marginBottom: 20,
+                    fontSize: 12.5,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Calculator size={14} style={{ color: "#475569" }} />
+                    <strong style={{ fontSize: 13, color: "var(--text-1)" }}>Active Calculation Formula</strong>
+                  </div>
+                  <div style={{ color: "#1E293B", fontWeight: 600, marginBottom: 4 }}>
+                    {empComp.compensationModel.toUpperCase()} compensation: Total monthly compensation=
+                    {empComp.compensationModel === "hourly"
+                      ? "Pay rate * Productive hours"
+                      : empComp.compensationModel === "monthly_salary"
+                      ? "Fixed monthly salary"
+                      : empComp.compensationModel === "daily"
+                      ? "Daily rate * Eligible payable days"
+                      : empComp.compensationModel === "overtime_based"
+                      ? "Pay rate * Regular Productive hours + Overtime pay"
+                      : "Base Retainer + Commission rules"}
+                  </div>
+                  <div style={{ color: "#475569", marginBottom: 4 }}>
+                    Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
+                  </div>
+                  <div style={{ color: "#64748B", fontSize: 11.5 }}>
+                    Total Bonuses and Total Penalties = please see details in Job section &gt; One time Bonuses &amp; Penalties table.
+                  </div>
+                </div>
+
+                {/* Compensation Details Table */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 10 }}>
+                    Compensation Details
+                  </div>
+                  <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 700 }}>
+                      <thead style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#64748B", textAlign: "left", fontSize: 11.5 }}>
+                        <tr>
+                          <th style={{ padding: "10px 14px" }}>Month</th>
+                          <th style={{ padding: "10px 14px" }}>Year</th>
+                          <th style={{ padding: "10px 14px" }}>Productive %</th>
+                          <th style={{ padding: "10px 14px" }}>Rate</th>
+                          <th style={{ padding: "10px 14px" }}>Gross</th>
+                          <th style={{ padding: "10px 14px" }}>Deductions</th>
+                          <th style={{ padding: "10px 14px" }}>Net Pay</th>
+                          <th style={{ padding: "10px 14px", textAlign: "right" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {compensationRows.map((row) => (
+                          <tr key={`${row.periodYear}-${row.periodMonth}`} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                            <td style={{ padding: "10px 14px", fontWeight: 600 }}>{getMonthName(row.periodMonth)}</td>
+                            <td style={{ padding: "10px 14px", color: "var(--text-2)" }}>{row.periodYear}</td>
+                            <td style={{ padding: "10px 14px", color: "#0F766E", fontWeight: 600 }}>
+                              {row.productiveHoursPercent}% ({row.productiveHours}h)
+                            </td>
+                            <td style={{ padding: "10px 14px" }}>{row.payRateDisplay}</td>
+                            <td style={{ padding: "10px 14px", fontWeight: 600 }}>{formatMoney(row.grossPay, row.currency)}</td>
+                            <td style={{ padding: "10px 14px", color: "#DC2626" }}>-{formatMoney(row.employeeDeductions, row.currency)}</td>
+                            <td style={{ padding: "10px 14px", fontWeight: 700, color: "#16A34A" }}>{formatMoney(row.netPay, row.currency)}</td>
+                            <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPayslipModal(row)}
+                                className="btn-neutral btn-sm"
+                                style={{ fontSize: 11, padding: "4px 8px" }}
+                              >
+                                <Eye size={11} className="mr-4" /> View Payslip
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* One-time Bonuses & Penalties Table */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 10 }}>
+                    One-time Bonuses &amp; Penalties (Job Section Integration)
+                  </div>
+                  <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 640 }}>
+                      <thead style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#64748B", textAlign: "left", fontSize: 11.5 }}>
+                        <tr>
+                          <th style={{ padding: "10px 14px" }}>Type</th>
+                          <th style={{ padding: "10px 14px" }}>Category</th>
+                          <th style={{ padding: "10px 14px" }}>Amount</th>
+                          <th style={{ padding: "10px 14px" }}>Month</th>
+                          <th style={{ padding: "10px 14px" }}>Reason</th>
+                          <th style={{ padding: "10px 14px" }}>Status</th>
+                          <th style={{ padding: "10px 14px", textAlign: "right" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employeeBonusesPenalties.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} style={{ padding: "20px 14px", textAlign: "center", color: "#94A3B8" }}>
+                              No one-time adjustments recorded for this employee.
+                            </td>
+                          </tr>
+                        ) : (
+                          employeeBonusesPenalties.map((item) => (
+                            <tr key={item.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                              <td style={{ padding: "10px 14px" }}>
+                                <span style={{
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  background: item.type === "bonus" ? "#DCFCE7" : "#FEE2E2",
+                                  color: item.type === "bonus" ? "#166534" : "#991B1B",
+                                  textTransform: "uppercase",
+                                }}>
+                                  {item.type}
+                                </span>
+                              </td>
+                              <td style={{ padding: "10px 14px", fontWeight: 600 }}>{item.category}</td>
+                              <td style={{ padding: "10px 14px", fontWeight: 700, color: item.type === "bonus" ? "#16A34A" : "#DC2626" }}>
+                                {item.type === "bonus" ? "+" : "-"}{formatMoney(item.amount, item.currency)}
+                              </td>
+                              <td style={{ padding: "10px 14px" }}>{getMonthName(item.periodMonth)} {item.periodYear}</td>
+                              <td style={{ padding: "10px 14px", color: "var(--text-3)", maxWidth: 180 }}>{item.reason || "—"}</td>
+                              <td style={{ padding: "10px 14px" }}>
+                                <StatusPill tone={item.status === "approved" ? "success" : item.status === "pending" ? "warning" : "neutral"}>
+                                  {item.status.toUpperCase()}
+                                </StatusPill>
+                              </td>
+                              <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                                <div style={{ display: "inline-flex", gap: 4 }}>
+                                  {item.status === "pending" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => updateBonusPenaltyStatus(item.id, "approved")}
+                                      className="btn-neutral btn-sm"
+                                      style={{ padding: "2px 6px", fontSize: 10.5, color: "#16A34A" }}
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteBonusPenalty(item.id)}
+                                    className="btn-neutral btn-sm"
+                                    style={{ padding: "2px 6px", fontSize: 10.5, color: "#DC2626" }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
             {/* Culture & Bio */}
             {(employee.bio || employee.funFact || employee.favoriteFood || employee.favoriteMusic) && (
               <Card>
@@ -604,6 +839,279 @@ export default function EmployeeProfile() {
           locations={locations}
           managers={managers}
         />
+      )}
+
+      {/* MODAL: VIEW / PRINT PAYSLIP */}
+      {selectedPayslipModal && (
+        <Modal
+          isOpen={!!selectedPayslipModal}
+          onClose={() => setSelectedPayslipModal(null)}
+          title={`Official Pay Statement — ${getMonthName(selectedPayslipModal.periodMonth)} ${selectedPayslipModal.periodYear}`}
+          width={760}
+        >
+          <div style={{ padding: "8px 4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid #E2E8F0", paddingBottom: 16, marginBottom: 18 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-1)" }}>Helpware / EasyHR</div>
+                <div style={{ fontSize: 12, color: "#64748B" }}>Corporate Payroll Disbursement Statement</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--primary)", marginTop: 6 }}>{selectedPayslipModal.employeeName}</div>
+                <div style={{ fontSize: 12, color: "#64748B" }}>ID: {empComp.employeeNumber || "#10974"} · {empComp.jobTitle}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <StatusPill tone="success">PAYSLIP FINALIZED</StatusPill>
+                <div style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>Period: {getMonthName(selectedPayslipModal.periodMonth)} {selectedPayslipModal.periodYear}</div>
+                <div style={{ fontSize: 12, color: "#64748B" }}>Currency: {selectedPayslipModal.currency}</div>
+              </div>
+            </div>
+
+            <div style={{ background: "#F8FAFC", borderRadius: 8, padding: 12, marginBottom: 18, border: "1px solid #E2E8F0", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, fontSize: 12 }}>
+              <div>
+                <span style={{ color: "#64748B", display: "block" }}>Productive Hours:</span>
+                <strong style={{ fontSize: 14, color: "#0F766E" }}>{selectedPayslipModal.productiveHours} hrs ({selectedPayslipModal.productiveHoursPercent}%)</strong>
+              </div>
+              <div>
+                <span style={{ color: "#64748B", display: "block" }}>Approved Overtime:</span>
+                <strong style={{ fontSize: 14, color: "var(--text-1)" }}>{selectedPayslipModal.approvedOvertimeHours} hrs</strong>
+              </div>
+              <div>
+                <span style={{ color: "#64748B", display: "block" }}>Days Worked:</span>
+                <strong style={{ fontSize: 14, color: "var(--text-1)" }}>{selectedPayslipModal.daysWorked} days</strong>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}>
+              <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#166534", marginBottom: 8 }}>Earnings</div>
+                <table style={{ width: "100%", fontSize: 12 }}>
+                  <tbody>
+                    <tr style={{ borderBottom: "1px solid #F1F5F9" }}>
+                      <td style={{ padding: "5px 0" }}>Base Productive Pay</td>
+                      <td style={{ padding: "5px 0", textAlign: "right", fontWeight: 600 }}>{formatMoney(selectedPayslipModal.regularCompensation, selectedPayslipModal.currency)}</td>
+                    </tr>
+                    {selectedPayslipModal.overtimeCompensation > 0 && (
+                      <tr style={{ borderBottom: "1px solid #F1F5F9" }}>
+                        <td style={{ padding: "5px 0" }}>Overtime Pay</td>
+                        <td style={{ padding: "5px 0", textAlign: "right", fontWeight: 600, color: "#16A34A" }}>+{formatMoney(selectedPayslipModal.overtimeCompensation, selectedPayslipModal.currency)}</td>
+                      </tr>
+                    )}
+                    {selectedPayslipModal.bonusesTotal > 0 && (
+                      <tr style={{ borderBottom: "1px solid #F1F5F9" }}>
+                        <td style={{ padding: "5px 0" }}>Approved Bonuses</td>
+                        <td style={{ padding: "5px 0", textAlign: "right", fontWeight: 600, color: "#16A34A" }}>+{formatMoney(selectedPayslipModal.bonusesTotal, selectedPayslipModal.currency)}</td>
+                      </tr>
+                    )}
+                    <tr style={{ borderTop: "2px solid #CBD5E1" }}>
+                      <td style={{ padding: "7px 0", fontWeight: 700 }}>Total Gross</td>
+                      <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 800 }}>{formatMoney(selectedPayslipModal.grossPay, selectedPayslipModal.currency)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#991B1B", marginBottom: 8 }}>Deductions</div>
+                <table style={{ width: "100%", fontSize: 12 }}>
+                  <tbody>
+                    {selectedPayslipModal.breakdown
+                      .filter((b) => !b.isAddition && !b.isEmployerCost)
+                      .map((item) => (
+                        <tr key={item.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                          <td style={{ padding: "5px 0" }}>{item.name}</td>
+                          <td style={{ padding: "5px 0", textAlign: "right", color: "#DC2626", fontWeight: 600 }}>-{formatMoney(item.amount, selectedPayslipModal.currency)}</td>
+                        </tr>
+                      ))}
+                    <tr style={{ borderTop: "2px solid #CBD5E1" }}>
+                      <td style={{ padding: "7px 0", fontWeight: 700, color: "#991B1B" }}>Total Deductions</td>
+                      <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 800, color: "#991B1B" }}>-{formatMoney(selectedPayslipModal.employeeDeductions, selectedPayslipModal.currency)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style={{ background: "#DCFCE7", padding: "14px 18px", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>Net Take-Home Pay</div>
+                <div style={{ fontSize: 11, color: "#15803D" }}>Approved for disbursement</div>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#15803D" }}>
+                {formatMoney(selectedPayslipModal.netPay, selectedPayslipModal.currency)}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" className="btn-neutral btn-sm" onClick={() => setSelectedPayslipModal(null)}>Close</button>
+              <button type="button" className="btn-primary btn-sm" onClick={() => window.print()}>
+                <Printer size={13} className="mr-4" /> Print / Save PDF
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: ADD ONE-TIME BONUS / PENALTY */}
+      {isBonusPenaltyModalOpen && (
+        <Modal
+          isOpen={isBonusPenaltyModalOpen}
+          onClose={() => setIsBonusPenaltyModalOpen(false)}
+          title={`Record One-time Adjustment — ${fullName}`}
+          width={480}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const amt = Number(bonusPenaltyForm.amount);
+              if (!amt || amt <= 0) {
+                toast.error("Invalid amount", "Enter a positive number.");
+                return;
+              }
+              setIsSavingBonusPenalty(true);
+              try {
+                addBonusPenalty({
+                  employeeId: empId,
+                  employeeName: fullName,
+                  type: bonusPenaltyForm.type,
+                  category: bonusPenaltyForm.category,
+                  amount: amt,
+                  currency: empComp.currency || "UGX",
+                  periodMonth: bonusPenaltyForm.periodMonth,
+                  periodYear: bonusPenaltyForm.periodYear,
+                  reason: bonusPenaltyForm.reason,
+                  status: "approved",
+                  addedBy: "HR Administrator",
+                });
+                setIsBonusPenaltyModalOpen(false);
+                setBonusPenaltyForm({
+                  type: "bonus",
+                  category: "Performance Bonus",
+                  amount: "",
+                  periodMonth: 10,
+                  periodYear: 2026,
+                  reason: "",
+                });
+              } finally {
+                setIsSavingBonusPenalty(false);
+              }
+            }}
+            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Type</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setBonusPenaltyForm({ ...bonusPenaltyForm, type: "bonus", category: "Performance Bonus" })}
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: bonusPenaltyForm.type === "bonus" ? "2px solid #16A34A" : "1px solid #E4E4E7",
+                    background: bonusPenaltyForm.type === "bonus" ? "#F0FDF4" : "#FFFFFF",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: bonusPenaltyForm.type === "bonus" ? "#166534" : "#52525B",
+                    cursor: "pointer",
+                  }}
+                >
+                  + Bonus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBonusPenaltyForm({ ...bonusPenaltyForm, type: "penalty", category: "Unpaid Absence Adjustment" })}
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: bonusPenaltyForm.type === "penalty" ? "2px solid #DC2626" : "1px solid #E4E4E7",
+                    background: bonusPenaltyForm.type === "penalty" ? "#FEF2F2" : "#FFFFFF",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: bonusPenaltyForm.type === "penalty" ? "#991B1B" : "#52525B",
+                    cursor: "pointer",
+                  }}
+                >
+                  - Penalty / Deduction
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Category</label>
+              <select
+                className="select"
+                value={bonusPenaltyForm.category}
+                onChange={(e) => setBonusPenaltyForm({ ...bonusPenaltyForm, category: e.target.value })}
+              >
+                {bonusPenaltyForm.type === "bonus" ? (
+                  <>
+                    <option value="Performance Bonus">Performance Bonus</option>
+                    <option value="Attendance Bonus">Attendance Bonus</option>
+                    <option value="Signing Bonus">Signing Bonus</option>
+                    <option value="Customer Satisfaction Spiff">Customer Satisfaction Spiff</option>
+                    <option value="Discretionary Bonus">Discretionary Bonus</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Unpaid Absence Adjustment">Unpaid Absence Adjustment</option>
+                    <option value="Salary Advance Repayment">Salary Advance Repayment</option>
+                    <option value="Equipment Damage / Loss">Equipment Damage / Loss</option>
+                    <option value="Authorized Other Deduction">Authorized Other Deduction</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Amount ({empComp.currency || 'UGX'})</label>
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="e.g. 250000"
+                  value={bonusPenaltyForm.amount}
+                  onChange={(e) => setBonusPenaltyForm({ ...bonusPenaltyForm, amount: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Month</label>
+                <select
+                  className="select"
+                  value={bonusPenaltyForm.periodMonth}
+                  onChange={(e) => setBonusPenaltyForm({ ...bonusPenaltyForm, periodMonth: Number(e.target.value) })}
+                >
+                  <option value={10}>October 2026</option>
+                  <option value={9}>September 2026</option>
+                  <option value={8}>August 2026</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>Reason / Notes</label>
+              <textarea
+                className="textarea"
+                placeholder="Audit justification..."
+                value={bonusPenaltyForm.reason}
+                onChange={(e) => setBonusPenaltyForm({ ...bonusPenaltyForm, reason: e.target.value })}
+                style={{ minHeight: 60 }}
+                required
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn-neutral"
+                onClick={() => setIsBonusPenaltyModalOpen(false)}
+                disabled={isSavingBonusPenalty}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isSavingBonusPenalty}>
+                {isSavingBonusPenalty ? <Loader2 size={14} className="animate-spin" /> : "Save to Payroll"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </>
   );

@@ -7,6 +7,7 @@ import { HRProvider } from '@/context/HRContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OperationsProvider } from '@/context/OperationsContext';
 import { ChatProvider } from '@/context/ChatContext';
+import { PayrollProvider } from '@/context/PayrollContext';
 
 import type { Metadata } from 'next';
 
@@ -53,9 +54,11 @@ export default function RootLayout({
                   <WidgetProvider>
                     <ToastProvider>
                       <ChatProvider>
-                        <AppLayout>
-                          {children}
-                        </AppLayout>
+                        <PayrollProvider>
+                          <AppLayout>
+                            {children}
+                          </AppLayout>
+                        </PayrollProvider>
                       </ChatProvider>
                     </ToastProvider>
                   </WidgetProvider>
