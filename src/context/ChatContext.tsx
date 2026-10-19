@@ -271,6 +271,34 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastEventIdRef = useRef<string>('');
 
+  const handleSetActiveChannelId = useCallback((id: string) => {
+    setActiveChannelId(id);
+    if (id) {
+      setChannels((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+      );
+      getToken().then((token) => {
+        if (!token) return;
+        fetch(`${API_BASE_URL}/api/v1/chat/channels/${id}/read`, {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }).catch(() => {});
+      });
+    }
+  }, [getToken]);
+
+  // Ensure active channel unread count is always 0
+  useEffect(() => {
+    if (!activeChannelId) return;
+    setChannels((prev) =>
+      prev.map((c) => (c.id === activeChannelId && c.unreadCount ? { ...c, unreadCount: 0 } : c))
+    );
+  }, [activeChannelId]);
+
   // 1. Fetch Organization Employees for member pickers and profile drawer
   useEffect(() => {
     let isMounted = true;
@@ -1692,7 +1720,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         channels,
         activeChannel,
-        setActiveChannelId,
+        setActiveChannelId: handleSetActiveChannelId,
         messages,
         allMessages,
         activeThread,

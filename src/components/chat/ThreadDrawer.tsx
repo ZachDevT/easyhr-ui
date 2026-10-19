@@ -27,6 +27,7 @@ import { MediaLightbox, LightboxMediaItem } from './MediaLightbox';
 import { RichMessageContent, PollCard } from './RichMessageContent';
 import { WysiwygChatEditor, WysiwygEditorRef } from './WysiwygChatEditor';
 import { useRole } from '@/context/RoleContext';
+import { downloadChatAttachment } from '@/utils/chatMedia';
 
 interface ThreadDrawerProps {
   parentMessage: ChatMessage;
@@ -101,8 +102,8 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
     setStagedAttachments((prev) => [
       ...prev,
       {
-        id: `gif-${Date.now()}-${Math.random()}`,
-        name: '',
+        id: `gif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: 'animation.gif',
         url: gifUrl,
         type: 'image',
       },
@@ -378,22 +379,30 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                             </div>
                           </div>
                         ) : (
-                          <a
-                            href={att.url}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => downloadChatAttachment(att.url, att.name)}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: 8,
+                              justifyContent: 'space-between',
+                              width: '100%',
                               padding: '8px 10px',
                               fontSize: 12,
-                              color: 'var(--primary, #A238FF)',
+                              color: 'var(--text-1, #18181B)',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textAlign: 'left',
                             }}
+                            title={`Download ${att.name}`}
                           >
-                            <Paperclip size={13} />
-                            <span>{att.name}</span>
-                          </a>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                              <Paperclip size={13} style={{ color: 'var(--primary, #A238FF)', flexShrink: 0 }} />
+                              <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</span>
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--primary, #A238FF)', fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>Download</span>
+                          </button>
                         )}
                       </div>
                     );
@@ -624,22 +633,30 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                                   </div>
                                 </div>
                               ) : (
-                                <a
-                                  href={att.url}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => downloadChatAttachment(att.url, att.name)}
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 6,
+                                    justifyContent: 'space-between',
+                                    width: '100%',
                                     padding: '6px 8px',
                                     fontSize: 11,
-                                    color: 'var(--primary, #A238FF)',
+                                    color: 'var(--text-1, #18181B)',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
                                   }}
+                                  title={`Download ${att.name}`}
                                 >
-                                  <Paperclip size={12} />
-                                  <span>{att.name}</span>
-                                </a>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                                    <Paperclip size={12} style={{ color: 'var(--primary, #A238FF)', flexShrink: 0 }} />
+                                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</span>
+                                  </span>
+                                  <span style={{ fontSize: 10.5, color: 'var(--primary, #A238FF)', fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>Download</span>
+                                </button>
                               )}
                             </div>
                           );

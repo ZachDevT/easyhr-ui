@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import { X, Download, ExternalLink, Film, Image as ImageIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Download, ExternalLink, Film, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { downloadChatAttachment, openChatMediaInNewTab } from '@/utils/chatMedia';
 
 export interface LightboxMediaItem {
   url: string;
@@ -16,6 +17,9 @@ interface MediaLightboxProps {
 }
 
 export function MediaLightbox({ item, onClose }: MediaLightboxProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
+
   useEffect(() => {
     if (!item) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -24,6 +28,30 @@ export function MediaLightbox({ item, onClose }: MediaLightboxProps) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [item, onClose]);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!item || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadChatAttachment(item.url, item.name);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleOpenOriginal = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!item || isOpening) return;
+    setIsOpening(true);
+    try {
+      await openChatMediaInNewTab(item.url, item.name);
+    } finally {
+      setIsOpening(false);
+    }
+  };
 
   if (!item) return null;
 
@@ -95,11 +123,10 @@ export function MediaLightbox({ item, onClose }: MediaLightboxProps) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noreferrer"
-            download={item.name}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isDownloading}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -111,17 +138,23 @@ export function MediaLightbox({ item, onClose }: MediaLightboxProps) {
               color: '#FFFFFF',
               fontSize: 12,
               fontWeight: 600,
-              textDecoration: 'none',
+              cursor: isDownloading ? 'wait' : 'pointer',
+              opacity: isDownloading ? 0.75 : 1,
             }}
+            title="Download file directly to disk"
           >
-            <Download size={13.5} />
-            <span>Download</span>
-          </a>
+            {isDownloading ? (
+              <Loader2 size={13.5} className="animate-spin" />
+            ) : (
+              <Download size={13.5} />
+            )}
+            <span>{isDownloading ? 'Downloading...' : 'Download'}</span>
+          </button>
 
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={handleOpenOriginal}
+            disabled={isOpening}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -133,12 +166,18 @@ export function MediaLightbox({ item, onClose }: MediaLightboxProps) {
               color: '#FFFFFF',
               fontSize: 12,
               fontWeight: 600,
-              textDecoration: 'none',
+              cursor: isOpening ? 'wait' : 'pointer',
+              opacity: isOpening ? 0.75 : 1,
             }}
+            title="Open media in a clean new tab"
           >
-            <ExternalLink size={13.5} />
-            <span>Open Original</span>
-          </a>
+            {isOpening ? (
+              <Loader2 size={13.5} className="animate-spin" />
+            ) : (
+              <ExternalLink size={13.5} />
+            )}
+            <span>{isOpening ? 'Opening...' : 'Open Original'}</span>
+          </button>
 
           <button
             type="button"

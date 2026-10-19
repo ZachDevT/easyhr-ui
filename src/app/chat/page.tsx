@@ -29,6 +29,7 @@ import {
   MapPin,
   Briefcase,
   ExternalLink,
+  Download,
   FileText,
   Maximize2,
   Play,
@@ -62,6 +63,7 @@ import {
   playNotificationSound,
   showDesktopNotification,
 } from '@/utils/chatSound';
+import { downloadChatAttachment } from '@/utils/chatMedia';
 
 export default function GroupChatPage() {
   const {
@@ -199,12 +201,38 @@ export default function GroupChatPage() {
   >([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const prevChannelIdRef = useRef<string>('');
+  const [firstUnreadMsgId, setFirstUnreadMsgId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<WysiwygEditorRef>(null);
 
+  // Identify first unread message when opening a channel with unread messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, activeChannel?.id]);
+    if (!activeChannel) return;
+    if (activeChannel.id !== prevChannelIdRef.current) {
+      prevChannelIdRef.current = activeChannel.id;
+      const count = activeChannel.unreadCount || 0;
+      if (count > 0 && messages.length > 0) {
+        const unreadIdx = Math.max(0, messages.length - count);
+        const target = messages[unreadIdx];
+        if (target) {
+          setFirstUnreadMsgId(target.id);
+          return;
+        }
+      }
+      setFirstUnreadMsgId(null);
+    }
+  }, [activeChannel?.id, messages]);
+
+  // Scroll to first unread message so user starts from unseen messages, otherwise scroll to latest
+  useEffect(() => {
+    if (firstUnreadMsgId && firstUnreadRef.current) {
+      firstUnreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length, activeChannel?.id, firstUnreadMsgId]);
 
   // Membership & permissions
   const currentUserId = String(currentUser?.id || 'user');
@@ -794,7 +822,7 @@ export default function GroupChatPage() {
                         </span>
                       </span>
 
-                      {ch.unreadCount ? (
+                      {ch.unreadCount && !isActive ? (
                         <span
                           style={{
                             fontSize: 10.5,
@@ -907,7 +935,7 @@ export default function GroupChatPage() {
                   </div>
                 ) : (
                   Object.entries(departmentGroups).map(([deptName, deptChans]) => {
-                    const deptTotalUnread = deptChans.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+                    const deptTotalUnread = deptChans.reduce((sum, c) => (c.id === activeChannel?.id ? sum : sum + (c.unreadCount || 0)), 0);
                     return (
                       <div key={deptName}>
                         {/* Department Group Header */}
@@ -1048,7 +1076,7 @@ export default function GroupChatPage() {
                                   </span>
                                 </span>
 
-                                {ch.unreadCount ? (
+                                {ch.unreadCount && !isActive ? (
                                   <span
                                     style={{
                                       fontSize: 10,
@@ -1814,70 +1842,53 @@ export default function GroupChatPage() {
                 {notificationPermission === 'default' && !dismissedNotificationBanner && (
                   <div
                     style={{
-                      background: 'linear-gradient(90deg, #F5EEFF 0%, #FAF5FF 100%)',
-                      borderBottom: '1px solid #E9D5FF',
-                      padding: '10px 18px',
+                      background: '#FAF5FF',
+                      borderBottom: '1px solid #EDE9FE',
+                      padding: '5px 14px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      fontSize: 12.5,
+                      gap: 12,
+                      fontSize: 12,
                       flexShrink: 0,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 8,
-                          background: '#FFFFFF',
-                          border: '1px solid #DDD6FE',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#7C3AED',
-                          boxShadow: '0 1px 2px rgba(124, 58, 237, 0.08)',
-                        }}
-                      >
-                        <Bell size={14} />
-                      </div>
-                      <div>
-                        <span style={{ fontWeight: 600, color: '#3B0764' }}>Turn on desktop notifications: </span>
-                        <span style={{ color: '#5B21B6' }}>
-                          Get real-time Slack-style audio chimes and alerts whenever team members tag you or reply to your threads.
-                        </span>
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                      <Bell size={13} style={{ color: '#7C3AED', flexShrink: 0 }} />
+                      <span style={{ color: '#5B21B6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <strong style={{ fontWeight: 600 }}>Enable desktop notifications</strong> to receive audio chimes and alerts when mentioned or replied to.
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                       <button
                         type="button"
                         onClick={handleEnableNotifications}
                         style={{
-                          padding: '5px 12px',
-                          borderRadius: 7,
+                          padding: '3px 10px',
+                          borderRadius: 6,
                           border: 'none',
                           background: '#7C3AED',
                           color: '#FFFFFF',
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: 600,
                           cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(124, 58, 237, 0.25)',
                         }}
                       >
-                        Enable Notifications
+                        Enable
                       </button>
                       <button
                         type="button"
                         onClick={handleDismissNotificationBanner}
                         style={{
-                          padding: '5px 10px',
-                          borderRadius: 7,
-                          border: '1px solid transparent',
+                          padding: '3px 7px',
+                          borderRadius: 6,
+                          border: 'none',
                           background: 'transparent',
-                          color: '#7C3AED',
-                          fontSize: 12,
+                          color: '#8B5CF6',
+                          fontSize: 11.5,
                           cursor: 'pointer',
                         }}
+                        title="Dismiss notification prompt"
                       >
                         Dismiss
                       </button>
@@ -2114,14 +2125,48 @@ export default function GroupChatPage() {
                     const isHovered = hoveredMsgId === msg.id;
 
                     return (
-                      <div
-                        key={msg.id}
-                        onMouseEnter={() => setHoveredMsgId(msg.id)}
-                        onMouseLeave={() => setHoveredMsgId(null)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: 12,
+                      <React.Fragment key={msg.id}>
+                        {msg.id === firstUnreadMsgId && (
+                          <div
+                            ref={firstUnreadRef}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              margin: '16px 0 12px 0',
+                            }}
+                          >
+                            <div style={{ flex: 1, height: 1, background: '#EF4444' }} />
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '3px 12px',
+                                borderRadius: 999,
+                                background: '#FEF2F2',
+                                border: '1px solid #FCA5A5',
+                                color: '#DC2626',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444' }} />
+                              New Messages
+                            </span>
+                            <div style={{ flex: 1, height: 1, background: '#EF4444' }} />
+                          </div>
+                        )}
+
+                        <div
+                          onMouseEnter={() => setHoveredMsgId(msg.id)}
+                          onMouseLeave={() => setHoveredMsgId(null)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 12,
                           padding: '10px 12px',
                           borderRadius: 12,
                           background: isHovered ? '#FAF9F7' : 'transparent',
@@ -2509,28 +2554,53 @@ export default function GroupChatPage() {
                                       </div>
                                     </div>
                                   ) : (
-                                    <a
-                                      href={att.url}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                    <button
+                                      type="button"
+                                      onClick={() => downloadChatAttachment(att.url, att.name)}
                                       style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 10,
+                                        justifyContent: 'space-between',
+                                        width: '100%',
+                                        gap: 12,
                                         padding: '10px 14px',
                                         color: 'var(--text-1, #18181B)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
                                       }}
+                                      title={`Download ${att.name}`}
                                     >
-                                      <FileText size={16} style={{ color: 'var(--primary, #A238FF)' }} />
-                                      <div>
-                                        <div style={{ fontSize: 12.5 }}>{att.name}</div>
-                                        {att.size && (
-                                          <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)' }}>
-                                            {att.size}
-                                          </div>
-                                        )}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                                        <FileText size={18} style={{ color: 'var(--primary, #A238FF)', flexShrink: 0 }} />
+                                        <div style={{ overflow: 'hidden' }}>
+                                          <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</div>
+                                          {att.size && (
+                                            <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)' }}>
+                                              {att.size}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
-                                    </a>
+                                      <div
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                          padding: '4px 8px',
+                                          borderRadius: 6,
+                                          background: 'var(--primary-light, #F5EBFF)',
+                                          color: 'var(--primary, #A238FF)',
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        <Download size={12} />
+                                        <span>Download</span>
+                                      </div>
+                                    </button>
                                   )}
                                 </div>
                               );
@@ -2801,7 +2871,8 @@ export default function GroupChatPage() {
                           </div>
                         )}
                       </div>
-                    );
+                    </React.Fragment>
+                  );
                   })
                 )}
                 <div ref={messagesEndRef} />
@@ -2847,8 +2918,8 @@ export default function GroupChatPage() {
                       setUploadedAttachments((prev) => [
                         ...prev,
                         {
-                          id: `gif-${Date.now()}-${Math.random()}`,
-                          name: '',
+                          id: `gif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                          name: 'animation.gif',
                           url: gifUrl,
                           type: 'image',
                         },
@@ -3973,27 +4044,6 @@ export default function GroupChatPage() {
               </div>
             </div>
 
-            {selectedProfileMember.email && (
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginBottom: 3 }}>
-                  Email Address
-                </div>
-                <a
-                  href={`mailto:${selectedProfileMember.email}`}
-                  style={{
-                    fontSize: 12.5,
-                    color: 'var(--primary, #A238FF)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  <Mail size={13} />
-                  <span>{selectedProfileMember.email}</span>
-                </a>
-              </div>
-            )}
 
             {selectedProfileMember.phone && (
               <div>
