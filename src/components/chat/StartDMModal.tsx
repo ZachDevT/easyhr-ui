@@ -169,10 +169,10 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                   color: 'var(--text-1, #18181B)',
                 }}
               >
-                New Direct Message
+                New DM
               </h2>
               <p style={{ fontSize: 11.5, color: 'var(--text-3, #A1A1AA)', margin: '1px 0 0 0' }}>
-                Chat 1:1 or select multiple people for a group chat
+                Chat 1:1 or select multiple people for a group DM
               </p>
             </div>
           </div>
@@ -519,7 +519,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                 fontSize: 12.5,
                 fontWeight: 600,
                 cursor: selectedIds.length > 0 && !isSubmitting ? 'pointer' : 'not-allowed',
-                boxShadow: selectedIds.length > 0 ? '0 1px 3px rgba(162, 56, 255, 0.3)' : 'none',
+                boxShadow: selectedIds.length > 0 ? '0 1px 3px rgba(0, 0, 0, 0.12)' : 'none',
               }}
             >
               {isSubmitting ? (
@@ -529,7 +529,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                 </>
               ) : (
                 <span>
-                  {selectedIds.length > 1 ? 'Start Group DM' : 'Start Direct Message'}
+                  {selectedIds.length > 1 ? 'Start Group DM' : 'Start DM'}
                 </span>
               )}
             </button>
