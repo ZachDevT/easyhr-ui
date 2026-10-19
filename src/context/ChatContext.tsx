@@ -79,6 +79,8 @@ export interface ChatChannel {
   channelType?: string;
   isArchived?: boolean;
   isMuted?: boolean;
+  lastMessageAt?: string;
+  lastMessagePreview?: string;
 }
 
 interface ChatContextType {
@@ -235,6 +237,8 @@ function mapBackendChannel(bc: any): ChatChannel {
     channelType: bc.channelType,
     isArchived: Boolean(bc.isArchived),
     isMuted: Boolean(bc.isMuted),
+    lastMessageAt: bc.lastMessageAt || bc.last_message_at || undefined,
+    lastMessagePreview: bc.lastMessagePreview || bc.last_message_preview || undefined,
   };
 }
 

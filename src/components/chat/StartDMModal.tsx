@@ -9,9 +9,10 @@ import { Employee } from '@/data/employees';
 interface StartDMModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onDMStarted?: () => void;
 }
 
-export function StartDMModal({ isOpen, onClose }: StartDMModalProps) {
+export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps) {
   const { allEmployees, openOrCreateDM } = useChat();
   const { currentUser } = useRole();
 
@@ -92,6 +93,7 @@ export function StartDMModal({ isOpen, onClose }: StartDMModalProps) {
           .join(', ');
         await openOrCreateDM(idsToMessage[0], names);
       }
+      onDMStarted?.();
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Failed to start direct message');

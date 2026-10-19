@@ -20,6 +20,7 @@ import {
   AtSign,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   ShieldAlert,
   Pin,
   Building2,
@@ -52,6 +53,7 @@ import { useCompany } from '@/context/CompanyContext';
 import { Employee } from '@/data/employees';
 import { CreateChannelModal } from '@/components/chat/CreateChannelModal';
 import { StartDMModal } from '@/components/chat/StartDMModal';
+import { DMsOverview } from '@/components/chat/DMsOverview';
 import { ThreadDrawer } from '@/components/chat/ThreadDrawer';
 import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
@@ -118,6 +120,8 @@ export default function GroupChatPage() {
   const [viewFilter, setViewFilter] = useState<'all' | 'threads' | 'pinned'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStartDMModal, setShowStartDMModal] = useState(false);
+  const [activeChatTab, setActiveChatTab] = useState<'channels' | 'dms'>('channels');
+  const [showDMsOverview, setShowDMsOverview] = useState<boolean>(false);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState<PickerTab>('emoji');
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMediaItem | null>(null);
@@ -354,6 +358,18 @@ export default function GroupChatPage() {
     };
   };
 
+  const channelsTotalUnread = useMemo(
+    () =>
+      generalChannels.reduce((sum, c) => sum + (c.unreadCount || 0), 0) +
+      Object.values(departmentGroups).flat().reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+    [generalChannels, departmentGroups]
+  );
+
+  const dmsTotalUnread = useMemo(
+    () => directMessageChannels.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+    [directMessageChannels]
+  );
+
   // Visible messages based on search + viewFilter
   const visibleMessages = useMemo(() => {
     let list = messages;
@@ -586,7 +602,7 @@ export default function GroupChatPage() {
 
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => (activeChatTab === 'dms' ? setShowStartDMModal(true) : setShowCreateModal(true))}
             style={{
               width: 28,
               height: 28,
@@ -600,14 +616,124 @@ export default function GroupChatPage() {
               cursor: 'pointer',
               flexShrink: 0,
             }}
-            title="Create new channel"
+            title={activeChatTab === 'dms' ? 'Start new direct message' : 'Create new channel'}
           >
             <Plus size={15} />
           </button>
         </div>
 
+        {/* Primary Header Tabs: Channels & Groups vs Direct Messages */}
+        <div style={{ padding: '8px 12px 2px 12px' }}>
+          <div
+            style={{
+              display: 'flex',
+              background: '#F4F4F5',
+              borderRadius: 10,
+              padding: 3,
+              gap: 2,
+            }}
+          >
+            {/* Channels & Groups Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveChatTab('channels');
+                setShowDMsOverview(false);
+                if (activeChannel?.channelType === 'dm' || activeChannel?.channelType === 'group_dm') {
+                  const firstGen =
+                    generalChannels[0] ||
+                    channels.find((c) => c.channelType !== 'dm' && c.channelType !== 'group_dm') ||
+                    channels[0];
+                  if (firstGen) {
+                    setActiveChannelId(firstGen.id);
+                  }
+                }
+              }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '6px 8px',
+                borderRadius: 7,
+                border: 'none',
+                background: activeChatTab === 'channels' ? '#FFFFFF' : 'transparent',
+                boxShadow: activeChatTab === 'channels' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                color: activeChatTab === 'channels' ? 'var(--text-1, #18181B)' : 'var(--text-3, #71717A)',
+                fontWeight: activeChatTab === 'channels' ? 600 : 500,
+                fontSize: 12,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Hash size={13} style={{ color: activeChatTab === 'channels' ? 'var(--primary, #A238FF)' : 'inherit' }} />
+              <span>Channels</span>
+              {channelsTotalUnread > 0 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: 999,
+                    background: 'var(--primary, #A238FF)',
+                    color: '#FFFFFF',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {channelsTotalUnread}
+                </span>
+              )}
+            </button>
+
+            {/* Direct Messages Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveChatTab('dms');
+                setShowDMsOverview(true);
+              }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '6px 8px',
+                borderRadius: 7,
+                border: 'none',
+                background: activeChatTab === 'dms' ? '#FFFFFF' : 'transparent',
+                boxShadow: activeChatTab === 'dms' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                color: activeChatTab === 'dms' ? 'var(--text-1, #18181B)' : 'var(--text-3, #71717A)',
+                fontWeight: activeChatTab === 'dms' ? 600 : 500,
+                fontSize: 12,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <MessageSquare size={13} style={{ color: activeChatTab === 'dms' ? 'var(--primary, #A238FF)' : 'inherit' }} />
+              <span>Direct Messages</span>
+              {dmsTotalUnread > 0 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: 999,
+                    background: 'var(--primary, #A238FF)',
+                    color: '#FFFFFF',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {dmsTotalUnread}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Channel Filter Search */}
-        <div style={{ padding: '12px 12px 6px 12px' }}>
+        <div style={{ padding: '8px 12px 6px 12px' }}>
           <div style={{ position: 'relative' }}>
             <Search
               size={13}
@@ -621,7 +747,7 @@ export default function GroupChatPage() {
             />
             <input
               type="text"
-              placeholder="Jump to channel..."
+              placeholder={activeChatTab === 'dms' ? 'Search direct messages...' : 'Jump to channel...'}
               value={searchChannelTerm}
               onChange={(e) => setSearchChannelTerm(e.target.value)}
               style={{
@@ -638,11 +764,13 @@ export default function GroupChatPage() {
           </div>
         </div>
 
-        {/* Quick View Nav (All / Threads / Pinned) */}
-        <div
-          style={{
-            padding: '4px 10px 10px 10px',
-            borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+        {activeChatTab === 'channels' ? (
+          <>
+            {/* Quick View Nav (All / Threads / Pinned) */}
+            <div
+              style={{
+                padding: '4px 10px 10px 10px',
+                borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
             display: 'flex',
             flexDirection: 'column',
             gap: 2,
@@ -1028,6 +1156,8 @@ export default function GroupChatPage() {
                         const targetCh = channels.find((c) => c.id === ch.id);
                         pendingUnreadCountRef.current = targetCh?.unreadCount || 0;
                         setActiveChannelId(ch.id);
+                        setShowDMsOverview(false);
+                        setActiveChatTab('dms');
                         setActiveThread(null);
                         setViewFilter('all');
                       }}
@@ -1491,6 +1621,285 @@ export default function GroupChatPage() {
             )}
           </div>
         </div>
+      </>
+    ) : (
+      <>
+            {/* All Direct Messages Overview Button */}
+            <div
+              style={{
+                padding: '4px 10px 10px 10px',
+                borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowDMsOverview(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: showDMsOverview ? 'var(--primary-light, #F5EBFF)' : '#FFFFFF',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  color: showDMsOverview ? 'var(--primary, #A238FF)' : 'var(--text-1, #18181B)',
+                  fontWeight: showDMsOverview ? 600 : 500,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <MessageSquare
+                    size={14}
+                    style={{
+                      color: showDMsOverview ? 'var(--primary, #A238FF)' : 'var(--text-3, #A1A1AA)',
+                    }}
+                  />
+                  <span>All Direct Messages</span>
+                </span>
+                {dmsTotalUnread > 0 && (
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      padding: '1px 6px',
+                      borderRadius: 999,
+                      background: 'var(--primary, #A238FF)',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {dmsTotalUnread}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Scrollable Direct Messages List */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '12px 10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0 8px',
+                  marginBottom: 4,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--text-3, #A1A1AA)',
+                    fontWeight: 600,
+                  }}
+                >
+                  Conversations ({directMessageChannels.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowStartDMModal(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    background: '#FFFFFF',
+                    color: 'var(--text-2, #52525B)',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                  }}
+                  title="Start a new direct message"
+                >
+                  <Plus size={11} />
+                  <span>New</span>
+                </button>
+              </div>
+
+              {directMessageChannels.length === 0 ? (
+                <div
+                  style={{
+                    padding: '28px 14px',
+                    textAlign: 'center',
+                    color: 'var(--text-3, #A1A1AA)',
+                    fontSize: 12,
+                  }}
+                >
+                  <p style={{ margin: '0 0 10px 0' }}>No direct messages yet.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowStartDMModal(true)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 7,
+                      border: 'none',
+                      background: 'var(--primary, #A238FF)',
+                      color: '#FFFFFF',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Start a Conversation
+                  </button>
+                </div>
+              ) : (
+                directMessageChannels.map((ch) => {
+                  const isActive = !showDMsOverview && activeChannel?.id === ch.id;
+                  const dmInfo = getDMParticipant(ch);
+                  return (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => {
+                        const targetCh = channels.find((c) => c.id === ch.id);
+                        pendingUnreadCountRef.current = targetCh?.unreadCount || 0;
+                        setActiveChannelId(ch.id);
+                        setShowDMsOverview(false);
+                        setActiveChatTab('dms');
+                        setActiveThread(null);
+                        setViewFilter('all');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '7px 8px',
+                        borderRadius: 8,
+                        border: isActive
+                          ? '1px solid var(--card-border, #E4E4E7)'
+                          : '1px solid transparent',
+                        background: isActive ? '#FFFFFF' : 'transparent',
+                        boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                        color: isActive ? 'var(--text-1, #18181B)' : 'var(--text-2, #52525B)',
+                        fontSize: 12.5,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <span style={{ position: 'relative', flexShrink: 0 }}>
+                          <span
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: '#FFFFFF',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 10,
+                              fontWeight: 700,
+                              overflow: 'hidden',
+                              color: 'var(--text-1, #18181B)',
+                            }}
+                          >
+                            {dmInfo?.avatar ? (
+                              <img
+                                src={dmInfo.avatar}
+                                alt={dmInfo.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : dmInfo?.isGroup ? (
+                              <Users size={12} style={{ color: 'var(--primary, #A238FF)' }} />
+                            ) : (
+                              (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
+                            )}
+                          </span>
+                          {!dmInfo?.isGroup && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                right: -1,
+                                bottom: -1,
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: '#10B981',
+                                border: '1.5px solid #FAF9F7',
+                              }}
+                            />
+                          )}
+                        </span>
+
+                        <span
+                          style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            fontWeight: isActive ? 600 : 400,
+                          }}
+                        >
+                          {dmInfo?.name || ch.name}
+                        </span>
+                      </span>
+
+                      {ch.unreadCount && !isActive ? (
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            padding: '1px 6px',
+                            borderRadius: 999,
+                            background: 'var(--primary, #A238FF)',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {ch.unreadCount}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowStartDMModal(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 8px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-3, #A1A1AA)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  marginTop: 4,
+                }}
+              >
+                <Plus size={13} />
+                <span>Start a direct message</span>
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Bottom Create New Button */}
         <div
@@ -1502,7 +1911,7 @@ export default function GroupChatPage() {
         >
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => (activeChatTab === 'dms' ? setShowStartDMModal(true) : setShowCreateModal(true))}
             style={{
               width: '100%',
               display: 'flex',
@@ -1520,7 +1929,7 @@ export default function GroupChatPage() {
             }}
           >
             <Plus size={14} />
-            <span>Create New Channel</span>
+            <span>{activeChatTab === 'dms' ? 'New Direct Message' : 'Create New Channel'}</span>
           </button>
         </div>
       </aside>
@@ -1538,41 +1947,85 @@ export default function GroupChatPage() {
           height: '100%',
         }}
       >
-        {activeChannel ? (
+        {showDMsOverview ? (
+          <DMsOverview
+            directMessageChannels={directMessageChannels}
+            activeChannelId={activeChannel?.id || null}
+            onSelectDM={(channelId) => {
+              const targetCh = channels.find((c) => c.id === channelId);
+              pendingUnreadCountRef.current = targetCh?.unreadCount || 0;
+              setActiveChannelId(channelId);
+              setShowDMsOverview(false);
+              setActiveChatTab('dms');
+              setActiveThread(null);
+              setViewFilter('all');
+            }}
+            onStartNewDM={() => setShowStartDMModal(true)}
+            allEmployees={allEmployees}
+            allMessages={allMessages}
+            currentUser={currentUser}
+            getDMParticipant={getDMParticipant}
+          />
+        ) : activeChannel ? (
           <>
             {/* Top Channel Bar */}
             <div
               style={{
-                height: 58,
-                padding: '0 22px',
+                height: 52,
+                padding: '0 16px',
                 borderBottom: '1px solid var(--card-border, #E4E4E7)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 16,
+                gap: 12,
                 background: '#FFFFFF',
                 flexShrink: 0,
               }}
             >
               {/* Left: Channel Breadcrumb & Topic or DM User Profile */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
                 {activeChannel.channelType === 'dm' || activeChannel.channelType === 'group_dm' ? (
                   (() => {
                     const dmInfo = getDMParticipant(activeChannel);
                     return (
                       <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDMsOverview(true);
+                            setActiveChatTab('dms');
+                          }}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 7,
+                            border: '1px solid var(--card-border, #E4E4E7)',
+                            background: '#FAF9F7',
+                            color: 'var(--text-2, #52525B)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            marginRight: 2,
+                            flexShrink: 0,
+                          }}
+                          title="All Direct Messages"
+                        >
+                          <ChevronLeft size={15} />
+                        </button>
+
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           <div
                             style={{
-                              width: 36,
-                              height: 36,
+                              width: 32,
+                              height: 32,
                               borderRadius: '50%',
                               background: '#FAF9F7',
                               border: '1px solid var(--card-border, #E4E4E7)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: 700,
                               color: 'var(--text-1, #18181B)',
                               overflow: 'hidden',
@@ -1585,7 +2038,7 @@ export default function GroupChatPage() {
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />
                             ) : dmInfo?.isGroup ? (
-                              <Users size={16} style={{ color: 'var(--primary, #A238FF)' }} />
+                              <Users size={15} style={{ color: 'var(--primary, #A238FF)' }} />
                             ) : (
                               (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
                             )}
@@ -1596,8 +2049,8 @@ export default function GroupChatPage() {
                                 position: 'absolute',
                                 right: 0,
                                 bottom: 0,
-                                width: 9.5,
-                                height: 9.5,
+                                width: 8.5,
+                                height: 8.5,
                                 borderRadius: '50%',
                                 background: '#10B981',
                                 border: '2px solid #FFFFFF',
@@ -1607,46 +2060,35 @@ export default function GroupChatPage() {
                         </div>
 
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span
-                              style={{
-                                fontSize: 15,
-                                color: 'var(--text-1, #18181B)',
-                                fontFamily: 'var(--font-title)',
-                                fontWeight: 700,
-                              }}
-                            >
-                              {dmInfo?.name}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 10.5,
-                                padding: '2px 8px',
-                                borderRadius: 999,
-                                background: '#F5EEFF',
-                                border: '1px solid #DDD6FE',
-                                color: '#7C3AED',
-                                fontWeight: 600,
-                              }}
-                            >
-                              {dmInfo?.isGroup ? 'Group DM' : 'Direct Message'}
-                            </span>
+                          <div
+                            style={{
+                              fontSize: 14,
+                              color: 'var(--text-1, #18181B)',
+                              fontFamily: 'var(--font-title)',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              lineHeight: 1.25,
+                            }}
+                          >
+                            {dmInfo?.name}
                           </div>
 
                           <div
                             style={{
-                              fontSize: 11.5,
+                              fontSize: 11,
                               color: 'var(--text-3, #A1A1AA)',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              maxWidth: 420,
                               display: 'flex',
                               alignItems: 'center',
                               gap: 6,
+                              marginTop: 1,
                             }}
                           >
-                            <span>{dmInfo?.title}</span>
+                            <span>{dmInfo?.title || 'Coworker'}</span>
                             {dmInfo?.department && (
                               <>
                                 <span>·</span>
@@ -1656,7 +2098,7 @@ export default function GroupChatPage() {
                             {!dmInfo?.isGroup && (
                               <>
                                 <span>·</span>
-                                <span style={{ color: '#059669', fontWeight: 500 }}>Active now</span>
+                                <span style={{ color: '#059669', fontWeight: 500 }}>Active</span>
                               </>
                             )}
                           </div>
@@ -1668,9 +2110,9 @@ export default function GroupChatPage() {
                   <>
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 7,
                         background: '#FAF9F7',
                         border: '1px solid var(--card-border, #E4E4E7)',
                         color: 'var(--text-1, #18181B)',
@@ -1680,25 +2122,28 @@ export default function GroupChatPage() {
                         flexShrink: 0,
                       }}
                     >
-                      {activeChannel.isPrivate ? <Lock size={15} /> : <Hash size={16} />}
+                      {activeChannel.isPrivate ? <Lock size={14} /> : <Hash size={15} />}
                     </div>
 
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {activeChannel.department && (
                           <>
-                            <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>
+                            <span style={{ fontSize: 11.5, color: 'var(--text-3, #A1A1AA)' }}>
                               {activeChannel.department}
                             </span>
-                            <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>/</span>
+                            <span style={{ fontSize: 11.5, color: 'var(--text-3, #A1A1AA)' }}>/</span>
                           </>
                         )}
                         <span
                           style={{
-                            fontSize: 15,
+                            fontSize: 14,
                             color: 'var(--text-1, #18181B)',
                             fontFamily: 'var(--font-title)',
                             fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                           }}
                         >
                           {activeChannel.name}
@@ -1707,8 +2152,8 @@ export default function GroupChatPage() {
                         {activeChannel.isPrivate && (
                           <span
                             style={{
-                              fontSize: 10.5,
-                              padding: '2px 8px',
+                              fontSize: 10,
+                              padding: '1px 6px',
                               borderRadius: 999,
                               background: '#FAF9F7',
                               border: '1px solid var(--card-border, #E4E4E7)',
@@ -1723,12 +2168,13 @@ export default function GroupChatPage() {
                       {activeChannel.topic && (
                         <div
                           style={{
-                            fontSize: 11.5,
+                            fontSize: 11,
                             color: 'var(--text-3, #A1A1AA)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            maxWidth: 420,
+                            maxWidth: 380,
+                            marginTop: 1,
                           }}
                         >
                           {activeChannel.topic}
@@ -1739,48 +2185,58 @@ export default function GroupChatPage() {
                 )}
               </div>
 
-              {/* Right: Pinned, Thread Popover, Search in Channel, Member Avatars */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {/* Right: Compact Action Toolbar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 {/* Notification Alerts & Sound Button */}
                 <button
                   type="button"
                   onClick={notificationPermission === 'default' ? handleEnableNotifications : handleToggleSound}
                   title={
                     notificationPermission === 'granted'
-                      ? (soundEnabled ? 'Desktop notifications & sound alerts active (click to mute sound)' : 'Audio muted (click to unmute)')
+                      ? soundEnabled
+                        ? 'Notifications & sound alerts active (click to mute)'
+                        : 'Audio muted (click to unmute)'
                       : 'Enable desktop notifications & sound alerts'
                   }
                   style={{
-                    display: 'inline-flex',
+                    width: 30,
+                    height: 30,
+                    borderRadius: 7,
+                    border:
+                      notificationPermission === 'granted' && soundEnabled
+                        ? '1px solid #DDD6FE'
+                        : '1px solid var(--card-border, #E4E4E7)',
+                    background:
+                      notificationPermission === 'granted' && soundEnabled ? '#F5EEFF' : '#FFFFFF',
+                    color:
+                      notificationPermission === 'granted' && soundEnabled
+                        ? '#7C3AED'
+                        : 'var(--text-2, #52525B)',
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: 5,
-                    height: 32,
-                    padding: '0 10px',
-                    borderRadius: 8,
-                    border: notificationPermission === 'granted'
-                      ? '1px solid #DDD6FE'
-                      : '1px solid var(--card-border, #E4E4E7)',
-                    background: notificationPermission === 'granted'
-                      ? (soundEnabled ? '#F5EEFF' : '#FAFAFA')
-                      : '#FFFFFF',
-                    color: notificationPermission === 'granted'
-                      ? (soundEnabled ? '#7C3AED' : 'var(--text-3, #A1A1AA)')
-                      : 'var(--text-2, #52525B)',
-                    fontSize: 12,
+                    justifyContent: 'center',
                     cursor: 'pointer',
-                    fontWeight: 500,
+                    position: 'relative',
                   }}
                 >
                   {notificationPermission === 'granted' ? (
-                    soundEnabled ? <Bell size={13} style={{ color: '#7C3AED' }} /> : <VolumeX size={13} />
+                    soundEnabled ? <Bell size={13.5} style={{ color: '#7C3AED' }} /> : <VolumeX size={13.5} />
                   ) : (
-                    <Bell size={13} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+                    <Bell size={13.5} style={{ color: 'var(--text-3, #A1A1AA)' }} />
                   )}
-                  <span style={{ fontSize: 11.5 }}>
-                    {notificationPermission === 'granted'
-                      ? (soundEnabled ? 'Alerts On' : 'Muted')
-                      : 'Alerts'}
-                  </span>
+                  {notificationPermission === 'granted' && soundEnabled && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 5,
+                        right: 5,
+                        width: 5,
+                        height: 5,
+                        borderRadius: '50%',
+                        background: '#7C3AED',
+                      }}
+                    />
+                  )}
                 </button>
 
                 {/* Pin Filter Button */}
@@ -1788,12 +2244,10 @@ export default function GroupChatPage() {
                   type="button"
                   onClick={() => setViewFilter(viewFilter === 'pinned' ? 'all' : 'pinned')}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    height: 32,
-                    padding: '0 10px',
-                    borderRadius: 8,
+                    height: 30,
+                    padding: pinnedCount > 0 ? '0 8px' : '0',
+                    width: pinnedCount > 0 ? 'auto' : 30,
+                    borderRadius: 7,
                     border:
                       viewFilter === 'pinned'
                         ? '1px solid var(--primary, #A238FF)'
@@ -1804,27 +2258,29 @@ export default function GroupChatPage() {
                       viewFilter === 'pinned'
                         ? 'var(--primary, #A238FF)'
                         : 'var(--text-2, #52525B)',
-                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                    fontSize: 11,
                     cursor: 'pointer',
                   }}
-                  title="Pinned messages"
+                  title={viewFilter === 'pinned' ? 'Show all messages' : 'Show pinned messages'}
                 >
-                  <Pin size={13} />
-                  {pinnedCount > 0 && <span>{pinnedCount}</span>}
+                  <Pin size={13.5} />
+                  {pinnedCount > 0 && <span style={{ fontWeight: 600 }}>{pinnedCount}</span>}
                 </button>
 
-                {/* Thread Dropdown Trigger (matches reference # Thread button) */}
+                {/* Thread Dropdown Trigger */}
                 <div style={{ position: 'relative' }}>
                   <button
                     type="button"
                     onClick={() => setShowThreadsPopover(!showThreadsPopover)}
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      height: 32,
-                      padding: '0 11px',
-                      borderRadius: 8,
+                      height: 30,
+                      padding: threadedMessages.length > 0 ? '0 8px' : '0',
+                      width: threadedMessages.length > 0 ? 'auto' : 30,
+                      borderRadius: 7,
                       border: showThreadsPopover
                         ? '1px solid var(--primary, #A238FF)'
                         : '1px solid var(--card-border, #E4E4E7)',
@@ -1833,18 +2289,23 @@ export default function GroupChatPage() {
                         : '#FFFFFF',
                       color: showThreadsPopover
                         ? 'var(--primary, #A238FF)'
-                        : 'var(--text-1, #18181B)',
-                      fontSize: 12,
+                        : 'var(--text-2, #52525B)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      fontSize: 11,
                       cursor: 'pointer',
                     }}
+                    title="Active threads"
                   >
-                    <Hash size={13} />
-                    <span>Thread</span>
+                    <MessageSquare size={13.5} />
                     {threadedMessages.length > 0 && (
                       <span
                         style={{
-                          fontSize: 10.5,
-                          padding: '0 5px',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '0 4px',
                           borderRadius: 999,
                           background: '#F4F4F5',
                           color: 'var(--text-2, #52525B)',
@@ -1861,9 +2322,9 @@ export default function GroupChatPage() {
                         position: 'absolute',
                         top: 'calc(100% + 8px)',
                         right: 0,
-                        width: 300,
+                        width: 290,
                         background: '#FFFFFF',
-                        borderRadius: 14,
+                        borderRadius: 12,
                         border: '1px solid var(--card-border, #E4E4E7)',
                         boxShadow: '0 16px 36px -6px rgba(17, 17, 24, 0.14)',
                         zIndex: 60,
@@ -1879,9 +2340,10 @@ export default function GroupChatPage() {
                           color: 'var(--text-3, #A1A1AA)',
                           borderBottom: '1px solid var(--border-subtle, #F0F0F3)',
                           marginBottom: 4,
+                          fontWeight: 600,
                         }}
                       >
-                        Active Threads in #{activeChannel.name}
+                        Active Threads
                       </div>
                       {threadedMessages.length > 0 ? (
                         threadedMessages.map((tm) => (
@@ -1910,7 +2372,7 @@ export default function GroupChatPage() {
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div
                                 style={{
-                                  fontSize: 12.5,
+                                  fontSize: 12,
                                   color: 'var(--text-1, #18181B)',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
@@ -1919,18 +2381,19 @@ export default function GroupChatPage() {
                               >
                                 {tm.content}
                               </div>
-                              <div style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)', marginTop: 2 }}>
-                                Started by {tm.senderName}
+                              <div style={{ fontSize: 10.5, color: 'var(--text-3, #A1A1AA)', marginTop: 2 }}>
+                                {tm.senderName}
                               </div>
                             </div>
                             <span
                               style={{
-                                fontSize: 11,
-                                padding: '2px 7px',
+                                fontSize: 10.5,
+                                padding: '1px 6px',
                                 borderRadius: 999,
                                 background: 'var(--primary-light, #F5EBFF)',
                                 color: 'var(--primary, #A238FF)',
                                 flexShrink: 0,
+                                fontWeight: 600,
                               }}
                             >
                               {tm.replyCount}
@@ -1946,7 +2409,7 @@ export default function GroupChatPage() {
                             color: 'var(--text-3, #A1A1AA)',
                           }}
                         >
-                          No active threads in this channel yet.
+                          No active threads yet.
                         </div>
                       )}
                     </div>
@@ -1954,35 +2417,49 @@ export default function GroupChatPage() {
                 </div>
 
                 {/* Search in channel input */}
-                <div style={{ position: 'relative', width: 185 }}>
+                <div style={{ position: 'relative' }}>
                   <Search
-                    size={13}
+                    size={12}
                     style={{
                       position: 'absolute',
-                      left: 10,
+                      left: 8,
                       top: '50%',
                       transform: 'translateY(-50%)',
                       color: 'var(--text-3, #A1A1AA)',
+                      pointerEvents: 'none',
                     }}
                   />
                   <input
                     type="text"
-                    placeholder={`Search in #${activeChannel.name}`}
+                    placeholder="Search..."
                     value={searchMessageTerm}
                     onChange={(e) => setSearchMessageTerm(e.target.value)}
                     style={{
-                      width: '100%',
-                      height: 32,
-                      padding: '0 10px 0 30px',
-                      fontSize: 12,
+                      width: 110,
+                      height: 30,
+                      padding: '0 8px 0 24px',
+                      fontSize: 11.5,
                       background: '#FAF9F7',
                       border: '1px solid var(--card-border, #E4E4E7)',
-                      borderRadius: 8,
+                      borderRadius: 7,
                       outline: 'none',
                       color: 'var(--text-1, #18181B)',
+                      transition: 'width 0.2s ease, border-color 0.2s ease',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.width = '150px';
+                      e.currentTarget.style.borderColor = 'var(--primary, #A238FF)';
+                    }}
+                    onBlur={(e) => {
+                      if (!searchMessageTerm) {
+                        e.currentTarget.style.width = '110px';
+                      }
+                      e.currentTarget.style.borderColor = 'var(--card-border, #E4E4E7)';
                     }}
                   />
                 </div>
+
+                <div style={{ width: 1, height: 16, background: 'var(--card-border, #E4E4E7)', margin: '0 2px' }} />
 
                 {/* Member Avatars Pill Toggle */}
                 <button
@@ -1999,10 +2476,10 @@ export default function GroupChatPage() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 8,
-                    height: 32,
-                    padding: '0 10px',
-                    borderRadius: 8,
+                    gap: 6,
+                    height: 30,
+                    padding: '0 8px',
+                    borderRadius: 7,
                     border:
                       showMemberDrawer && !activeThread && !selectedProfileMember
                         ? '1px solid var(--primary, #A238FF)'
@@ -2012,26 +2489,27 @@ export default function GroupChatPage() {
                         ? 'var(--primary-light, #F5EBFF)'
                         : '#FFFFFF',
                     color: 'var(--text-1, #18181B)',
-                    fontSize: 12,
+                    fontSize: 11.5,
                     cursor: 'pointer',
                   }}
-                  title="Toggle channel members sidebar"
+                  title="Toggle members sidebar"
                 >
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    {channelMembers.slice(0, 3).map((m, idx) => (
+                    {channelMembers.slice(0, 2).map((m, idx) => (
                       <span
                         key={m.id}
                         style={{
-                          width: 20,
-                          height: 20,
+                          width: 18,
+                          height: 18,
                           borderRadius: '50%',
                           background: '#F4F4F5',
                           border: '1.5px solid #FFFFFF',
-                          marginLeft: idx === 0 ? 0 : -6,
+                          marginLeft: idx === 0 ? 0 : -5,
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 9,
+                          fontSize: 8.5,
+                          fontWeight: 700,
                           overflow: 'hidden',
                         }}
                       >
@@ -2047,7 +2525,9 @@ export default function GroupChatPage() {
                       </span>
                     ))}
                   </div>
-                  <span>{channelMembers.length}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2, #52525B)' }}>
+                    {channelMembers.length}
+                  </span>
                 </button>
               </div>
             </div>
@@ -4208,7 +4688,25 @@ export default function GroupChatPage() {
               </div>
             )}
           </>
-        ) : null}
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 32,
+              color: 'var(--text-3, #A1A1AA)',
+              gap: 12,
+            }}
+          >
+            <MessageSquare size={36} style={{ color: 'var(--text-3, #A1A1AA)', opacity: 0.5 }} />
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-2, #52525B)' }}>
+              Select a conversation or channel to start chatting
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -4217,7 +4715,7 @@ export default function GroupChatPage() {
           2. Member Profile Sidebar (when clicking a member, matching Reference Image 3)
           3. All Members Directory (default right sidebar, matching Reference Image 1)
          ═══════════════════════════════════════════════════════════════════════ */}
-      {activeThread ? (
+      {!showDMsOverview && (activeThread ? (
         <ThreadDrawer parentMessage={activeThread} onClose={() => setActiveThread(null)} />
       ) : selectedProfileMember ? (
         <aside
@@ -4361,6 +4859,8 @@ export default function GroupChatPage() {
                     const fullName = `${selectedProfileMember.firstName} ${selectedProfileMember.lastName}`.trim();
                     await openOrCreateDM(String(selectedProfileMember.id), fullName);
                     setSelectedProfileMember(null);
+                    setShowDMsOverview(false);
+                    setActiveChatTab('dms');
                   } catch (err) {
                     console.error('Failed to open DM:', err);
                   }
@@ -4792,13 +5292,20 @@ export default function GroupChatPage() {
             })}
           </div>
         </aside>
-      ) : null}
+      ) : null)}
 
       {/* Create Channel Modal */}
       <CreateChannelModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
 
       {/* Start Direct Message Modal */}
-      <StartDMModal isOpen={showStartDMModal} onClose={() => setShowStartDMModal(false)} />
+      <StartDMModal
+        isOpen={showStartDMModal}
+        onClose={() => setShowStartDMModal(false)}
+        onDMStarted={() => {
+          setShowDMsOverview(false);
+          setActiveChatTab('dms');
+        }}
+      />
 
       {/* Full-Screen Media Lightbox (Images & Videos) */}
       <MediaLightbox item={lightboxMedia} onClose={() => setLightboxMedia(null)} />
