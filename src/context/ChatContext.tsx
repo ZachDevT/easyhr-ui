@@ -118,7 +118,7 @@ interface ChatContextType {
   rejectJoinRequest: (channelId: string, userId: string) => Promise<void>;
   addMemberToChannel: (channelId: string, userId: string) => Promise<void>;
   removeMemberFromChannel: (channelId: string, userId: string) => Promise<void>;
-  openOrCreateDM: (participantId: string, participantName?: string) => Promise<ChatChannel>;
+  openOrCreateDM: (participantIdOrIds: string | string[], participantName?: string) => Promise<ChatChannel>;
   typingUsers: string[];
   setTyping: (isTyping: boolean) => void;
   allEmployees: Employee[];
@@ -1557,24 +1557,61 @@ const isSetupOrPublicRoute = () => {
     [currentUser, getToken]
   );
 
-  // 12b. Open or Create Direct Message
+  // 12b. Open or Create Direct Message (1-on-1 or Group DM)
   const openOrCreateDM = useCallback(
-    async (participantId: string, participantName?: string): Promise<ChatChannel> => {
+    async (participantIdOrIds: string | string[], participantName?: string): Promise<ChatChannel> => {
       const token = await getToken();
       if (!token) {
         throw new Error('Please sign in to start a direct message');
       }
 
-      // Check if we already have a DM channel locally with this participant
-      const existingChannel = channels.find(
-        (c) =>
-          (c.channelType === 'dm' || c.channelType === 'group_dm') &&
-          c.memberIds.includes(participantId)
-      );
+      const participantIds = (
+        Array.isArray(participantIdOrIds) ? participantIdOrIds : [participantIdOrIds]
+      )
+        .filter(Boolean)
+        .map(String);
+
+      if (participantIds.length === 0) {
+        throw new Error('Please select at least one coworker');
+      }
+
+      const isGroup = participantIds.length > 1;
+      const myId = String(currentUser?.id || '');
+      const myEmpId = (currentUser as any)?.employeeId ? String((currentUser as any).employeeId) : '';
+      const myIds = [myId, myEmpId, 'user'].filter(Boolean);
+
+      // Check if we already have a matching DM channel locally
+      let existingChannel: ChatChannel | undefined;
+      if (isGroup) {
+        existingChannel = channels.find((c) => {
+          if (c.channelType !== 'group_dm') return false;
+          const others = c.memberIds.filter((id) => !myIds.includes(id));
+          if (others.length !== participantIds.length) return false;
+          return participantIds.every((pid) => others.includes(pid));
+        });
+      } else {
+        existingChannel = channels.find((c) => {
+          if (c.channelType !== 'dm') return false;
+          const others = c.memberIds.filter((id) => !myIds.includes(id));
+          return others.includes(participantIds[0]) || (c.memberIds.includes(participantIds[0]) && c.memberIds.length <= 2);
+        });
+      }
+
       if (existingChannel) {
         handleSetActiveChannelId(existingChannel.id);
         return existingChannel;
       }
+
+      const bodyPayload = isGroup
+        ? {
+            participantIds,
+            name: participantName || '',
+          }
+        : {
+            participantId: participantIds[0],
+            participantIds,
+            name: participantName || '',
+          };
 
       const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels/dm`, {
         method: 'POST',
@@ -1582,10 +1619,7 @@ const isSetupOrPublicRoute = () => {
           ...getAuthHeaders(token),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          participantId,
-          name: participantName || '',
-        }),
+        body: JSON.stringify(bodyPayload),
       });
 
       if (!res.ok) {
@@ -1600,12 +1634,12 @@ const isSetupOrPublicRoute = () => {
         if (prev.some((c) => c.id === serverChannel.id)) {
           return prev.map((c) => (c.id === serverChannel.id ? serverChannel : c));
         }
-        return [...prev, serverChannel];
+        return [serverChannel, ...prev];
       });
       handleSetActiveChannelId(serverChannel.id);
       return serverChannel;
     },
-    [channels, getToken, handleSetActiveChannelId]
+    [channels, getToken, handleSetActiveChannelId, currentUser]
   );
 
   // 13. Join Channel Request

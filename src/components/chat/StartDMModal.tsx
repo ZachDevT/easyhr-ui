@@ -87,11 +87,11 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
         const names = idsToMessage
           .map((id) => {
             const e = allEmployees.find((emp) => String(emp.id) === id);
-            return e ? e.firstName : '';
+            return e ? `${e.firstName} ${e.lastName}`.trim() : '';
           })
           .filter(Boolean)
           .join(', ');
-        await openOrCreateDM(idsToMessage[0], names);
+        await openOrCreateDM(idsToMessage, names);
       }
       onDMStarted?.();
       onClose();

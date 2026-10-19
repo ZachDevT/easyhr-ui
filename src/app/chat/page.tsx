@@ -315,9 +315,10 @@ export default function GroupChatPage() {
     const isGroup = ch.channelType === 'group_dm';
     const myId = String(currentUser?.id || '');
     const myEmpId = (currentUser as any)?.employeeId ? String((currentUser as any).employeeId) : '';
+    const myIds = [myId, myEmpId, 'user'].filter(Boolean);
 
     const otherMemberIds = ch.memberIds.filter(
-      (id) => id !== myId && id !== myEmpId && id !== 'user'
+      (id) => !myIds.includes(id)
     );
 
     const otherEmployees = allEmployees.filter((emp) =>
@@ -326,9 +327,9 @@ export default function GroupChatPage() {
 
     if (otherEmployees.length === 0) {
       return {
-        name: ch.name || 'DM',
+        name: ch.name || (isGroup ? 'Group Conversation' : 'DM'),
         avatar: undefined,
-        title: 'Coworker',
+        title: isGroup ? `${ch.memberIds.length} participants` : 'Coworker',
         department: '',
         isGroup,
         memberCount: ch.memberIds.length,
@@ -336,13 +337,14 @@ export default function GroupChatPage() {
     }
 
     if (isGroup || otherEmployees.length > 1) {
+      const groupNames = otherEmployees.map((e) => `${e.firstName} ${e.lastName}`.trim()).join(', ');
       return {
-        name: otherEmployees.map((e) => e.firstName).join(', ') || ch.name,
+        name: groupNames || ch.name || 'Group Conversation',
         avatar: undefined,
-        title: `${otherEmployees.length} participants`,
+        title: `${otherEmployees.length + 1} participants`,
         department: '',
         isGroup: true,
-        memberCount: otherEmployees.length,
+        memberCount: otherEmployees.length + 1,
       };
     }
 
@@ -1806,25 +1808,25 @@ export default function GroupChatPage() {
                             width: 36,
                             height: 36,
                             borderRadius: '50%',
-                            background: '#FAF9F7',
-                            border: '1px solid var(--card-border, #E4E4E7)',
+                            background: dmInfo?.isGroup ? '#F5F3FF' : '#FAF9F7',
+                            border: dmInfo?.isGroup ? '1px solid #DDD6FE' : '1px solid var(--card-border, #E4E4E7)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: 11,
                             fontWeight: 700,
                             overflow: 'hidden',
-                            color: 'var(--text-1, #18181B)',
+                            color: dmInfo?.isGroup ? '#7C3AED' : 'var(--text-1, #18181B)',
                           }}
                         >
-                          {dmInfo?.avatar ? (
+                          {dmInfo?.isGroup ? (
+                            <Users size={16} style={{ color: '#7C3AED' }} />
+                          ) : dmInfo?.avatar ? (
                             <img
                               src={dmInfo.avatar}
                               alt={dmInfo.name}
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
-                          ) : dmInfo?.isGroup ? (
-                            <Users size={15} style={{ color: 'var(--text-2, #52525B)' }} />
                           ) : (
                             (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
                           )}
@@ -1855,18 +1857,38 @@ export default function GroupChatPage() {
                             marginBottom: 2,
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: ch.unreadCount && !isActive ? 700 : (isActive ? 600 : 500),
-                              color: 'var(--text-1, #18181B)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {dmInfo?.name || ch.name}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                            {dmInfo?.isGroup && (
+                              <span
+                                style={{
+                                  fontSize: 9.5,
+                                  fontWeight: 700,
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  background: '#F5F3FF',
+                                  color: '#6D28D9',
+                                  border: '1px solid #DDD6FE',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Group
+                              </span>
+                            )}
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: ch.unreadCount && !isActive ? 700 : (isActive ? 600 : 500),
+                                color: 'var(--text-1, #18181B)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {dmInfo?.name || ch.name}
+                            </span>
+                          </div>
                           {lastTime && (
                             <span
                               style={{
@@ -2007,8 +2029,10 @@ export default function GroupChatPage() {
                               width: 32,
                               height: 32,
                               borderRadius: '50%',
-                              background: '#FAF9F7',
-                              border: '1px solid var(--card-border, #E4E4E7)',
+                              background: dmInfo?.isGroup ? '#F5F3FF' : '#FAF9F7',
+                              border: dmInfo?.isGroup
+                                ? '1px solid #DDD6FE'
+                                : '1px solid var(--card-border, #E4E4E7)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -2018,14 +2042,14 @@ export default function GroupChatPage() {
                               overflow: 'hidden',
                             }}
                           >
-                            {dmInfo?.avatar ? (
+                            {dmInfo?.isGroup ? (
+                              <Users size={16} style={{ color: '#7C3AED' }} />
+                            ) : dmInfo?.avatar ? (
                               <img
                                 src={dmInfo.avatar}
                                 alt={dmInfo.name}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />
-                            ) : dmInfo?.isGroup ? (
-                              <Users size={15} style={{ color: 'var(--primary, #A238FF)' }} />
                             ) : (
                               (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
                             )}
@@ -2049,17 +2073,43 @@ export default function GroupChatPage() {
                         <div style={{ minWidth: 0 }}>
                           <div
                             style={{
-                              fontSize: 14,
-                              color: 'var(--text-1, #18181B)',
-                              fontFamily: 'var(--font-title)',
-                              fontWeight: 700,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              lineHeight: 1.25,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 7,
                             }}
                           >
-                            {dmInfo?.name}
+                            <span
+                              style={{
+                                fontSize: 14,
+                                color: 'var(--text-1, #18181B)',
+                                fontFamily: 'var(--font-title)',
+                                fontWeight: 700,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                lineHeight: 1.25,
+                              }}
+                            >
+                              {dmInfo?.name}
+                            </span>
+                            {dmInfo?.isGroup && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  background: '#F5F3FF',
+                                  color: '#6D28D9',
+                                  border: '1px solid #DDD6FE',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Group DM
+                              </span>
+                            )}
                           </div>
 
                           <div
@@ -2075,7 +2125,7 @@ export default function GroupChatPage() {
                               marginTop: 1,
                             }}
                           >
-                            <span>{dmInfo?.title || 'Coworker'}</span>
+                            <span>{dmInfo?.title || (dmInfo?.isGroup ? `${dmInfo.memberCount} members` : 'Coworker')}</span>
                             {dmInfo?.department && (
                               <>
                                 <span>·</span>
@@ -2799,14 +2849,14 @@ export default function GroupChatPage() {
                               flexShrink: 0,
                             }}
                           >
-                            {dmInfo?.avatar ? (
+                            {dmInfo?.isGroup ? (
+                              <Users size={18} style={{ color: '#7C3AED' }} />
+                            ) : dmInfo?.avatar ? (
                               <img
                                 src={dmInfo.avatar}
                                 alt={dmInfo.name}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />
-                            ) : dmInfo?.isGroup ? (
-                              <Users size={18} style={{ color: 'var(--text-2, #52525B)' }} />
                             ) : (
                               (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
                             )}
@@ -2832,7 +2882,7 @@ export default function GroupChatPage() {
                         <div>
                           <div style={{ fontSize: 14, color: 'var(--text-1, #18181B)' }}>
                             {isDM ? (
-                              <span>This is the start of your direct chat with <strong>{dmInfo?.name}</strong></span>
+                              <span>This is the start of your {dmInfo?.isGroup ? 'group conversation' : 'direct chat'} with <strong>{dmInfo?.name}</strong></span>
                             ) : (
                               <span>Welcome to <strong>#{activeChannel.name}</strong></span>
                             )}
@@ -2840,9 +2890,11 @@ export default function GroupChatPage() {
                           <div style={{ fontSize: 12, color: 'var(--text-2, #52525B)', marginTop: 2 }}>
                             {isDM ? (
                               <span>
-                                {dmInfo?.title || 'Coworker'}
+                                {dmInfo?.title || (dmInfo?.isGroup ? `${dmInfo.memberCount} members` : 'Coworker')}
                                 {dmInfo?.department ? ` · ${dmInfo.department}` : ''}
-                                {' · Messages sent here are private and direct.'}
+                                {dmInfo?.isGroup
+                                  ? ' · Messages sent here are shared with everyone in this group.'
+                                  : ' · Messages sent here are private and direct.'}
                               </span>
                             ) : (
                               <>
