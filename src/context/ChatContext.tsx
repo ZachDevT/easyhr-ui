@@ -224,10 +224,10 @@ function mapBackendChannel(bc: any): ChatChannel {
     isPrivate: Boolean(bc.isPrivate),
     departmentRestricted: Boolean(bc.departmentRestriction),
     department: bc.departmentRestriction || undefined,
-    createdById: String(bc.createdBy || ''),
-    createdBy: 'Workspace',
+    createdById: String(bc.createdById || bc.createdBy || ''),
+    createdBy: bc.createdBy || 'Workspace',
     createdAt: bc.createdAt || new Date().toISOString(),
-    adminIds: bc.createdBy ? [String(bc.createdBy)] : [],
+    adminIds: bc.adminIds ? bc.adminIds.map(String) : bc.createdById ? [String(bc.createdById)] : [],
     memberIds: (bc.memberIds || []).map(String),
     pendingRequestUserIds: (bc.pendingRequestUserIds || []).map(String),
     unreadCount: bc.unreadCount || 0,
@@ -687,7 +687,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             const data = JSON.parse(e.data);
             const ch = mapBackendChannel(data);
-            setChannels((prev) => (prev.some((c) => c.id === ch.id) ? prev : [...prev, ch]));
+            setChannels((prev) =>
+              prev.some((c) => c.id === ch.id) ? prev.map((c) => (c.id === ch.id ? { ...c, ...ch } : c)) : [...prev, ch]
+            );
           } catch {}
         });
         sse.addEventListener('channel.updated', (e: MessageEvent) => {
@@ -714,17 +716,29 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sse.addEventListener('channel.member_joined', (e: MessageEvent) => {
           try {
             const data = JSON.parse(e.data);
-            setChannels((prev) =>
-              prev.map((c) => {
-                if (c.id === data.channelId) {
-                  const mIds = c.memberIds.includes(String(data.employeeId))
-                    ? c.memberIds
-                    : [...c.memberIds, String(data.employeeId)];
-                  return { ...c, memberIds: mIds };
+            if (data.channel) {
+              const ch = mapBackendChannel(data.channel);
+              setChannels((prev) =>
+                prev.some((c) => c.id === ch.id) ? prev.map((c) => (c.id === ch.id ? { ...c, ...ch } : c)) : [...prev, ch]
+              );
+            } else {
+              setChannels((prev) => {
+                const found = prev.some((c) => c.id === data.channelId);
+                if (!found) {
+                  refreshChannels();
+                  return prev;
                 }
-                return c;
-              })
-            );
+                return prev.map((c) => {
+                  if (c.id === data.channelId) {
+                    const mIds = c.memberIds.includes(String(data.employeeId))
+                      ? c.memberIds
+                      : [...c.memberIds, String(data.employeeId)];
+                    return { ...c, memberIds: mIds };
+                  }
+                  return c;
+                });
+              });
+            }
           } catch {}
         });
         sse.addEventListener('channel.member_left', (e: MessageEvent) => {
@@ -1458,59 +1472,44 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const myId = String(currentUser?.id || 'user');
       const initialMemberIds = Array.from(new Set([myId, ...(input.memberIds || [])]));
 
-      const optimisticChannel: ChatChannel = {
-        id: `ch-${cleanName}-${Date.now().toString(36).slice(2, 6)}`,
-        name: cleanName,
-        topic: input.description || 'Welcome to #' + cleanName,
-        description: input.description,
-        isPrivate: input.isPrivate,
-        departmentRestricted: input.departmentRestricted,
-        department: input.department,
-        createdById: myId,
-        createdBy: `${currentUser?.firstName || 'Current'} ${currentUser?.lastName || 'User'}`.trim(),
-        createdAt: new Date().toISOString(),
-        adminIds: [myId],
-        memberIds: initialMemberIds,
-        pendingRequestUserIds: [],
-        unreadCount: 0,
-      };
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Please sign in to create channels');
+      }
 
-      setChannels((prev) => [...prev, optimisticChannel]);
-      setActiveChannelId(optimisticChannel.id);
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: cleanName,
+          description: input.description || '',
+          topic: input.description || '',
+          isPrivate: input.isPrivate,
+          channelType: 'channel',
+          departmentRestriction: input.departmentRestricted ? (input.department || '') : '',
+          memberIds: initialMemberIds,
+        }),
+      });
 
-      try {
-        const token = await getToken();
-        if (token) {
-          const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels`, {
-            method: 'POST',
-            headers: {
-              ...getAuthHeaders(token),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              name: cleanName,
-              description: input.description || '',
-              topic: input.description || '',
-              isPrivate: input.isPrivate,
-              channelType: input.isPrivate ? 'private' : input.department ? 'department' : 'public',
-              departmentRestriction: input.department || '',
-              memberIds: initialMemberIds,
-            }),
-          });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const msg = errJson.detail || errJson.title || errJson.message || 'Failed to create channel';
+        throw new Error(msg);
+      }
 
-          if (res.ok) {
-            const data = await res.json();
-            const serverChannel = mapBackendChannel(data);
-            setChannels((prev) =>
-              prev.map((c) => (c.id === optimisticChannel.id ? serverChannel : c))
-            );
-            setActiveChannelId(serverChannel.id);
-            return serverChannel;
-          }
+      const data = await res.json();
+      const serverChannel = mapBackendChannel(data);
+      setChannels((prev) => {
+        if (prev.some((c) => c.id === serverChannel.id)) {
+          return prev.map((c) => (c.id === serverChannel.id ? serverChannel : c));
         }
-      } catch {}
-
-      return optimisticChannel;
+        return [...prev, serverChannel];
+      });
+      setActiveChannelId(serverChannel.id);
+      return serverChannel;
     },
     [currentUser, getToken]
   );

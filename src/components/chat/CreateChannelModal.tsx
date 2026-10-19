@@ -32,6 +32,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -48,7 +49,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
     return fullName.includes(q) || dept.includes(q);
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = name.trim().toLowerCase().replace(/\s+/g, '-');
     if (!cleanName) {
@@ -57,7 +58,9 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
     }
 
     try {
-      createChannel({
+      setIsSubmitting(true);
+      setError('');
+      await createChannel({
         name: cleanName,
         description: description.trim(),
         isPrivate,
@@ -73,6 +76,8 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Failed to create channel');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -542,11 +547,11 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
               borderTop: '1px solid var(--border-subtle, #F0F0F3)',
             }}
           >
-            <button type="button" onClick={onClose} className="btn btn-neutral">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="btn btn-neutral">
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              Create Channel
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary">
+              {isSubmitting ? 'Creating...' : 'Create Channel'}
             </button>
           </div>
         </form>
