@@ -1199,6 +1199,74 @@ tr:hover td { background: #FAFAF8; }
 
 .limit-chip { display: inline-flex; align-items: center; padding: 2px 8px; background: var(--primary-tint); color: var(--primary); border-radius: 9999px; font-size: 11px; font-weight: 700; margin-left: 4px; }
 
+/* Add widget round icon button */
+.widget-add-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: none;
+  background-image: var(--gradient);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(162, 56, 255, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.widget-add-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 14px rgba(162, 56, 255, 0.38);
+  opacity: 0.96;
+}
+.widget-add-btn:active {
+  transform: scale(0.95);
+}
+
+/* Tooltip helper */
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #18181B;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  z-index: 100;
+  line-height: 1;
+}
+.tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px;
+  border-style: solid;
+  border-color: #18181B transparent transparent transparent;
+}
+.tooltip-wrap:hover .tooltip-bubble,
+.tooltip-wrap:focus-within .tooltip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
 .widget-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .widget-picker-card { display: flex; align-items: center; gap: 12px; padding: 14px; border: 2px solid var(--card-border); border-radius: 12px; cursor: pointer; transition: all 0.15s; position: relative; }
 .widget-picker-card:hover { border-color: var(--primary); background: var(--primary-tint); }

@@ -102,27 +102,17 @@ export default function Dashboard() {
         </div>
 
         <div className="row gap-10" style={{ alignItems: 'center' }}>
-          <button 
-            type="button"
-            className="btn-primary"
-            onClick={() => setPickerOpen(true)}
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: 6,
-              padding: '7px 16px',
-              borderRadius: 9999,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: 'none',
-              boxShadow: '0 2px 8px rgba(162, 56, 255, 0.18)',
-            }}
-            title="Add new widget"
-          >
-            <Plus size={15} strokeWidth={2.5} />
-            <span>Add Widget</span>
-          </button>
+          <div className="tooltip-wrap">
+            <button 
+              type="button"
+              className="widget-add-btn"
+              onClick={() => setPickerOpen(true)}
+              aria-label="Add Widget"
+            >
+              <Plus size={16} strokeWidth={2.6} />
+            </button>
+            <span className="tooltip-bubble">Add Widget</span>
+          </div>
           <button 
             className={isEditing ? "btn-primary" : "widget-manage-btn"} 
             onClick={() => setIsEditing(!isEditing)} 
