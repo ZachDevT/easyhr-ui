@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Send,
@@ -34,7 +34,7 @@ interface ThreadDrawerProps {
 }
 
 export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
-  const { sendMessage, deleteMessage, toggleReaction, votePoll, closePoll, activeChannel, allEmployees, uploadAttachment } = useChat();
+  const { sendMessage, deleteMessage, toggleReaction, votePoll, closePoll, activeChannel, allEmployees, uploadAttachment, fetchThreadReplies } = useChat();
   const { currentUser, isHRAdmin, role } = useRole();
   const currentUserId = String(currentUser?.id || 'user');
   const isChannelAdmin =
@@ -44,6 +44,20 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
     role === 'HR Admin';
 
   const [replyText, setReplyText] = useState('');
+  const [isLoadingReplies, setIsLoadingReplies] = useState(false);
+
+  useEffect(() => {
+    if (!parentMessage?.id) return;
+    let isCancelled = false;
+    setIsLoadingReplies(true);
+    fetchThreadReplies(parentMessage.id, parentMessage.channelId).finally(() => {
+      if (!isCancelled) setIsLoadingReplies(false);
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [parentMessage?.id, parentMessage?.channelId, fetchThreadReplies]);
+
   const [showPicker, setShowPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState<PickerTab>('emoji');
   const [hoveredReplyId, setHoveredReplyId] = useState<string | null>(null);
@@ -193,32 +207,47 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: '50%',
-                background: '#F4F4F5',
-                border: '1px solid var(--card-border, #E4E4E7)',
-                color: 'var(--text-1, #18181B)',
-                fontSize: 11,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                flexShrink: 0,
-              }}
-            >
-              {parentMessage.senderAvatar ? (
-                <img
-                  src={parentMessage.senderAvatar}
-                  alt={parentMessage.senderName}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                parentMessage.senderName.slice(0, 2).toUpperCase()
-              )}
-            </div>
+            {(() => {
+              const parentEmp = allEmployees.find(
+                (e) =>
+                  String(e.id) === parentMessage.senderId ||
+                  `${e.firstName} ${e.lastName}`.trim().toLowerCase() === parentMessage.senderName.toLowerCase()
+              );
+              const parentAvatar =
+                parentMessage.senderAvatar ||
+                parentEmp?.avatar ||
+                (parentEmp as any)?.avatarUrl ||
+                (parentEmp as any)?.avatar_url ||
+                '';
+              return (
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: '50%',
+                    background: '#F4F4F5',
+                    border: '1px solid var(--card-border, #E4E4E7)',
+                    color: 'var(--text-1, #18181B)',
+                    fontSize: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                  }}
+                >
+                  {parentAvatar ? (
+                    <img
+                      src={parentAvatar}
+                      alt={parentMessage.senderName}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    parentMessage.senderName.slice(0, 2).toUpperCase()
+                  )}
+                </div>
+              );
+            })()}
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -261,100 +290,114 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
 
               {parentMessage.attachments && parentMessage.attachments.length > 0 && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {parentMessage.attachments.map((att) => (
-                    <div
-                      key={att.id}
-                      style={{
-                        borderRadius: 10,
-                        overflow: 'hidden',
-                        border: '1px solid var(--card-border, #E4E4E7)',
-                        background: '#FFFFFF',
-                        position: 'relative',
-                      }}
-                    >
-                      {att.type === 'image' ? (
-                        <div
-                          onClick={() =>
-                            setLightboxMedia({
-                              url: att.url,
-                              name: att.name,
-                              type: 'image',
-                              size: att.size,
-                            })
-                          }
-                          style={{ position: 'relative', cursor: 'zoom-in' }}
-                        >
-                          <img
-                            src={att.url}
-                            alt=""
-                            style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
-                          />
-                        </div>
-                      ) : att.type === 'video' ? (
-                        <div
-                          onClick={() =>
-                            setLightboxMedia({
-                              url: att.url,
-                              name: att.name,
-                              type: 'video',
-                              size: att.size,
-                            })
-                          }
-                          style={{ position: 'relative', cursor: 'pointer', background: '#09090B' }}
-                        >
-                          <video
-                            src={att.url}
-                            muted
-                            playsInline
-                            style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
-                          />
+                  {parentMessage.attachments.map((att) => {
+                    const isImage =
+                      att.type === 'image' ||
+                      Boolean(att.mimeType?.startsWith('image/')) ||
+                      /\.(png|jpe?g|gif|webp|svg)($|\?)/i.test(att.url) ||
+                      /\.(png|jpe?g|gif|webp|svg)$/i.test(att.name || '');
+
+                    const isVideo =
+                      att.type === 'video' ||
+                      Boolean(att.mimeType?.startsWith('video/')) ||
+                      /\.(mp4|webm|mov|ogg)($|\?)/i.test(att.url) ||
+                      /\.(mp4|webm|mov|ogg)$/i.test(att.name || '');
+
+                    return (
+                      <div
+                        key={att.id}
+                        style={{
+                          borderRadius: 10,
+                          overflow: 'hidden',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background: '#FFFFFF',
+                          position: 'relative',
+                        }}
+                      >
+                        {isImage ? (
                           <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: 'rgba(0,0,0,0.28)',
-                              color: '#FFFFFF',
-                            }}
+                            onClick={() =>
+                              setLightboxMedia({
+                                url: att.url,
+                                name: att.name,
+                                type: 'image',
+                                size: att.size,
+                              })
+                            }
+                            style={{ position: 'relative', cursor: 'zoom-in' }}
                           >
+                            <img
+                              src={att.url}
+                              alt=""
+                              style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
+                            />
+                          </div>
+                        ) : isVideo ? (
+                          <div
+                            onClick={() =>
+                              setLightboxMedia({
+                                url: att.url,
+                                name: att.name,
+                                type: 'video',
+                                size: att.size,
+                              })
+                            }
+                            style={{ position: 'relative', cursor: 'pointer', background: '#09090B' }}
+                          >
+                            <video
+                              src={att.url}
+                              muted
+                              playsInline
+                              style={{ width: '100%', maxHeight: 170, objectFit: 'cover', display: 'block' }}
+                            />
                             <div
                               style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: '50%',
-                                background: 'rgba(255,255,255,0.2)',
-                                backdropFilter: 'blur(4px)',
+                                position: 'absolute',
+                                inset: 0,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                background: 'rgba(0,0,0,0.28)',
+                                color: '#FFFFFF',
                               }}
                             >
-                              <Play size={15} fill="#FFFFFF" />
+                              <div
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: '50%',
+                                  background: 'rgba(255,255,255,0.2)',
+                                  backdropFilter: 'blur(4px)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Play size={15} fill="#FFFFFF" />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <a
-                          href={att.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            padding: '8px 10px',
-                            fontSize: 12,
-                            color: 'var(--primary, #A238FF)',
-                          }}
-                        >
-                          <Paperclip size={13} />
-                          <span>{att.name}</span>
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                        ) : (
+                          <a
+                            href={att.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '8px 10px',
+                              fontSize: 12,
+                              color: 'var(--primary, #A238FF)',
+                            }}
+                          >
+                            <Paperclip size={13} />
+                            <span>{att.name}</span>
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -379,7 +422,46 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
         </div>
 
         {/* Replies List */}
-        {parentMessage.replies && parentMessage.replies.length > 0 ? (
+        {isLoadingReplies && (!parentMessage.replies || parentMessage.replies.length === 0) ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 8 }}>
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'chatShimmer 1.5s infinite',
+                  }}
+                />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div
+                    style={{
+                      width: '35%',
+                      height: 12,
+                      borderRadius: 4,
+                      background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                      backgroundSize: '200% 100%',
+                      animation: 'chatShimmer 1.5s infinite',
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: '75%',
+                      height: 14,
+                      borderRadius: 4,
+                      background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                      backgroundSize: '200% 100%',
+                      animation: 'chatShimmer 1.5s infinite',
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : parentMessage.replies && parentMessage.replies.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {parentMessage.replies.map((reply) => {
               const isHovered = hoveredReplyId === reply.id;
@@ -399,32 +481,47 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                     transition: 'background 0.12s ease',
                   }}
                 >
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      background: '#F4F4F5',
-                      border: '1px solid var(--card-border, #E4E4E7)',
-                      color: 'var(--text-1, #18181B)',
-                      fontSize: 10,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {reply.senderAvatar ? (
-                      <img
-                        src={reply.senderAvatar}
-                        alt={reply.senderName}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      reply.senderName.slice(0, 2).toUpperCase()
-                    )}
-                  </div>
+                  {(() => {
+                    const replyEmp = allEmployees.find(
+                      (e) =>
+                        String(e.id) === reply.senderId ||
+                        `${e.firstName} ${e.lastName}`.trim().toLowerCase() === reply.senderName.toLowerCase()
+                    );
+                    const replyAvatar =
+                      reply.senderAvatar ||
+                      replyEmp?.avatar ||
+                      (replyEmp as any)?.avatarUrl ||
+                      (replyEmp as any)?.avatar_url ||
+                      '';
+                    return (
+                      <div
+                        style={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: '50%',
+                          background: '#F4F4F5',
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          color: 'var(--text-1, #18181B)',
+                          fontSize: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {replyAvatar ? (
+                          <img
+                            src={replyAvatar}
+                            alt={reply.senderName}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          reply.senderName.slice(0, 2).toUpperCase()
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
@@ -451,88 +548,102 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
 
                     {reply.attachments && reply.attachments.length > 0 && (
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {reply.attachments.map((att) => (
-                          <div
-                            key={att.id}
-                            style={{
-                              borderRadius: 8,
-                              overflow: 'hidden',
-                              border: '1px solid var(--card-border, #E4E4E7)',
-                              position: 'relative',
-                            }}
-                          >
-                            {att.type === 'image' ? (
-                              <img
-                                src={att.url}
-                                alt=""
-                                onClick={() =>
-                                  setLightboxMedia({
-                                    url: att.url,
-                                    name: att.name,
-                                    type: 'image',
-                                    size: att.size,
-                                  })
-                                }
-                                style={{
-                                  width: '100%',
-                                  maxHeight: 150,
-                                  objectFit: 'cover',
-                                  display: 'block',
-                                  cursor: 'zoom-in',
-                                }}
-                              />
-                            ) : att.type === 'video' ? (
-                              <div
-                                onClick={() =>
-                                  setLightboxMedia({
-                                    url: att.url,
-                                    name: att.name,
-                                    type: 'video',
-                                    size: att.size,
-                                  })
-                                }
-                                style={{ position: 'relative', cursor: 'pointer', background: '#09090B' }}
-                              >
-                                <video
+                        {reply.attachments.map((att) => {
+                          const isImage =
+                            att.type === 'image' ||
+                            Boolean(att.mimeType?.startsWith('image/')) ||
+                            /\.(png|jpe?g|gif|webp|svg)($|\?)/i.test(att.url) ||
+                            /\.(png|jpe?g|gif|webp|svg)$/i.test(att.name || '');
+
+                          const isVideo =
+                            att.type === 'video' ||
+                            Boolean(att.mimeType?.startsWith('video/')) ||
+                            /\.(mp4|webm|mov|ogg)($|\?)/i.test(att.url) ||
+                            /\.(mp4|webm|mov|ogg)$/i.test(att.name || '');
+
+                          return (
+                            <div
+                              key={att.id}
+                              style={{
+                                borderRadius: 8,
+                                overflow: 'hidden',
+                                border: '1px solid var(--card-border, #E4E4E7)',
+                                position: 'relative',
+                              }}
+                            >
+                              {isImage ? (
+                                <img
                                   src={att.url}
-                                  muted
-                                  playsInline
-                                  style={{ width: '100%', maxHeight: 150, objectFit: 'cover', display: 'block' }}
-                                />
-                                <div
+                                  alt=""
+                                  onClick={() =>
+                                    setLightboxMedia({
+                                      url: att.url,
+                                      name: att.name,
+                                      type: 'image',
+                                      size: att.size,
+                                    })
+                                  }
                                   style={{
-                                    position: 'absolute',
-                                    inset: 0,
+                                    width: '100%',
+                                    maxHeight: 150,
+                                    objectFit: 'cover',
+                                    display: 'block',
+                                    cursor: 'zoom-in',
+                                  }}
+                                />
+                              ) : isVideo ? (
+                                <div
+                                  onClick={() =>
+                                    setLightboxMedia({
+                                      url: att.url,
+                                      name: att.name,
+                                      type: 'video',
+                                      size: att.size,
+                                    })
+                                  }
+                                  style={{ position: 'relative', cursor: 'pointer', background: '#09090B' }}
+                                >
+                                  <video
+                                    src={att.url}
+                                    muted
+                                    playsInline
+                                    style={{ width: '100%', maxHeight: 150, objectFit: 'cover', display: 'block' }}
+                                  />
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      inset: 0,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: 'rgba(0,0,0,0.3)',
+                                      color: '#FFFFFF',
+                                    }}
+                                  >
+                                    <Play size={16} fill="#FFFFFF" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <a
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: 'rgba(0,0,0,0.3)',
-                                    color: '#FFFFFF',
+                                    gap: 6,
+                                    padding: '6px 8px',
+                                    fontSize: 11,
+                                    color: 'var(--primary, #A238FF)',
                                   }}
                                 >
-                                  <Play size={16} fill="#FFFFFF" />
-                                </div>
-                              </div>
-                            ) : (
-                              <a
-                                href={att.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  padding: '6px 8px',
-                                  fontSize: 11,
-                                  color: 'var(--primary, #A238FF)',
-                                }}
-                              >
-                                <Paperclip size={12} />
-                                <span>{att.name}</span>
-                              </a>
-                            )}
-                          </div>
-                        ))}
+                                  <Paperclip size={12} />
+                                  <span>{att.name}</span>
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 

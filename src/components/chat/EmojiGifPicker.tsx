@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Smile, Search, Sparkles, X, Zap, Loader2, Plus } from 'lucide-react';
 
 export type PickerTab = 'emoji' | 'animated' | 'gif';
@@ -246,19 +246,41 @@ export function getAnimatedEmojiUrl(code: string) {
 }
 
 const FALLBACK_GIFS = [
-  { id: 'fb-1', url: 'https://media.giphy.com/media/3oEjHV0z8S7WM4MwnK/giphy.gif', preview: 'https://media.giphy.com/media/3oEjHV0z8S7WM4MwnK/200w.gif' },
-  { id: 'fb-2', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif', preview: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200w.gif' },
-  { id: 'fb-3', url: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif', preview: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/200w.gif' },
-  { id: 'fb-4', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif', preview: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/200w.gif' },
-  { id: 'fb-5', url: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif', preview: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/200w.gif' },
-  { id: 'fb-6', url: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif', preview: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/200w.gif' },
-  { id: 'fb-7', url: 'https://media.giphy.com/media/hPTZgtzfRIB5Nfb5rL/giphy.gif', preview: 'https://media.giphy.com/media/hPTZgtzfRIB5Nfb5rL/200w.gif' },
-  { id: 'fb-8', url: 'https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif', preview: 'https://media.giphy.com/media/blSTtZehjAZ8I/200w.gif' },
-  { id: 'fb-9', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif', preview: 'https://media.giphy.com/media/111ebonMs90YLu/200w.gif' },
-  { id: 'fb-10', url: 'https://media.giphy.com/media/XreQmk7ETCak0/giphy.gif', preview: 'https://media.giphy.com/media/XreQmk7ETCak0/200w.gif' },
-  { id: 'fb-11', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', preview: 'https://media.giphy.com/media/g9582DNuQppxC/200w.gif' },
-  { id: 'fb-12', url: 'https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif', preview: 'https://media.giphy.com/media/5GoVLqeAOo6PK/200w.gif' },
+  { id: 'fb-1', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif', keywords: 'party celebrate tada celebration' },
+  { id: 'fb-2', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif', keywords: 'rocket launch ship feature deploy' },
+  { id: 'fb-3', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f92f/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f92f/512.gif', keywords: 'mind blown explode shocked wow' },
+  { id: 'fb-4', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif', keywords: 'fire hot lit amazing' },
+  { id: 'fb-5', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif', keywords: 'hundred 100 perfect agree' },
+  { id: 'fb-6', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f923/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f923/512.gif', keywords: 'laughing lol rofl hilarious funny' },
+  { id: 'fb-7', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif', keywords: 'thumbs up like good yes approve' },
+  { id: 'fb-8', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44f/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44f/512.gif', keywords: 'applause clapping cheer bravo' },
+  { id: 'fb-9', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2764_fe0f/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2764_fe0f/512.gif', keywords: 'heart love support thank you' },
+  { id: 'fb-10', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60e/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60e/512.gif', keywords: 'cool sunglasses smooth confident' },
+  { id: 'fb-11', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f64f/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f64f/512.gif', keywords: 'high five pray thank you grateful' },
+  { id: 'fb-12', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4bb/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4bb/512.gif', keywords: 'coding laptop computer work developer tech' },
+  { id: 'fb-13', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2615/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2615/512.gif', keywords: 'coffee morning break tea cafe' },
+  { id: 'fb-14', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f929/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f929/512.gif', keywords: 'star eyes excited amaze wow' },
+  { id: 'fb-15', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2728/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2728/512.gif', keywords: 'sparkles magic shiny new clean' },
+  { id: 'fb-16', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3c6/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3c6/512.gif', keywords: 'trophy winner champion victory' },
+  { id: 'fb-17', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2705/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/2705/512.gif', keywords: 'check mark done approved success' },
+  { id: 'fb-18', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f451/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f451/512.gif', keywords: 'crown king queen leader vip' },
+  { id: 'fb-19', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f913/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f913/512.gif', keywords: 'nerd glasses smart genius' },
+  { id: 'fb-20', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44b/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44b/512.gif', keywords: 'wave hello hi bye welcome' },
+  { id: 'fb-21', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4aa/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4aa/512.gif', keywords: 'flex muscle strength strong team' },
+  { id: 'fb-22', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f440/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f440/512.gif', keywords: 'eyes looking watching review see' },
+  { id: 'fb-23', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f48e/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f48e/512.gif', keywords: 'gem diamond precious valuable quality' },
+  { id: 'fb-24', url: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fa84/512.gif', preview: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fa84/512.gif', keywords: 'magic wand sparkle miracle' },
 ];
+
+const KLIPY_API_KEY = 'XsffCdMQnhohtJoj69V58f0FpCTKwYSYswA6POid6scjIfyuLThFXzLQQnjonzhY';
+const KLIPY_BASE_URL = 'https://api.klipy.com/v2';
+
+export interface GifItem {
+  id: string;
+  url: string;
+  preview: string;
+  title?: string;
+}
 
 const GIF_QUICK_TAGS = [
   'Trending',
@@ -288,7 +310,7 @@ export function EmojiGifPicker({
   const [animSearch, setAnimSearch] = useState('');
 
   const [gifSearch, setGifSearch] = useState('');
-  const [gifResults, setGifResults] = useState<{ id: string; url: string; preview: string }[]>(FALLBACK_GIFS);
+  const [gifResults, setGifResults] = useState<GifItem[]>([]);
   const [gifNextPos, setGifNextPos] = useState<string>('');
   const [isLoadingGifs, setIsLoadingGifs] = useState(false);
 
@@ -297,60 +319,70 @@ export function EmojiGifPicker({
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  // Fetch 48 GIFs from live Tenor API
-  const fetchTenorGifs = async (query: string, posCursor = '', append = false, signal?: AbortSignal) => {
-    setIsLoadingGifs(true);
+  // Real-time Klipy GIF fetch (Trending or Search)
+  const fetchKlipyGifs = useCallback(async (query: string, pos = '', append = false) => {
     try {
+      setIsLoadingGifs(true);
       const trimmed = query.trim();
-      const base =
-        trimmed.length > 0 && trimmed.toLowerCase() !== 'trending'
-          ? `https://g.tenor.com/v1/search?q=${encodeURIComponent(trimmed)}&key=LIVDSRZULELA&limit=48&media_filter=minimal`
-          : `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=48&media_filter=minimal`;
-      const endpoint = posCursor ? `${base}&pos=${encodeURIComponent(posCursor)}` : base;
+      let url = '';
+      if (!trimmed || trimmed.toLowerCase() === 'trending') {
+        url = `${KLIPY_BASE_URL}/featured?key=${KLIPY_API_KEY}&limit=24`;
+      } else {
+        url = `${KLIPY_BASE_URL}/search?q=${encodeURIComponent(trimmed)}&key=${KLIPY_API_KEY}&limit=24`;
+      }
+      if (pos) {
+        url += `&pos=${encodeURIComponent(pos)}`;
+      }
 
-      const res = await fetch(endpoint, { signal });
-      if (!res.ok) throw new Error('Tenor API error');
-      const data = await res.json();
-      if (Array.isArray(data?.results) && data.results.length > 0) {
-        const mapped = data.results
-          .map((item: any) => {
-            const media = item.media?.[0];
-            const fullGif = media?.gif?.url || media?.mediumgif?.url || media?.tinygif?.url;
-            const previewGif = media?.tinygif?.url || media?.nanogif?.url || fullGif;
-            if (!fullGif) return null;
-            return {
-              id: String(item.id),
-              url: fullGif,
-              preview: previewGif,
-            };
-          })
-          .filter(Boolean) as { id: string; url: string; preview: string }[];
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const results: GifItem[] = (data.results || []).map((item: any) => {
+          const fm = item.media_formats || {};
+          const gifUrl = fm.gif?.url || fm.mediumgif?.url || item.url || '';
+          const previewUrl =
+            fm.tinygif?.url ||
+            fm.nanogif?.url ||
+            fm.tinygifpreview?.url ||
+            fm.gifpreview?.url ||
+            gifUrl;
+          return {
+            id: String(item.id),
+            url: gifUrl,
+            preview: previewUrl,
+            title: item.title || '',
+          };
+        }).filter((g: GifItem) => Boolean(g.url));
 
-        if (mapped.length > 0) {
-          setGifResults((prev) => (append ? [...prev, ...mapped] : mapped));
-          setGifNextPos(data.next || '');
+        if (append) {
+          setGifResults((prev) => [...prev, ...results]);
+        } else {
+          setGifResults(results);
         }
+        setGifNextPos(data.next || '');
       }
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        // Keep current or fallback GIFs
-      }
+    } catch {
+      // Keep existing results
     } finally {
       setIsLoadingGifs(false);
     }
-  };
+  }, []);
 
+  // Fetch initial trending GIFs on mount or tab activation
+  useEffect(() => {
+    if (activeTab === 'gif' && gifResults.length === 0 && !gifSearch) {
+      fetchKlipyGifs('');
+    }
+  }, [activeTab, fetchKlipyGifs, gifResults.length, gifSearch]);
+
+  // Debounced real-time search
   useEffect(() => {
     if (activeTab !== 'gif') return;
-    const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetchTenorGifs(gifSearch, '', false, controller.signal);
-    }, 200);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [activeTab, gifSearch]);
+      fetchKlipyGifs(gifSearch);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [activeTab, gifSearch, fetchKlipyGifs]);
 
   // Filtered Emojis
   const displayedEmojis = React.useMemo(() => {
@@ -836,7 +868,7 @@ export function EmojiGifPicker({
             {gifNextPos && (
               <button
                 type="button"
-                onClick={() => fetchTenorGifs(gifSearch, gifNextPos, true)}
+                onClick={() => fetchKlipyGifs(gifSearch, gifNextPos, true)}
                 disabled={isLoadingGifs}
                 style={{
                   gridColumn: '1 / -1',
@@ -852,6 +884,7 @@ export function EmojiGifPicker({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
+                  marginTop: 4,
                 }}
               >
                 {isLoadingGifs ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}

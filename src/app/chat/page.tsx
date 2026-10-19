@@ -43,6 +43,9 @@ import {
   Quote,
   Link2,
   BarChart2,
+  Bell,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useChat, ChatPoll } from '@/context/ChatContext';
 import { useRole } from '@/context/RoleContext';
@@ -54,6 +57,11 @@ import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
 import { RichMessageContent, PollCard } from '@/components/chat/RichMessageContent';
 import { WysiwygChatEditor, WysiwygEditorRef } from '@/components/chat/WysiwygChatEditor';
+import {
+  requestNotificationPermission,
+  playNotificationSound,
+  showDesktopNotification,
+} from '@/utils/chatSound';
 
 export default function GroupChatPage() {
   const {
@@ -61,9 +69,13 @@ export default function GroupChatPage() {
     activeChannel,
     setActiveChannelId,
     messages,
+    allMessages,
     activeThread,
     setActiveThread,
+    isLoadingChannels,
+    isLoadingMessages,
     sendMessage,
+    retrySendMessage,
     deleteMessage,
     togglePinMessage,
     toggleReaction,
@@ -83,6 +95,19 @@ export default function GroupChatPage() {
   const { currentUser, role, isHRAdmin } = useRole();
   const { company } = useCompany();
 
+  // Role & Ownership check
+  const roleStr = String(role || '').toLowerCase();
+  const isOwnerOrAdmin =
+    Boolean(isHRAdmin) ||
+    roleStr.includes('hr') ||
+    roleStr === 'company_owner' ||
+    roleStr === 'admin' ||
+    roleStr === 'owner' ||
+    roleStr === 'workspace_admin' ||
+    String((currentUser as any)?.role || '').toLowerCase().includes('owner') ||
+    String((currentUser as any)?.role || '').toLowerCase().includes('admin') ||
+    String((currentUser as any)?.role || '').toLowerCase().includes('hr');
+
   // UI state
   const [inputText, setInputText] = useState('');
   const [searchChannelTerm, setSearchChannelTerm] = useState('');
@@ -99,6 +124,57 @@ export default function GroupChatPage() {
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [showThreadsPopover, setShowThreadsPopover] = useState(false);
+
+  // Desktop Notifications & Audio Chime state
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [dismissedNotificationBanner, setDismissedNotificationBanner] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
+      const dismissed = localStorage.getItem('easyhr_dismissed_chat_notifications');
+      if (dismissed === 'true') {
+        setDismissedNotificationBanner(true);
+      }
+      const soundPref = localStorage.getItem('easyhr_chat_sound_enabled');
+      if (soundPref === 'false') {
+        setSoundEnabled(false);
+      }
+    }
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    const perm = await requestNotificationPermission();
+    setNotificationPermission(perm);
+    playNotificationSound('mention');
+    if (perm === 'granted') {
+      showDesktopNotification({
+        title: '🔔 Desktop Notifications Active!',
+        body: 'You will now receive Slack-style sound alerts and notifications when tagged or replied to.',
+      });
+    }
+  };
+
+  const handleDismissNotificationBanner = () => {
+    setDismissedNotificationBanner(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('easyhr_dismissed_chat_notifications', 'true');
+    }
+  };
+
+  const handleToggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('easyhr_chat_sound_enabled', String(next));
+    }
+    if (next) {
+      playNotificationSound('message');
+    }
+  };
 
   // Poll Builder state
   const [showPollBuilder, setShowPollBuilder] = useState(false);
@@ -135,16 +211,18 @@ export default function GroupChatPage() {
   const isPublicChannel = activeChannel
     ? !activeChannel.isPrivate && !activeChannel.departmentRestricted
     : false;
+  const isAnnouncementsChannel = activeChannel?.name.toLowerCase() === 'announcements';
   const isMember = activeChannel
     ? isPublicChannel ||
+      isAnnouncementsChannel ||
       activeChannel.memberIds.includes(currentUserId) ||
-      activeChannel.memberIds.includes('user')
+      activeChannel.memberIds.includes('user') ||
+      isOwnerOrAdmin
     : false;
   const isChannelAdmin = activeChannel
     ? activeChannel.adminIds.includes(currentUserId) ||
       activeChannel.adminIds.includes('user') ||
-      isHRAdmin ||
-      role === 'HR Admin'
+      isOwnerOrAdmin
     : false;
   const hasRequested = activeChannel
     ? activeChannel.pendingRequestUserIds.includes(currentUserId)
@@ -182,7 +260,8 @@ export default function GroupChatPage() {
   const visibleMessages = useMemo(() => {
     let list = messages;
     if (viewFilter === 'threads') {
-      list = list.filter((m) => (m.replyCount || 0) > 0);
+      const chThreads = messages.filter((m) => (m.replyCount || 0) > 0);
+      list = chThreads.length > 0 ? chThreads : allMessages.filter((m) => (m.replyCount || 0) > 0);
     } else if (viewFilter === 'pinned') {
       list = list.filter((m) => m.pinned);
     }
@@ -195,11 +274,16 @@ export default function GroupChatPage() {
       );
     }
     return list;
-  }, [messages, viewFilter, searchMessageTerm]);
+  }, [messages, allMessages, viewFilter, searchMessageTerm]);
 
   const threadedMessages = useMemo(
     () => messages.filter((m) => (m.replyCount || 0) > 0),
     [messages]
+  );
+
+  const allThreadedMessages = useMemo(
+    () => allMessages.filter((m) => (m.replyCount || 0) > 0),
+    [allMessages]
   );
 
   const pinnedCount = useMemo(
@@ -329,6 +413,16 @@ export default function GroupChatPage() {
         color: 'var(--text-1, #18181B)',
       }}
     >
+      <style>{`
+        @keyframes chatShimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes chatSpin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* ═══════════════════════════════════════════════════════════════════════
           LEFT INNER SIDEBAR: Channels, Department Groups & Team Members
          ═══════════════════════════════════════════════════════════════════════ */}
@@ -502,7 +596,7 @@ export default function GroupChatPage() {
               <MessageSquare size={14} style={{ color: 'var(--text-3, #A1A1AA)' }} />
               <span>Thread Discussions</span>
             </span>
-            {threadedMessages.length > 0 && (
+            {(threadedMessages.length > 0 || allThreadedMessages.length > 0) && (
               <span
                 style={{
                   fontSize: 10.5,
@@ -512,7 +606,7 @@ export default function GroupChatPage() {
                   color: 'var(--text-2, #52525B)',
                 }}
               >
-                {threadedMessages.length}
+                {threadedMessages.length > 0 ? threadedMessages.length : allThreadedMessages.length}
               </span>
             )}
           </button>
@@ -589,12 +683,49 @@ export default function GroupChatPage() {
 
             {!collapsedSections['channels'] && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {generalChannels.map((ch) => {
-                  const isActive = activeChannel?.id === ch.id;
-                  const canAccess =
-                    !ch.isPrivate ||
-                    ch.memberIds.includes(currentUserId) ||
-                    ch.memberIds.includes('user');
+                {isLoadingChannels ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '7px 10px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 3,
+                            background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'chatShimmer 1.5s infinite',
+                          }}
+                        />
+                        <div
+                          style={{
+                            width: `${55 + (i % 3) * 18}%`,
+                            height: 12,
+                            borderRadius: 4,
+                            background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'chatShimmer 1.5s infinite',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  generalChannels.map((ch) => {
+                    const isActive = activeChannel?.id === ch.id;
+                    const canAccess =
+                      !ch.isPrivate ||
+                      ch.memberIds.includes(currentUserId) ||
+                      ch.memberIds.includes('user') ||
+                      isOwnerOrAdmin;
                   return (
                     <button
                       key={ch.id}
@@ -690,7 +821,7 @@ export default function GroupChatPage() {
                       ) : null}
                     </button>
                   );
-                })}
+                }))}
 
                 <button
                   type="button"
@@ -739,134 +870,207 @@ export default function GroupChatPage() {
 
             {!collapsedSections['groups'] && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {Object.entries(departmentGroups).map(([deptName, deptChans]) => (
-                  <div key={deptName}>
-                    {/* Department Group Header */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '4px 8px',
-                        fontSize: 12,
-                        color: 'var(--text-1, #18181B)',
-                      }}
-                    >
-                      <span
+                {isLoadingChannels ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
                         style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 6,
-                          background: '#FFFFFF',
-                          border: '1px solid var(--card-border, #E4E4E7)',
-                          color: 'var(--text-1, #18181B)',
-                          fontSize: 10.5,
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
+                          gap: 8,
+                          padding: '7px 10px',
                         }}
                       >
-                        {deptName.slice(0, 1).toUpperCase()}
-                      </span>
-                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {deptName}
-                      </span>
-                    </div>
-
-                    {/* Nested Department Channels */}
-                    <div
-                      style={{
-                        marginLeft: 17,
-                        paddingLeft: 10,
-                        borderLeft: '1px solid var(--card-border, #E4E4E7)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 2,
-                        marginTop: 2,
-                      }}
-                    >
-                      {deptChans.map((ch) => {
-                        const isActive = activeChannel?.id === ch.id;
-                        const isUserMember =
-                          ch.memberIds.includes(currentUserId) || ch.memberIds.includes('user');
-                        return (
-                          <button
-                            key={ch.id}
-                            type="button"
-                            onClick={() => {
-                              setActiveChannelId(ch.id);
-                              setActiveThread(null);
-                              setViewFilter('all');
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: 8,
-                              border: isActive
-                                ? '1px solid var(--card-border, #E4E4E7)'
-                                : '1px solid transparent',
-                              background: isActive ? '#FFFFFF' : 'transparent',
-                              color: isActive
-                                ? 'var(--text-1, #18181B)'
-                                : 'var(--text-2, #52525B)',
-                              fontSize: 12.5,
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                            }}
-                          >
+                        <div
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 3,
+                            background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'chatShimmer 1.5s infinite',
+                          }}
+                        />
+                        <div
+                          style={{
+                            width: `${50 + (i % 3) * 20}%`,
+                            height: 12,
+                            borderRadius: 4,
+                            background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'chatShimmer 1.5s infinite',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  Object.entries(departmentGroups).map(([deptName, deptChans]) => {
+                    const deptTotalUnread = deptChans.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+                    return (
+                      <div key={deptName}>
+                        {/* Department Group Header */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                            padding: '4px 8px',
+                            fontSize: 12,
+                            color: 'var(--text-1, #18181B)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
                             <span
                               style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 6,
+                                background: '#FFFFFF',
+                                border: '1px solid var(--card-border, #E4E4E7)',
+                                color: 'var(--text-1, #18181B)',
+                                fontSize: 10.5,
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 6,
-                                minWidth: 0,
-                                overflow: 'hidden',
+                                justifyContent: 'center',
+                                flexShrink: 0,
                               }}
                             >
-                              {ch.isPrivate ? (
-                                <Lock
-                                  size={12.5}
-                                  style={{
-                                    color: isActive
-                                      ? 'var(--primary, #A238FF)'
-                                      : 'var(--text-3, #A1A1AA)',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              ) : (
-                                <Hash
-                                  size={13}
-                                  style={{
-                                    color: isActive
-                                      ? 'var(--primary, #A238FF)'
-                                      : 'var(--text-3, #A1A1AA)',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              )}
-                              <span
+                              {deptName.slice(0, 1).toUpperCase()}
+                            </span>
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {deptName}
+                            </span>
+                          </div>
+
+                          {deptTotalUnread > 0 && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 6px',
+                                borderRadius: 999,
+                                background: 'var(--primary, #A238FF)',
+                                color: '#FFFFFF',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {deptTotalUnread}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Nested Department Channels */}
+                        <div
+                          style={{
+                            marginLeft: 17,
+                            paddingLeft: 10,
+                            borderLeft: '1px solid var(--card-border, #E4E4E7)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 2,
+                            marginTop: 2,
+                          }}
+                        >
+                          {deptChans.map((ch) => {
+                            const isActive = activeChannel?.id === ch.id;
+                            const isUserMember =
+                              ch.memberIds.includes(currentUserId) ||
+                              ch.memberIds.includes('user') ||
+                              isOwnerOrAdmin;
+                            return (
+                              <button
+                                key={ch.id}
+                                type="button"
+                                onClick={() => {
+                                  setActiveChannelId(ch.id);
+                                  setActiveThread(null);
+                                  setViewFilter('all');
+                                }}
                                 style={{
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 8,
+                                  border: isActive
+                                    ? '1px solid var(--card-border, #E4E4E7)'
+                                    : '1px solid transparent',
+                                  background: isActive ? '#FFFFFF' : 'transparent',
+                                  color: isActive
+                                    ? 'var(--text-1, #18181B)'
+                                    : 'var(--text-2, #52525B)',
+                                  fontSize: 12.5,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
                                 }}
                               >
-                                {ch.name}
-                              </span>
-                            </span>
-                            {!isUserMember && (
-                              <Lock size={11} style={{ color: 'var(--text-3, #A1A1AA)', flexShrink: 0 }} />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                                <span
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    minWidth: 0,
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  {ch.isPrivate ? (
+                                    <Lock
+                                      size={12.5}
+                                      style={{
+                                        color: isActive
+                                          ? 'var(--primary, #A238FF)'
+                                          : 'var(--text-3, #A1A1AA)',
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  ) : (
+                                    <Hash
+                                      size={13}
+                                      style={{
+                                        color: isActive
+                                          ? 'var(--primary, #A238FF)'
+                                          : 'var(--text-3, #A1A1AA)',
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  )}
+                                  <span
+                                    style={{
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {ch.name}
+                                  </span>
+                                </span>
+
+                                {ch.unreadCount ? (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      padding: '1px 6px',
+                                      borderRadius: 999,
+                                      background: 'var(--primary, #A238FF)',
+                                      color: '#FFFFFF',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {ch.unreadCount}
+                                  </span>
+                                ) : !isUserMember ? (
+                                  <Lock size={11} style={{ color: 'var(--text-3, #A1A1AA)', flexShrink: 0 }} />
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }))}
               </div>
             )}
           </div>
@@ -1114,6 +1318,48 @@ export default function GroupChatPage() {
 
               {/* Right: Pinned, Thread Popover, Search in Channel, Member Avatars */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                {/* Notification Alerts & Sound Button */}
+                <button
+                  type="button"
+                  onClick={notificationPermission === 'default' ? handleEnableNotifications : handleToggleSound}
+                  title={
+                    notificationPermission === 'granted'
+                      ? (soundEnabled ? 'Desktop notifications & sound alerts active (click to mute sound)' : 'Audio muted (click to unmute)')
+                      : 'Enable desktop notifications & Slack-style chimes'
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    height: 32,
+                    padding: '0 10px',
+                    borderRadius: 8,
+                    border: notificationPermission === 'granted'
+                      ? '1px solid #DDD6FE'
+                      : '1px solid var(--card-border, #E4E4E7)',
+                    background: notificationPermission === 'granted'
+                      ? (soundEnabled ? '#F5EEFF' : '#FAFAFA')
+                      : '#FFFFFF',
+                    color: notificationPermission === 'granted'
+                      ? (soundEnabled ? '#7C3AED' : 'var(--text-3, #A1A1AA)')
+                      : 'var(--text-2, #52525B)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {notificationPermission === 'granted' ? (
+                    soundEnabled ? <Bell size={13} style={{ color: '#7C3AED' }} /> : <VolumeX size={13} />
+                  ) : (
+                    <Bell size={13} style={{ color: 'var(--text-3, #A1A1AA)' }} />
+                  )}
+                  <span style={{ fontSize: 11.5 }}>
+                    {notificationPermission === 'granted'
+                      ? (soundEnabled ? 'Alerts On' : 'Muted')
+                      : 'Alerts'}
+                  </span>
+                </button>
+
                 {/* Pin Filter Button */}
                 <button
                   type="button"
@@ -1563,8 +1809,84 @@ export default function GroupChatPage() {
                 </div>
               </div>
             ) : (
-              /* ─── MESSAGE STREAM ─── */
-              <div
+              <>
+                {/* Slack-style Desktop Notification Permission Banner */}
+                {notificationPermission === 'default' && !dismissedNotificationBanner && (
+                  <div
+                    style={{
+                      background: 'linear-gradient(90deg, #F5EEFF 0%, #FAF5FF 100%)',
+                      borderBottom: '1px solid #E9D5FF',
+                      padding: '10px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: 12.5,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: '#FFFFFF',
+                          border: '1px solid #DDD6FE',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#7C3AED',
+                          boxShadow: '0 1px 2px rgba(124, 58, 237, 0.08)',
+                        }}
+                      >
+                        <Bell size={14} />
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 600, color: '#3B0764' }}>Turn on desktop notifications: </span>
+                        <span style={{ color: '#5B21B6' }}>
+                          Get real-time Slack-style audio chimes and alerts whenever team members tag you or reply to your threads.
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={handleEnableNotifications}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: 7,
+                          border: 'none',
+                          background: '#7C3AED',
+                          color: '#FFFFFF',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(124, 58, 237, 0.25)',
+                        }}
+                      >
+                        Enable Notifications
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDismissNotificationBanner}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: 7,
+                          border: '1px solid transparent',
+                          background: 'transparent',
+                          color: '#7C3AED',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── MESSAGE STREAM ─── */}
+                <div
                 style={{
                   flex: 1,
                   overflowY: 'auto',
@@ -1661,16 +1983,129 @@ export default function GroupChatPage() {
                 </div>
 
                 {/* Message Items */}
-                {visibleMessages.length === 0 ? (
+                {isLoadingMessages ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '24px 12px' }}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, opacity: 0.85 }}>
+                        <div
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: '50%',
+                            background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'chatShimmer 1.5s infinite',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div
+                              style={{
+                                width: 110,
+                                height: 13,
+                                borderRadius: 4,
+                                background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'chatShimmer 1.5s infinite',
+                              }}
+                            />
+                            <div
+                              style={{
+                                width: 50,
+                                height: 11,
+                                borderRadius: 4,
+                                background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'chatShimmer 1.5s infinite',
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              width: i % 2 === 0 ? '70%' : '50%',
+                              height: 13,
+                              borderRadius: 4,
+                              background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                              backgroundSize: '200% 100%',
+                              animation: 'chatShimmer 1.5s infinite',
+                            }}
+                          />
+                          {i % 2 === 0 && (
+                            <div
+                              style={{
+                                width: '35%',
+                                height: 13,
+                                borderRadius: 4,
+                                background: 'linear-gradient(90deg, #F4F4F5 25%, #E4E4E7 50%, #F4F4F5 75%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'chatShimmer 1.5s infinite',
+                              }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : visibleMessages.length === 0 ? (
                   <div
                     style={{
-                      padding: '48px 20px',
+                      padding: '56px 20px',
                       textAlign: 'center',
-                      color: 'var(--text-3, #A1A1AA)',
-                      fontSize: 13,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 12,
                     }}
                   >
-                    No messages match the current filter.
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: '#FAF5FF',
+                        border: '1px solid #E9D5FF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--primary, #A238FF)',
+                      }}
+                    >
+                      <MessageSquare size={20} />
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1, #18181B)' }}>
+                      {viewFilter === 'threads'
+                        ? 'No active thread discussions yet'
+                        : viewFilter === 'pinned'
+                        ? 'No pinned messages in this channel'
+                        : 'No messages found'}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-3, #A1A1AA)', maxWidth: 360, lineHeight: 1.5 }}>
+                      {viewFilter === 'threads'
+                        ? `Replies to any message in #${activeChannel?.name || 'this channel'} will appear here as focused thread discussions.`
+                        : viewFilter === 'pinned'
+                        ? `Important announcements or notes can be pinned to #${activeChannel?.name || 'this channel'} for quick reference.`
+                        : 'Try searching for something else or send a message below.'}
+                    </div>
+                    {viewFilter !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setViewFilter('all')}
+                        style={{
+                          marginTop: 6,
+                          padding: '6px 14px',
+                          borderRadius: 8,
+                          border: '1px solid var(--card-border, #E4E4E7)',
+                          background: '#FFFFFF',
+                          color: 'var(--text-2, #52525B)',
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        View all messages
+                      </button>
+                    )}
                   </div>
                 ) : (
                   visibleMessages.map((msg) => {
@@ -1695,52 +2130,64 @@ export default function GroupChatPage() {
                         }}
                       >
                         {/* Left Column: Avatar + Optional Thread Connector */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <div
-                            onClick={() => {
-                              const found = allEmployees.find(
-                                (e) =>
-                                  String(e.id) === msg.senderId ||
-                                  `${e.firstName} ${e.lastName}`.trim() === msg.senderName
-                              );
-                              if (found) {
-                                setSelectedProfileMember(found);
-                                setActiveThread(null);
-                              }
-                            }}
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: '50%',
-                              background: '#F4F4F5',
-                              border: '1px solid var(--card-border, #E4E4E7)',
-                              color: 'var(--text-1, #18181B)',
-                              fontSize: 12,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              overflow: 'hidden',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {msg.senderAvatar ? (
-                              <img
-                                src={msg.senderAvatar}
-                                alt={msg.senderName}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            ) : (
-                              msg.senderName.slice(0, 2).toUpperCase()
-                            )}
-                          </div>
-                        </div>
+                        {(() => {
+                          const found = allEmployees.find(
+                            (e) =>
+                              String(e.id) === msg.senderId ||
+                              `${e.firstName} ${e.lastName}`.trim().toLowerCase() === msg.senderName.toLowerCase()
+                          );
+                          const effectiveAvatar =
+                            msg.senderAvatar ||
+                            found?.avatar ||
+                            (found as any)?.avatarUrl ||
+                            (found as any)?.avatar_url ||
+                            (found as any)?.photoUrl ||
+                            '';
+
+                          return (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <div
+                                onClick={() => {
+                                  if (found) {
+                                    setSelectedProfileMember(found);
+                                    setActiveThread(null);
+                                  }
+                                }}
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: '50%',
+                                  background: '#F4F4F5',
+                                  border: '1px solid var(--card-border, #E4E4E7)',
+                                  color: 'var(--text-1, #18181B)',
+                                  fontSize: 12,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  overflow: 'hidden',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {effectiveAvatar ? (
+                                  <img
+                                    src={effectiveAvatar}
+                                    alt={msg.senderName}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  msg.senderName.slice(0, 2).toUpperCase()
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Right Column: Sender Header, Message Body, Attachments, Reactions, Thread Connector */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1767,6 +2214,78 @@ export default function GroupChatPage() {
                             <span style={{ fontSize: 11, color: 'var(--text-3, #A1A1AA)' }}>
                               {msg.createdAt}
                             </span>
+                            {msg.status === 'sending' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 10.5,
+                                  color: '#A1A1AA',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    border: '1.5px solid #A238FF',
+                                    borderTopColor: 'transparent',
+                                    borderRadius: '50%',
+                                    animation: 'chatSpin 0.8s linear infinite',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                <span>Sending...</span>
+                              </span>
+                            )}
+                            {msg.status === 'sent' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 2,
+                                  fontSize: 10.5,
+                                  color: '#10B981',
+                                }}
+                                title="Delivered"
+                              >
+                                <Check size={11} />
+                              </span>
+                            )}
+                            {msg.status === 'failed' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11,
+                                  color: '#EF4444',
+                                  background: '#FEF2F2',
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  border: '1px solid #FCA5A5',
+                                }}
+                              >
+                                <ShieldAlert size={11} />
+                                <span>{msg.errorMessage || 'Failed to send'}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => retrySendMessage(msg.clientMsgId || msg.id)}
+                                  style={{
+                                    background: '#EF4444',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: 4,
+                                    padding: '1px 6px',
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Retry
+                                </button>
+                              </span>
+                            )}
                             {msg.pinned && (
                               <span
                                 style={{
@@ -1823,7 +2342,20 @@ export default function GroupChatPage() {
                                 marginTop: 10,
                               }}
                             >
-                              {msg.attachments.map((att) => (
+                              {msg.attachments.map((att) => {
+                                const isImage =
+                                  att.type === 'image' ||
+                                  Boolean(att.mimeType?.startsWith('image/')) ||
+                                  /\.(png|jpe?g|gif|webp|svg)($|\?)/i.test(att.url) ||
+                                  /\.(png|jpe?g|gif|webp|svg)$/i.test(att.name || '');
+
+                                const isVideo =
+                                  att.type === 'video' ||
+                                  Boolean(att.mimeType?.startsWith('video/')) ||
+                                  /\.(mp4|webm|mov|ogg)($|\?)/i.test(att.url) ||
+                                  /\.(mp4|webm|mov|ogg)$/i.test(att.name || '');
+
+                                return (
                                 <div
                                   key={att.id}
                                   style={{
@@ -1835,7 +2367,7 @@ export default function GroupChatPage() {
                                     position: 'relative',
                                   }}
                                 >
-                                  {att.type === 'image' ? (
+                                  {isImage ? (
                                     <div
                                       onClick={() =>
                                         setLightboxMedia({
@@ -1879,7 +2411,7 @@ export default function GroupChatPage() {
                                         <span>Full view</span>
                                       </div>
                                     </div>
-                                  ) : att.type === 'video' ? (
+                                  ) : isVideo ? (
                                     <div
                                       onClick={() =>
                                         setLightboxMedia({
@@ -2001,7 +2533,8 @@ export default function GroupChatPage() {
                                     </a>
                                   )}
                                 </div>
-                              ))}
+                              );
+                            })}
                             </div>
                           )}
 
@@ -2092,34 +2625,48 @@ export default function GroupChatPage() {
                               >
                                 {/* Reply avatars */}
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                  {(msg.replies || []).slice(0, 3).map((rep, idx) => (
-                                    <span
-                                      key={rep.id}
-                                      style={{
-                                        width: 18,
-                                        height: 18,
-                                        borderRadius: '50%',
-                                        background: '#F4F4F5',
-                                        border: '1.5px solid #FFFFFF',
-                                        marginLeft: idx === 0 ? 0 : -5,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: 8.5,
-                                        overflow: 'hidden',
-                                      }}
-                                    >
-                                      {rep.senderAvatar ? (
-                                        <img
-                                          src={rep.senderAvatar}
-                                          alt={rep.senderName}
-                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        />
-                                      ) : (
-                                        rep.senderName.slice(0, 1)
-                                      )}
-                                    </span>
-                                  ))}
+                                  {(msg.replies || []).slice(0, 3).map((rep, idx) => {
+                                    const repEmp = allEmployees.find(
+                                      (e) =>
+                                        String(e.id) === rep.senderId ||
+                                        `${e.firstName} ${e.lastName}`.trim().toLowerCase() === rep.senderName.toLowerCase()
+                                    );
+                                    const repAvatar =
+                                      rep.senderAvatar ||
+                                      repEmp?.avatar ||
+                                      (repEmp as any)?.avatarUrl ||
+                                      (repEmp as any)?.avatar_url ||
+                                      '';
+
+                                    return (
+                                      <span
+                                        key={rep.id}
+                                        style={{
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: '50%',
+                                          background: '#F4F4F5',
+                                          border: '1.5px solid #FFFFFF',
+                                          marginLeft: idx === 0 ? 0 : -5,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: 8.5,
+                                          overflow: 'hidden',
+                                        }}
+                                      >
+                                        {repAvatar ? (
+                                          <img
+                                            src={repAvatar}
+                                            alt={rep.senderName}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          />
+                                        ) : (
+                                          rep.senderName.slice(0, 1)
+                                        )}
+                                      </span>
+                                    );
+                                  })}
                                 </div>
 
                                 <span style={{ color: 'var(--primary, #A238FF)' }}>
@@ -2259,7 +2806,8 @@ export default function GroupChatPage() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-            )}
+            </>
+          )}
 
             {/* Typing Indicator */}
             {typingUsers.length > 0 && (
@@ -2756,16 +3304,55 @@ export default function GroupChatPage() {
                 )}
 
                 {/* Slack-Inspired Live WYSIWYG Rich Text & Media Composer Container */}
-                <form
-                  onSubmit={handleSend}
-                  style={{
-                    borderRadius: 14,
-                    border: '1px solid var(--card-border, #E4E4E7)',
-                    background: '#FAF9F7',
-                    overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-                  }}
-                >
+                {isAnnouncementsChannel && !isOwnerOrAdmin ? (
+                  <div
+                    style={{
+                      borderRadius: 14,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      background: '#FAF9F7',
+                      padding: '18px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: '#FFFFFF',
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--primary, #A238FF)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Lock size={16} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1, #18181B)' }}>
+                        #announcements is a read-only channel
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)', marginTop: 2 }}>
+                        Only HR Managers and Workspace Administrators can post official announcements here.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={handleSend}
+                    style={{
+                      borderRadius: 14,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      background: '#FAF9F7',
+                      overflow: 'hidden',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                    }}
+                  >
                   {/* Live ContentEditable WYSIWYG Editor (No separate preview box) */}
                   <WysiwygChatEditor
                     ref={editorRef}
@@ -3147,6 +3734,7 @@ export default function GroupChatPage() {
                     </button>
                   </div>
                 </form>
+              )}
               </div>
             )}
           </>

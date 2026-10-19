@@ -6,6 +6,7 @@ import { useRole } from '@/context/RoleContext';
 import { useCompany } from '@/context/CompanyContext';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { employees as initialEmployees, Employee } from '@/data/employees';
+import { playNotificationSound, showDesktopNotification } from '@/utils/chatSound';
 
 export interface ChatReaction {
   emoji: string;
@@ -51,9 +52,12 @@ export interface ChatMessage {
   reactions?: Record<string, ChatReaction>; // emoji -> ChatReaction
   replyCount?: number;
   replies?: ChatMessage[];
+  replyToId?: string;
   pinned?: boolean;
   saved?: boolean;
   clientMsgId?: string;
+  status?: 'sending' | 'sent' | 'failed';
+  errorMessage?: string;
 }
 
 export interface ChatChannel {
@@ -85,12 +89,15 @@ interface ChatContextType {
   allMessages: ChatMessage[];
   activeThread: ChatMessage | null;
   setActiveThread: (msg: ChatMessage | null) => void;
+  isLoadingChannels: boolean;
+  isLoadingMessages: boolean;
   sendMessage: (
     content: string,
     attachments?: ChatAttachment[],
     threadParentId?: string,
     poll?: ChatPoll
   ) => Promise<void>;
+  retrySendMessage: (clientMsgId: string) => Promise<void>;
   votePoll: (messageId: string, optionId: string) => Promise<void>;
   closePoll: (messageId: string) => Promise<void>;
   deleteMessage: (messageId: string, threadParentId?: string) => Promise<void>;
@@ -116,118 +123,14 @@ interface ChatContextType {
   isRealtimeConnected: boolean;
   refreshChannels: () => Promise<void>;
   refreshMessages: () => Promise<void>;
+  fetchThreadReplies: (parentMessageId: string, channelId?: string) => Promise<ChatMessage[]>;
 }
 
 const STORAGE_KEY_CHANNELS = 'easyhr_chat_channels_v3';
 const STORAGE_KEY_MESSAGES = 'easyhr_chat_messages_v5';
 
-const DEFAULT_CHANNELS: ChatChannel[] = [
-  {
-    id: 'ch-general',
-    name: 'general',
-    topic: 'Company-wide updates, announcements & team discussions',
-    description: 'The primary workspace channel for everyone at the company.',
-    isPrivate: false,
-    departmentRestricted: false,
-    createdById: '1',
-    createdBy: 'Sarah Johnson',
-    createdAt: '2026-01-01T08:00:00Z',
-    adminIds: ['1', 'user'],
-    memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
-    pendingRequestUserIds: [],
-  },
-  {
-    id: 'ch-announcements',
-    name: 'announcements',
-    topic: 'Official company news, policy releases & milestones',
-    description: 'Broadcast channel for executive and HR updates.',
-    isPrivate: false,
-    departmentRestricted: false,
-    createdById: '1',
-    createdBy: 'Sarah Johnson',
-    createdAt: '2026-01-02T09:00:00Z',
-    adminIds: ['1', 'user'],
-    memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
-    pendingRequestUserIds: [],
-  },
-  {
-    id: 'ch-random',
-    name: 'random',
-    topic: 'Non-work banter, water cooler chats, memes & celebrations',
-    description: 'Casual chat for the entire team.',
-    isPrivate: false,
-    departmentRestricted: false,
-    createdById: '2',
-    createdBy: 'Michael Chen',
-    createdAt: '2026-01-02T10:00:00Z',
-    adminIds: ['2'],
-    memberIds: ['1', '2', '3', '4', '5', '6', '7', '8', 'user'],
-    pendingRequestUserIds: [],
-  },
-  {
-    id: 'ch-dev-talk',
-    name: 'dev-talk',
-    topic: 'Engineering discussions, architecture & release syncs',
-    description: 'Technical discussion channel for engineering teams.',
-    isPrivate: false,
-    departmentRestricted: true,
-    department: 'Engineering',
-    createdById: '2',
-    createdBy: 'Michael Chen',
-    createdAt: '2026-01-03T11:00:00Z',
-    adminIds: ['2'],
-    memberIds: ['2', 'user'],
-    pendingRequestUserIds: [],
-  },
-  {
-    id: 'ch-design-team',
-    name: 'design-team',
-    topic: 'UI/UX design reviews, Figma shares & brand assets',
-    description: 'Design team work-in-progress and critiques.',
-    isPrivate: false,
-    departmentRestricted: true,
-    department: 'Design',
-    createdById: '4',
-    createdBy: 'Emily Davis',
-    createdAt: '2026-01-03T14:00:00Z',
-    adminIds: ['4'],
-    memberIds: ['4', 'user'],
-    pendingRequestUserIds: [],
-  },
-];
-
-const DEFAULT_MESSAGES: ChatMessage[] = [
-  {
-    id: 'msg-1',
-    channelId: 'ch-general',
-    senderId: '1',
-    senderName: 'Sarah Johnson',
-    senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    senderRole: 'Head of People',
-    content: 'Welcome to the EasyHR Workspace Chat! 👋 Feel free to join departmental channels or drop updates here.',
-    createdAt: '09:00 AM',
-    reactions: {
-      '🎉': { emoji: '🎉', count: 4, users: ['2', '3', '4', 'user'] },
-      '❤️': { emoji: '❤️', count: 2, users: ['2', 'user'] },
-    },
-    replyCount: 1,
-    pinned: true,
-  },
-  {
-    id: 'msg-2',
-    channelId: 'ch-general',
-    senderId: '2',
-    senderName: 'Michael Chen',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    senderRole: 'Lead Engineer',
-    content: 'Excited to have this integrated! Testing real-time threads and reaction synchronization.',
-    createdAt: '09:15 AM',
-    reactions: {
-      '🚀': { emoji: '🚀', count: 3, users: ['1', '4', 'user'] },
-    },
-    replyCount: 0,
-  },
-];
+const DEFAULT_CHANNELS: ChatChannel[] = [];
+const DEFAULT_MESSAGES: ChatMessage[] = [];
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -303,9 +206,11 @@ function mapBackendMessage(bm: any): ChatMessage {
     poll: formattedPoll,
     reactions,
     replyCount: bm.threadCount || 0,
+    replyToId: bm.replyToId || bm.parentMessageId || bm.parent_message_id || undefined,
     pinned: Boolean(bm.pinned),
     saved: Boolean(bm.saved),
     clientMsgId: bm.clientMsgId,
+    status: 'sent',
   };
 }
 
@@ -332,18 +237,35 @@ function mapBackendChannel(bc: any): ChatChannel {
   };
 }
 
+// Helper to reconcile and deduplicate thread replies
+function reconcileReplies(existing: ChatMessage[] = [], newReply: ChatMessage): ChatMessage[] {
+  const idx = existing.findIndex(
+    (r) =>
+      (newReply.id && r.id === newReply.id) ||
+      (newReply.clientMsgId && r.clientMsgId && r.clientMsgId === newReply.clientMsgId)
+  );
+  if (idx >= 0) {
+    const next = [...existing];
+    next[idx] = { ...existing[idx], ...newReply, status: 'sent' };
+    return next;
+  }
+  return [...existing, newReply];
+}
+
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { getToken } = useAuth();
   const { currentUser } = useRole();
   const { company } = useCompany();
 
-  const [channels, setChannels] = useState<ChatChannel[]>(DEFAULT_CHANNELS);
-  const [activeChannelId, setActiveChannelId] = useState<string>('ch-general');
-  const [allMessages, setAllMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<string>('');
+  const [allMessages, setAllMessages] = useState<ChatMessage[]>([]);
   const [activeThread, setActiveThread] = useState<ChatMessage | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [allEmployees, setAllEmployees] = useState<Employee[]>(initialEmployees);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
+  const [isLoadingChannels, setIsLoadingChannels] = useState<boolean>(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(true);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -356,12 +278,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const token = await getToken();
         if (!token) return;
-        const res = await fetch(`${API_BASE_URL}/api/v1/employees`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/employees?limit=200`, {
           headers: getAuthHeaders(token),
         });
         if (res.ok) {
           const data = await res.json();
-          const items = Array.isArray(data) ? data : data.employees || data.items || [];
+          const items = Array.isArray(data) ? data : data.data || data.employees || data.items || [];
           if (isMounted && items.length > 0) {
             const formatted = items.map((e: any) => ({
               id: String(e.id),
@@ -369,7 +291,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
               lastName: e.lastName || e.last_name || '',
               email: e.workEmail || e.work_email || e.email || '',
               phone: e.phone || '',
-              avatar: e.avatarUrl || e.avatar_url || '',
+              avatar: e.avatar || e.avatarUrl || e.avatar_url || e.photoUrl || e.photo_url || e.image || '',
               department: e.department || 'General',
               title: e.jobTitle || e.job_title || 'Team Member',
               division: e.division || '',
@@ -393,6 +315,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 2. Fetch Channels from Backend
   const refreshChannels = useCallback(async () => {
     try {
+      setIsLoadingChannels(true);
       const token = await getToken();
       if (!token) return;
       const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels`, {
@@ -403,17 +326,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const serverChannels = (data.channels || []).map(mapBackendChannel);
         if (serverChannels.length > 0) {
           setChannels(serverChannels);
-          // If activeChannel is not in the list, set to the first channel
+          // If activeChannel is not in the list, default to general or first channel
           setActiveChannelId((prev) => {
-            if (serverChannels.some((c: ChatChannel) => c.id === prev)) {
+            if (prev && serverChannels.some((c: ChatChannel) => c.id === prev)) {
               return prev;
             }
-            return serverChannels[0].id;
+            const gen = serverChannels.find((c: ChatChannel) => c.name.toLowerCase() === 'general');
+            return gen ? gen.id : serverChannels[0].id;
           });
         }
       }
     } catch {
       // Keep existing channels fallback
+    } finally {
+      setIsLoadingChannels(false);
     }
   }, [getToken]);
 
@@ -423,8 +349,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 3. Fetch Messages for Active Channel
   const refreshMessages = useCallback(async () => {
-    if (!activeChannelId) return;
+    if (!activeChannelId || activeChannelId === 'ch-general') return;
     try {
+      setIsLoadingMessages(true);
       const token = await getToken();
       if (!token) return;
 
@@ -457,6 +384,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch {
       // Keep cached messages
+    } finally {
+      setIsLoadingMessages(false);
     }
   }, [activeChannelId, getToken]);
 
@@ -525,23 +454,65 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return c;
               })
             );
+
+            // Audio & Browser Notification Alerts
+            const myId = String(currentUser?.id || 'user');
+            if (newMsg.senderId !== myId) {
+              const contentLower = (newMsg.content || '').toLowerCase();
+              const myFirst = (currentUser?.firstName || '').toLowerCase();
+              const myLast = (currentUser?.lastName || '').toLowerCase();
+              const isMentioned =
+                (myFirst && contentLower.includes(`@${myFirst}`)) ||
+                (myLast && contentLower.includes(`@${myLast}`)) ||
+                contentLower.includes('@here') ||
+                contentLower.includes('@channel');
+
+              if (isMentioned) {
+                playNotificationSound('mention');
+                showDesktopNotification({
+                  title: `${newMsg.senderName} mentioned you`,
+                  body: newMsg.content || 'Sent an attachment',
+                  tag: `mention-${newMsg.id}`,
+                });
+              } else if (newMsg.channelId === activeChannelId) {
+                if (typeof document !== 'undefined' && document.hidden) {
+                  playNotificationSound('message');
+                  showDesktopNotification({
+                    title: `${newMsg.senderName}`,
+                    body: newMsg.content || 'New message',
+                    tag: `msg-${newMsg.id}`,
+                  });
+                }
+              } else {
+                // Message in background channel
+                if (typeof document !== 'undefined' && document.hidden) {
+                  showDesktopNotification({
+                    title: `${newMsg.senderName}`,
+                    body: newMsg.content || 'New message in channel',
+                    tag: `msg-${newMsg.id}`,
+                  });
+                }
+              }
+            }
           } catch {}
         });
 
-        // Thread Reply Created
+        // Thread Reply Created (deduplicated & reconciled)
         sse.addEventListener('thread.reply_created', (e: MessageEvent) => {
           try {
             if (e.lastEventId) lastEventIdRef.current = e.lastEventId;
             const data = JSON.parse(e.data);
             const replyMsg = mapBackendMessage(data);
+            const parentId = data.replyToId || replyMsg.replyToId || data.parentMessageId;
+            if (!parentId) return;
 
             setAllMessages((prev) =>
               prev.map((m) => {
-                if (m.id === replyMsg.channelId || m.id === data.replyToId) {
-                  const updatedReplies = [...(m.replies || []), replyMsg];
+                if (m.id === parentId) {
+                  const updatedReplies = reconcileReplies(m.replies || [], replyMsg);
                   return {
                     ...m,
-                    replyCount: (m.replyCount || 0) + 1,
+                    replyCount: Math.max(m.replyCount || 0, updatedReplies.length),
                     replies: updatedReplies,
                   };
                 }
@@ -550,15 +521,27 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             );
 
             setActiveThread((current) => {
-              if (current && (current.id === data.replyToId || current.id === replyMsg.channelId)) {
+              if (current && (current.id === parentId)) {
+                const updatedReplies = reconcileReplies(current.replies || [], replyMsg);
                 return {
                   ...current,
-                  replyCount: (current.replyCount || 0) + 1,
-                  replies: [...(current.replies || []), replyMsg],
+                  replyCount: Math.max(current.replyCount || 0, updatedReplies.length),
+                  replies: updatedReplies,
                 };
               }
               return current;
             });
+
+            // Audio & Browser Notification Alerts for thread replies
+            const myId = String(currentUser?.id || 'user');
+            if (replyMsg.senderId !== myId) {
+              playNotificationSound('reply');
+              showDesktopNotification({
+                title: `${replyMsg.senderName} replied to thread`,
+                body: replyMsg.content || 'Sent a reply in thread',
+                tag: `thread-${parentId}`,
+              });
+            }
           } catch {}
         });
 
@@ -794,11 +777,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('channelId', activeChannelId);
+        if (activeChannelId && activeChannelId !== 'ch-general') {
+          formData.append('channelId', activeChannelId);
+        }
+
+        const headers = getAuthHeaders(token);
+        delete (headers as any)['Content-Type'];
 
         const res = await fetch(`${API_BASE_URL}/api/v1/chat/attachments`, {
           method: 'POST',
-          headers: getAuthHeaders(token),
+          headers,
           body: formData,
         });
 
@@ -837,6 +825,62 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [getToken, activeChannelId]
   );
 
+  // 5b. Fetch Thread Replies on Demand
+  const fetchThreadReplies = useCallback(
+    async (parentMessageId: string, channelId?: string): Promise<ChatMessage[]> => {
+      if (!parentMessageId) return [];
+      try {
+        const token = await getToken();
+        const chId = channelId || activeChannelId;
+        const url = `${API_BASE_URL}/api/v1/chat/messages/${encodeURIComponent(parentMessageId)}/replies${
+          chId ? `?channelId=${encodeURIComponent(chId)}` : ''
+        }`;
+        const res = await fetch(url, {
+          headers: getAuthHeaders(token),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const serverReplies: ChatMessage[] = (data.replies || []).map((r: any) => ({
+            ...mapBackendMessage(r),
+            status: 'sent' as const,
+          }));
+
+          // Update activeThread with server replies
+          setActiveThread((curr) => {
+            if (curr && curr.id === parentMessageId) {
+              return {
+                ...curr,
+                replyCount: Math.max(curr.replyCount || 0, serverReplies.length),
+                replies: serverReplies,
+              };
+            }
+            return curr;
+          });
+
+          // Update parent message inside allMessages
+          setAllMessages((prev) =>
+            prev.map((m) => {
+              if (m.id === parentMessageId) {
+                return {
+                  ...m,
+                  replyCount: Math.max(m.replyCount || 0, serverReplies.length),
+                  replies: serverReplies,
+                };
+              }
+              return m;
+            })
+          );
+
+          return serverReplies;
+        }
+      } catch (err) {
+        console.error('Failed to fetch thread replies:', err);
+      }
+      return [];
+    },
+    [getToken, activeChannelId]
+  );
+
   // 6. Send Message with Optimistic UI & Server Synchronization
   const sendMessage = useCallback(
     async (
@@ -866,6 +910,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         replyCount: 0,
         replies: [],
         clientMsgId,
+        status: 'sending',
       };
 
       if (threadParentId) {
@@ -933,30 +978,221 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (res.ok) {
             const data = await res.json();
-            const serverMsg = mapBackendMessage(data);
-
-            setAllMessages((prev) =>
-              prev.map((m) => (m.clientMsgId === clientMsgId ? serverMsg : m))
-            );
+            const serverMsg: ChatMessage = {
+              ...mapBackendMessage(data),
+              status: 'sent',
+            };
 
             if (threadParentId) {
+              setAllMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id === threadParentId) {
+                    const nextReplies = (m.replies || []).map((r) =>
+                      r.clientMsgId === clientMsgId || r.id === clientMsgId ? serverMsg : r
+                    );
+                    return {
+                      ...m,
+                      replyCount: nextReplies.length,
+                      replies: nextReplies,
+                    };
+                  }
+                  return m;
+                })
+              );
+
               setActiveThread((curr) => {
                 if (curr && curr.id === threadParentId) {
+                  const nextReplies = (curr.replies || []).map((r) =>
+                    r.clientMsgId === clientMsgId || r.id === clientMsgId ? serverMsg : r
+                  );
                   return {
                     ...curr,
-                    replies: (curr.replies || []).map((r) => (r.clientMsgId === clientMsgId ? serverMsg : r)),
+                    replyCount: nextReplies.length,
+                    replies: nextReplies,
                   };
                 }
                 return curr;
               });
+            } else {
+              setAllMessages((prev) =>
+                prev.map((m) => (m.clientMsgId === clientMsgId ? serverMsg : m))
+              );
+            }
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg = errData?.detail || 'Failed to send message';
+            if (threadParentId) {
+              setAllMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id === threadParentId) {
+                    return {
+                      ...m,
+                      replies: (m.replies || []).map((r) =>
+                        r.clientMsgId === clientMsgId
+                          ? { ...r, status: 'failed', errorMessage: errMsg }
+                          : r
+                      ),
+                    };
+                  }
+                  return m;
+                })
+              );
+              setActiveThread((curr) => {
+                if (curr && curr.id === threadParentId) {
+                  return {
+                    ...curr,
+                    replies: (curr.replies || []).map((r) =>
+                      r.clientMsgId === clientMsgId
+                        ? { ...r, status: 'failed', errorMessage: errMsg }
+                        : r
+                    ),
+                  };
+                }
+                return curr;
+              });
+            } else {
+              setAllMessages((prev) =>
+                prev.map((m) =>
+                  m.clientMsgId === clientMsgId
+                    ? { ...m, status: 'failed', errorMessage: errMsg }
+                    : m
+                )
+              );
             }
           }
         }
-      } catch {
-        // Optimistic message remains visible
+      } catch (err: any) {
+        const errMsg = err?.message || 'Network error';
+        if (threadParentId) {
+          setAllMessages((prev) =>
+            prev.map((m) => {
+              if (m.id === threadParentId) {
+                return {
+                  ...m,
+                  replies: (m.replies || []).map((r) =>
+                    r.clientMsgId === clientMsgId
+                      ? { ...r, status: 'failed', errorMessage: errMsg }
+                      : r
+                  ),
+                };
+              }
+              return m;
+            })
+          );
+          setActiveThread((curr) => {
+            if (curr && curr.id === threadParentId) {
+              return {
+                ...curr,
+                replies: (curr.replies || []).map((r) =>
+                  r.clientMsgId === clientMsgId
+                    ? { ...r, status: 'failed', errorMessage: errMsg }
+                    : r
+                ),
+              };
+            }
+            return curr;
+          });
+        } else {
+          setAllMessages((prev) =>
+            prev.map((m) =>
+              m.clientMsgId === clientMsgId
+                ? { ...m, status: 'failed', errorMessage: errMsg }
+                : m
+            )
+          );
+        }
       }
     },
     [activeChannelId, currentUser, activeThread, getToken]
+  );
+
+  // Retry sending a failed message
+  const retrySendMessage = useCallback(
+    async (clientMsgId: string) => {
+      const msg = allMessages.find((m) => m.clientMsgId === clientMsgId);
+      if (!msg) return;
+
+      setAllMessages((prev) =>
+        prev.map((m) =>
+          m.clientMsgId === clientMsgId
+            ? { ...m, status: 'sending', errorMessage: undefined }
+            : m
+        )
+      );
+
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Not authenticated');
+
+        const bodyPayload: any = {
+          channelId: msg.channelId,
+          content: msg.content,
+          clientMsgId,
+        };
+
+        if (msg.attachments && msg.attachments.length > 0) {
+          bodyPayload.attachmentIds = msg.attachments
+            .map((a) => a.id)
+            .filter((id) => id && !id.startsWith('att-') && !id.startsWith('file-'));
+          bodyPayload.attachments = msg.attachments.map((a) => ({
+            id: a.id,
+            name: a.name,
+            url: a.url,
+            type: a.type,
+            mimeType: a.mimeType,
+          }));
+        }
+
+        if (msg.poll) {
+          bodyPayload.poll = {
+            question: msg.poll.question,
+            options: msg.poll.options.map((opt) => ({ text: opt.text })),
+            allowMultiple: msg.poll.allowMultiple,
+            isAnonymous: msg.poll.anonymous,
+          };
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/chat/messages`, {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(token),
+            'Content-Type': 'application/json',
+            'Idempotency-Key': clientMsgId,
+          },
+          body: JSON.stringify(bodyPayload),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const serverMsg: ChatMessage = {
+            ...mapBackendMessage(data),
+            status: 'sent',
+          };
+          setAllMessages((prev) =>
+            prev.map((m) => (m.clientMsgId === clientMsgId ? serverMsg : m))
+          );
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData?.detail || 'Failed to send message';
+          setAllMessages((prev) =>
+            prev.map((m) =>
+              m.clientMsgId === clientMsgId
+                ? { ...m, status: 'failed', errorMessage: errMsg }
+                : m
+            )
+          );
+        }
+      } catch (err: any) {
+        setAllMessages((prev) =>
+          prev.map((m) =>
+            m.clientMsgId === clientMsgId
+              ? { ...m, status: 'failed', errorMessage: err?.message || 'Network error' }
+              : m
+          )
+        );
+      }
+    },
+    [allMessages, getToken]
   );
 
   // 7. Vote on Poll
@@ -1461,7 +1697,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         allMessages,
         activeThread,
         setActiveThread,
+        isLoadingChannels,
+        isLoadingMessages,
         sendMessage,
+        retrySendMessage,
         votePoll,
         closePoll,
         deleteMessage,
@@ -1480,6 +1719,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isRealtimeConnected,
         refreshChannels,
         refreshMessages,
+        fetchThreadReplies,
       }}
     >
       {children}
