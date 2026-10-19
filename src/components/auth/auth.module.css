@@ -25,7 +25,8 @@
 .divider:before,.divider:after{content:"";height:1px;background:#ebe8eb;flex:1}
 .switch{text-align:center;color:#777179;font-size:13px;margin-top:18px}
 .switch a,.row a{color:#9635ec;font-weight:700;text-decoration:none}
-.row{display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:12px;margin:1px 0 16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.row .field{margin-bottom:0}
 .check{display:flex;align-items:flex-start;gap:10px;color:#686268;font-size:13.5px;line-height:1.5;margin-bottom:20px;cursor:pointer}
 .check input{margin-top:3px;transform:scale(1.1)}.check input{accent-color:#9e35ef}
 .secure{display:flex;align-items:center;justify-content:center;gap:6px;color:#9a949a;font-size:11px;margin-top:20px}

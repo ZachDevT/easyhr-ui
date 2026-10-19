@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, Globe2, AlertCircle, Eye, EyeOff, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowRight, AlertCircle, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { AuthField, AuthShell, authStyles as s } from '@/components/auth/AuthShell';
 import { useClerk, useAuth } from '@clerk/nextjs';
 
@@ -149,21 +149,6 @@ function SignUpContent() {
     }
   };
 
-  const signUpWithGoogle = async () => {
-    if (!clerk?.client?.signIn) return;
-    setIsSubmitting(true);
-    try {
-      await clerk.client.signIn.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: postAuthDestination,
-      });
-    } catch (err: any) {
-      console.error('Google error:', err);
-      setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || err?.message || 'Google sign-up failed.');
-      setIsSubmitting(false);
-    }
-  };
 
   const notReady = isSubmitting || !signUp;
 
@@ -218,35 +203,6 @@ function SignUpContent() {
       title={isInviteFlow ? "Create your employee account" : "Create your EasyHR account"}
       subtitle={isInviteFlow ? "Set up your credentials to access your onboarding portal." : "You'll create your company and invite your team next."}
     >
-      <div style={{
-        marginBottom: '1rem',
-        padding: '0.75rem 1rem',
-        borderRadius: '0.75rem',
-        backgroundColor: '#f5f3ff',
-        border: '1px solid #ddd6fe',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.625rem',
-        fontSize: '0.8125rem',
-        color: '#5b21b6'
-      }}>
-        <Sparkles size={16} style={{ flexShrink: 0, color: '#7c3aed' }} />
-        <div>
-          Received an invitation email from your employer?{' '}
-          <Link
-            href={`/auth/accept-invite${redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : ''}`}
-            style={{ fontWeight: 600, textDecoration: 'underline', color: '#6d28d9' }}
-          >
-            Activate here
-          </Link>
-        </div>
-      </div>
-
-      <button type="button" disabled={notReady} onClick={signUpWithGoogle} className={s.secondaryButton}
-        style={{opacity:notReady?0.7:1,cursor:notReady?'not-allowed':'pointer'}}>
-        <Globe2 size={17}/> {isSubmitting ? 'Redirecting to Google...' : 'Sign up with Google'}
-      </button>
-      <div className={s.divider}>or use your work email</div>
       <form onSubmit={handleSignUp}>
         <div className={s.row}>
           <AuthField label="First name"><input placeholder="Amina" value={firstName} onChange={(e)=>setFirstName(e.target.value)} required/></AuthField>
