@@ -34,7 +34,6 @@ import {
   ToggleLeft,
   ToggleRight,
   RefreshCw,
-  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
@@ -45,7 +44,6 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatRibbon } from '@/components/ui/StatRibbon';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from '@/components/ui/Toast';
-import { PayrollGuideModal } from '@/components/payroll/PayrollGuideModal';
 import { usePayroll } from '@/context/PayrollContext';
 import {
   PayrollRule,
@@ -186,7 +184,6 @@ export default function PayrollPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [payrollRunSuccess, setPayrollRunSuccess] = useState(false);
   const [selectedPaystub, setSelectedPaystub] = useState<PayrollCalculationResult | null>(null);
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Filter for rules engine
   const [ruleCategoryFilter, setRuleCategoryFilter] = useState<string>('all');
@@ -473,111 +470,6 @@ export default function PayrollPage() {
           </button>
         </div>
       )}
-
-      {/* Interactive Plain-English Quick Explainer Banner */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)',
-          border: '1px solid #BFDBFE',
-          borderRadius: 14,
-          padding: '20px 24px',
-          marginBottom: 28,
-        }}
-      >
-        <div className="row-between align-center mb-16">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: '#DBEAFE',
-                color: '#1D4ED8',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <h4 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#1E293B' }}>
-                How EasyHR Calculates Payroll — The 4-Step Pipeline
-              </h4>
-              <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>
-                Designed so non-HR team members and founders understand exactly where every cent goes.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsGuideOpen(true)}
-            className="btn-neutral btn-sm"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              background: '#FFFFFF',
-              borderColor: '#93C5FD',
-              color: '#1D4ED8',
-            }}
-          >
-            <HelpCircle size={14} /> Open Full Plain-English Guide
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10, padding: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: 4 }}>
-              Step 1: Clock-In Tracking
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 650, color: '#0F172A', marginBottom: 4 }}>
-              Productive Time
-            </div>
-            <div style={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.4 }}>
-              Punches measure real working time minus unpaid lunch breaks. Missing clock-outs are flagged.
-            </div>
-          </div>
-
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10, padding: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#16A34A', textTransform: 'uppercase', marginBottom: 4 }}>
-              Step 2: Base &amp; Job Bonuses
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 650, color: '#0F172A', marginBottom: 4 }}>
-              Earnings Breakdown
-            </div>
-            <div style={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.4 }}>
-              Hourly pay or salary + Job tab bonuses + Overtime (1.5×) − lawful penalties = <strong>Gross Pay</strong>.
-            </div>
-          </div>
-
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10, padding: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#D97706', textTransform: 'uppercase', marginBottom: 4 }}>
-              Step 3: Taxes &amp; Social Security
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 650, color: '#0F172A', marginBottom: 4 }}>
-              Statutory Brackets
-            </div>
-            <div style={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.4 }}>
-              Government PAYE tax + 5% employee NSSF pension are subtracted. Employer pays 10% match separately.
-            </div>
-          </div>
-
-          <div style={{ border: '1.5px solid #10B981', borderRadius: 10, padding: 12, background: '#F0FDF4' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#15803D', textTransform: 'uppercase', marginBottom: 4 }}>
-              Step 4: Bank Disbursement
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#065F46', marginBottom: 4 }}>
-              💰 Net Take-Home Pay
-            </div>
-            <div style={{ fontSize: 11.5, color: '#047857', lineHeight: 1.4 }}>
-              Clean funds deposited into bank or mobile money. Payslips are published to the employee profile.
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Aggregate Stats Ribbon */}
       <StatRibbon
@@ -944,23 +836,6 @@ export default function PayrollPage() {
                 </p>
               </div>
 
-              {/* Step 1 Plain-English Explainer */}
-              <div style={{ padding: '14px 28px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569' }}>
-                  <Sparkles size={14} style={{ color: 'var(--primary, #2563EB)', flexShrink: 0 }} />
-                  <span>
-                    <strong>How this works:</strong> Clocked hours minus unpaid lunch breaks = <strong>Productive hours</strong>. If an employee worked beyond their scheduled hours, it counts as Overtime (at 1.5× pay rate) instead of regular pay.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGuideOpen(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary, #2563EB)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  View guide →
-                </button>
-              </div>
-
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 12.5 }}>
                   <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
@@ -1034,23 +909,6 @@ export default function PayrollPage() {
                 </p>
               </div>
 
-              {/* Step 2 Plain-English Explainer */}
-              <div style={{ padding: '14px 28px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569' }}>
-                  <Sparkles size={14} style={{ color: '#16A34A', flexShrink: 0 }} />
-                  <span>
-                    <strong>How this works:</strong> Regular Base Pay (Hours × Rate or salary) + Job tab bonuses + Overtime (1.5×) = <strong>Total Gross Pay</strong> before statutory deductions.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGuideOpen(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary, #2563EB)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  View guide →
-                </button>
-              </div>
-
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 12.5 }}>
                   <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
@@ -1098,23 +956,6 @@ export default function PayrollPage() {
                 </p>
               </div>
 
-              {/* Step 3 Plain-English Explainer */}
-              <div style={{ padding: '14px 28px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569' }}>
-                  <Sparkles size={14} style={{ color: '#DC2626', flexShrink: 0 }} />
-                  <span>
-                    <strong>How this works:</strong> Statutory deductions include mandatory Government PAYE Income Tax and 5% employee NSSF retirement savings. Employer NSSF (10%) is paid separately by the company.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGuideOpen(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary, #2563EB)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  View guide →
-                </button>
-              </div>
-
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 12.5 }}>
                   <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
@@ -1160,23 +1001,6 @@ export default function PayrollPage() {
                 <p className="text-xs text-4 mt-4 m-0">
                   Review the complete payroll disbursement summary. Once approved, employee payslips will be generated and available.
                 </p>
-              </div>
-
-              {/* Step 4 Plain-English Explainer */}
-              <div style={{ padding: '14px 28px', background: '#F0FDF4', borderBottom: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#166534' }}>
-                  <CheckCircle2 size={15} style={{ color: '#16A34A', flexShrink: 0 }} />
-                  <span>
-                    <strong>How this works:</strong> Final review of Net Take-Home Pay (deposited to employees) and Total Business Cost. Approving locks this pay run and generates finalized payslips for employees.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGuideOpen(true)}
-                  style={{ background: 'none', border: 'none', color: '#166534', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  View guide →
-                </button>
               </div>
 
               <div style={{ padding: 24 }}>
@@ -1483,29 +1307,6 @@ export default function PayrollPage() {
         tabs={TABS}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        actions={
-          <button
-            type="button"
-            onClick={() => setIsGuideOpen(true)}
-            className="btn-neutral btn-sm"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12.5,
-              fontWeight: 600,
-              background: '#FFFFFF',
-              color: 'var(--primary, #2563EB)',
-              border: 'none',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              padding: '7px 14px',
-              borderRadius: 8,
-              cursor: 'pointer',
-            }}
-          >
-            <HelpCircle size={15} /> How Payroll Works (Guide)
-          </button>
-        }
       />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '36px 48px', background: 'var(--bg-page)' }}>
@@ -1533,71 +1334,9 @@ export default function PayrollPage() {
                 <div style={{ fontSize: 12, color: '#64748B' }}>Model: {selectedPaystub.compensationModel.toUpperCase()} · Rate: {selectedPaystub.payRateDisplay}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                  <Badge variant="success">PAYSLIP FINALIZED</Badge>
-                  <button
-                    type="button"
-                    onClick={() => setIsGuideOpen(true)}
-                    className="btn-neutral btn-sm"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      color: '#1D4ED8',
-                      background: '#EFF6FF',
-                      borderColor: '#BFDBFE',
-                    }}
-                  >
-                    <HelpCircle size={12} /> How it works
-                  </button>
-                </div>
+                <Badge variant="success">PAYSLIP FINALIZED</Badge>
                 <div style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Period: Month {selectedPaystub.periodMonth}, {selectedPaystub.periodYear}</div>
                 <div style={{ fontSize: 12, color: '#64748B' }}>Currency: {selectedPaystub.currency}</div>
-              </div>
-            </div>
-
-            {/* Plain-English 3-Box Big Picture: Earnings - Deductions = Net Take-Home */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto 1fr auto 1.25fr',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 20,
-                background: '#F8FAFC',
-                padding: '12px 16px',
-                borderRadius: 12,
-                border: '1px solid #E2E8F0',
-              }}
-            >
-              <div style={{ background: '#FFFFFF', padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0' }}>
-                <div style={{ fontSize: 10.5, color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>1. Gross Earnings</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginTop: 2 }}>
-                  {formatMoney(selectedPaystub.grossPay, selectedPaystub.currency)}
-                </div>
-                <div style={{ fontSize: 10.5, color: '#94A3B8' }}>Base + Bonuses + OT</div>
-              </div>
-
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>−</div>
-
-              <div style={{ background: '#FEF2F2', padding: '10px 14px', borderRadius: 8, border: '1px solid #FECACA' }}>
-                <div style={{ fontSize: 10.5, color: '#991B1B', fontWeight: 700, textTransform: 'uppercase' }}>2. Statutory Deductions</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#DC2626', marginTop: 2 }}>
-                  -{formatMoney(selectedPaystub.employeeDeductions, selectedPaystub.currency)}
-                </div>
-                <div style={{ fontSize: 10.5, color: '#EF4444' }}>PAYE Tax + 5% Pension</div>
-              </div>
-
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>=</div>
-
-              <div style={{ background: '#ECFDF5', padding: '10px 16px', borderRadius: 8, border: '2px solid #10B981' }}>
-                <div style={{ fontSize: 10.5, color: '#065F46', fontWeight: 700, textTransform: 'uppercase' }}>3. Net Take-Home Pay</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#059669', marginTop: 2 }}>
-                  {formatMoney(selectedPaystub.netPay, selectedPaystub.currency)}
-                </div>
-                <div style={{ fontSize: 10.5, color: '#10B981' }}>Deposited into employee account</div>
               </div>
             </div>
 
@@ -1880,13 +1619,6 @@ export default function PayrollPage() {
           </div>
         </Modal>
       )}
-
-      {/* MODAL: PAYROLL PLAIN-ENGLISH GUIDE */}
-      <PayrollGuideModal
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
-        isEmployeeView={false}
-      />
     </div>
   );
 }
