@@ -20,7 +20,6 @@ import {
   AtSign,
   ChevronDown,
   ChevronRight,
-  Sparkles,
   ShieldAlert,
   Pin,
   Building2,
@@ -33,7 +32,6 @@ import {
   FileText,
   Maximize2,
   Play,
-  Zap,
   Bold,
   Italic,
   Strikethrough,
@@ -58,6 +56,7 @@ import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
 import { RichMessageContent, PollCard } from '@/components/chat/RichMessageContent';
 import { WysiwygChatEditor, WysiwygEditorRef } from '@/components/chat/WysiwygChatEditor';
+import { GifIcon, AnimatedEmojiIcon } from '@/components/chat/ChatCustomIcons';
 import {
   requestNotificationPermission,
   playNotificationSound,
@@ -3700,9 +3699,9 @@ export default function GroupChatPage() {
                           gap: 4,
                           cursor: 'pointer',
                         }}
-                        title="Inline Animated Emojis (added after text)"
+                        title="Animated Emojis"
                       >
-                        <Zap size={11.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <AnimatedEmojiIcon size={12.5} style={{ color: 'var(--primary, #A238FF)' }} />
                         <span>Animated</span>
                       </button>
 
@@ -3732,9 +3731,9 @@ export default function GroupChatPage() {
                           gap: 4,
                           cursor: 'pointer',
                         }}
-                        title="Live Tenor GIF Search (mix with text)"
+                        title="Search GIFs"
                       >
-                        <Sparkles size={11.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <GifIcon size={13} style={{ color: 'var(--primary, #A238FF)' }} />
                         <span>GIF</span>
                       </button>
 

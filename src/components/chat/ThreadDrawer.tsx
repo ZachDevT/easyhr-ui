@@ -16,10 +16,7 @@ import {
   Italic,
   Strikethrough,
   Code,
-  List,
   Quote,
-  Zap,
-  Sparkles,
 } from 'lucide-react';
 import { ChatMessage, useChat } from '@/context/ChatContext';
 import { EmojiGifPicker, PickerTab } from './EmojiGifPicker';
@@ -28,6 +25,7 @@ import { RichMessageContent, PollCard } from './RichMessageContent';
 import { WysiwygChatEditor, WysiwygEditorRef } from './WysiwygChatEditor';
 import { useRole } from '@/context/RoleContext';
 import { downloadChatAttachment } from '@/utils/chatMedia';
+import { GifIcon, AnimatedEmojiIcon } from './ChatCustomIcons';
 
 interface ThreadDrawerProps {
   parentMessage: ChatMessage;
@@ -941,7 +939,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 }}
                 title="Animated Emojis"
               >
-                <Zap size={14} />
+                <AnimatedEmojiIcon size={14.5} />
               </button>
               <button
                 type="button"
@@ -963,7 +961,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 }}
                 title="GIFs"
               >
-                <Sparkles size={14} />
+                <GifIcon size={14.5} />
               </button>
               <button
                 type="button"

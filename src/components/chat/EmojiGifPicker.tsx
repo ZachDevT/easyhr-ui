@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Smile, Search, Sparkles, X, Zap, Loader2, Plus } from 'lucide-react';
+import { Smile, Search, X, Loader2, Plus } from 'lucide-react';
+import { GifIcon, AnimatedEmojiIcon } from './ChatCustomIcons';
 
 export type PickerTab = 'emoji' | 'animated' | 'gif';
 
@@ -484,7 +485,7 @@ export function EmojiGifPicker({
               cursor: 'pointer',
             }}
           >
-            <Zap size={13.5} />
+            <AnimatedEmojiIcon size={14} />
             <span>Animated ({ANIMATED_EMOJI_CODES.length})</span>
           </button>
 
@@ -507,7 +508,7 @@ export function EmojiGifPicker({
               cursor: 'pointer',
             }}
           >
-            <Sparkles size={13.5} />
+            <GifIcon size={14} />
             <span>GIFs</span>
           </button>
         </div>
