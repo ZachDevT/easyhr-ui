@@ -706,13 +706,7 @@ export default function GroupChatPage() {
               onClick={() => {
                 setActiveChatTab('channels');
                 if (activeChannel?.channelType === 'dm' || activeChannel?.channelType === 'group_dm') {
-                  const firstGen =
-                    generalChannels[0] ||
-                    channels.find((c) => c.channelType !== 'dm' && c.channelType !== 'group_dm') ||
-                    channels[0];
-                  if (firstGen) {
-                    setActiveChannelId(firstGen.id);
-                  }
+                  setActiveChannelId('');
                 }
               }}
               style={{
@@ -4770,7 +4764,7 @@ export default function GroupChatPage() {
                 margin: '0 0 6px 0',
               }}
             >
-              {activeChatTab === 'dms' ? 'EasyHR DMs' : 'Select a Channel'}
+              {activeChatTab === 'dms' ? 'Select a conversation to start' : 'Select a channel to start'}
             </h3>
 
             <p
@@ -4783,7 +4777,7 @@ export default function GroupChatPage() {
               }}
             >
               {activeChatTab === 'dms'
-                ? 'Send and receive messages with your coworkers directly and securely. Select a chat from the left or start a new conversation.'
+                ? 'Send and receive messages with your coworkers directly and securely. Choose a chat from the left or start a new conversation.'
                 : 'Choose a channel from the left sidebar to start chatting, sharing files, and collaborating.'}
             </p>
 

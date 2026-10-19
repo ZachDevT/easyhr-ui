@@ -376,13 +376,12 @@ const isSetupOrPublicRoute = () => {
         const serverChannels = (data.channels || []).map(mapBackendChannel);
         if (serverChannels.length > 0) {
           setChannels(serverChannels);
-          // If activeChannel is not in the list, default to general or first channel
+          // Preserve activeChannelId only if already set and present in serverChannels; otherwise do not auto-select
           setActiveChannelId((prev) => {
             if (prev && serverChannels.some((c: ChatChannel) => c.id === prev)) {
               return prev;
             }
-            const gen = serverChannels.find((c: ChatChannel) => c.name.toLowerCase() === 'general');
-            return gen ? gen.id : serverChannels[0].id;
+            return '';
           });
         }
       }
@@ -845,7 +844,8 @@ const isSetupOrPublicRoute = () => {
 
   // Derived Active Channel
   const activeChannel = useMemo(() => {
-    return channels.find((c) => c.id === activeChannelId) || channels[0] || null;
+    if (!activeChannelId) return null;
+    return channels.find((c) => c.id === activeChannelId) || null;
   }, [channels, activeChannelId]);
 
   // Messages for Active Channel
