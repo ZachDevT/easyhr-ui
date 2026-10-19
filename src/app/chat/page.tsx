@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Hash,
@@ -473,6 +473,33 @@ export default function GroupChatPage() {
     () => messages.filter((m) => m.pinned).length,
     [messages]
   );
+
+  // Helper to format reaction tooltip with participant names
+  const getReactionUsersTooltip = useCallback((users: string[] = [], emoji: string) => {
+    if (!users || users.length === 0) return '';
+    const names = users.map((uid) => {
+      if (uid === currentUserId || uid === 'user' || (currentUserEmpId && uid === currentUserEmpId)) {
+        return 'You';
+      }
+      const emp = allEmployees.find((e) => String(e.id) === String(uid));
+      if (emp) {
+        const full = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+        return full || emp.firstName || 'Coworker';
+      }
+      return 'Coworker';
+    });
+
+    const uniqueNames = Array.from(new Set(names)).sort((a, b) => (a === 'You' ? -1 : b === 'You' ? 1 : 0));
+    if (uniqueNames.length === 0) return '';
+    if (uniqueNames.length === 1) {
+      return `${uniqueNames[0]} reacted with ${emoji}`;
+    }
+    if (uniqueNames.length === 2) {
+      return `${uniqueNames[0]} and ${uniqueNames[1]} reacted with ${emoji}`;
+    }
+    const remaining = uniqueNames.length - 2;
+    return `${uniqueNames[0]}, ${uniqueNames[1]} and ${remaining} other${remaining > 1 ? 's' : ''} reacted with ${emoji}`;
+  }, [allEmployees, currentUserId, currentUserEmpId]);
 
   // Resolve channel members list
   const channelMembers = useMemo(() => {
@@ -1059,7 +1086,7 @@ export default function GroupChatPage() {
                             size={13.5}
                             style={{
                               color: isActive
-                                ? 'var(--primary, #A238FF)'
+                                ? 'var(--primary, #2563EB)'
                                 : 'var(--text-3, #A1A1AA)',
                               flexShrink: 0,
                             }}
@@ -1069,7 +1096,7 @@ export default function GroupChatPage() {
                             size={14}
                             style={{
                               color: isActive
-                                ? 'var(--primary, #A238FF)'
+                                ? 'var(--primary, #2563EB)'
                                 : 'var(--text-3, #A1A1AA)',
                               flexShrink: 0,
                             }}
@@ -1092,7 +1119,7 @@ export default function GroupChatPage() {
                             fontSize: 10.5,
                             padding: '1px 6px',
                             borderRadius: 999,
-                            background: 'var(--primary, #A238FF)',
+                            background: 'var(--primary, #2563EB)',
                             color: '#FFFFFF',
                           }}
                         >
@@ -1276,7 +1303,7 @@ export default function GroupChatPage() {
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />
                             ) : dmInfo?.isGroup ? (
-                              <Users size={11} style={{ color: 'var(--primary, #A238FF)' }} />
+                              <Users size={11} style={{ color: 'var(--primary, #2563EB)' }} />
                             ) : (
                               (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
                             )}
@@ -1315,7 +1342,7 @@ export default function GroupChatPage() {
                             fontSize: 10,
                             padding: '1px 6px',
                             borderRadius: 999,
-                            background: 'var(--primary, #A238FF)',
+                            background: 'var(--primary, #2563EB)',
                             color: '#FFFFFF',
                             fontWeight: 700,
                           }}
@@ -1455,7 +1482,7 @@ export default function GroupChatPage() {
                                 fontSize: 10,
                                 padding: '1px 6px',
                                 borderRadius: 999,
-                                background: 'var(--primary, #A238FF)',
+                                background: 'var(--primary, #2563EB)',
                                 color: '#FFFFFF',
                                 fontWeight: 700,
                               }}
@@ -1525,7 +1552,7 @@ export default function GroupChatPage() {
                                       size={12.5}
                                       style={{
                                         color: isActive
-                                          ? 'var(--primary, #A238FF)'
+                                          ? 'var(--primary, #2563EB)'
                                           : 'var(--text-3, #A1A1AA)',
                                         flexShrink: 0,
                                       }}
@@ -1535,7 +1562,7 @@ export default function GroupChatPage() {
                                       size={13}
                                       style={{
                                         color: isActive
-                                          ? 'var(--primary, #A238FF)'
+                                          ? 'var(--primary, #2563EB)'
                                           : 'var(--text-3, #A1A1AA)',
                                         flexShrink: 0,
                                       }}
@@ -1558,7 +1585,7 @@ export default function GroupChatPage() {
                                       fontSize: 10,
                                       padding: '1px 6px',
                                       borderRadius: 999,
-                                      background: 'var(--primary, #A238FF)',
+                                      background: 'var(--primary, #2563EB)',
                                       color: '#FFFFFF',
                                       fontWeight: 700,
                                     }}
@@ -1808,19 +1835,19 @@ export default function GroupChatPage() {
                             width: 36,
                             height: 36,
                             borderRadius: '50%',
-                            background: dmInfo?.isGroup ? '#F5F3FF' : '#FAF9F7',
-                            border: dmInfo?.isGroup ? '1px solid #DDD6FE' : '1px solid var(--card-border, #E4E4E7)',
+                            background: dmInfo?.isGroup ? 'var(--primary-tint, #EFF6FF)' : '#FAF9F7',
+                            border: dmInfo?.isGroup ? '1px solid var(--primary-tint, #DBEAFE)' : '1px solid var(--card-border, #E4E4E7)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: 11,
                             fontWeight: 700,
                             overflow: 'hidden',
-                            color: dmInfo?.isGroup ? '#7C3AED' : 'var(--text-1, #18181B)',
+                            color: dmInfo?.isGroup ? 'var(--primary, #2563EB)' : 'var(--text-1, #18181B)',
                           }}
                         >
                           {dmInfo?.isGroup ? (
-                            <Users size={16} style={{ color: '#7C3AED' }} />
+                            <Users size={16} style={{ color: 'var(--primary, #2563EB)' }} />
                           ) : dmInfo?.avatar ? (
                             <img
                               src={dmInfo.avatar}
@@ -1865,9 +1892,9 @@ export default function GroupChatPage() {
                                   fontWeight: 700,
                                   padding: '1px 5px',
                                   borderRadius: 4,
-                                  background: '#F5F3FF',
-                                  color: '#6D28D9',
-                                  border: '1px solid #DDD6FE',
+                                  background: 'var(--primary-tint, #EFF6FF)',
+                                  color: 'var(--primary, #2563EB)',
+                                  border: '1px solid var(--primary-tint, #DBEAFE)',
                                   textTransform: 'uppercase',
                                   letterSpacing: '0.04em',
                                   flexShrink: 0,
@@ -2029,21 +2056,21 @@ export default function GroupChatPage() {
                               width: 32,
                               height: 32,
                               borderRadius: '50%',
-                              background: dmInfo?.isGroup ? '#F5F3FF' : '#FAF9F7',
+                              background: dmInfo?.isGroup ? 'var(--primary-tint, #EFF6FF)' : '#FAF9F7',
                               border: dmInfo?.isGroup
-                                ? '1px solid #DDD6FE'
+                                ? '1px solid var(--primary-tint, #DBEAFE)'
                                 : '1px solid var(--card-border, #E4E4E7)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               fontSize: 11,
                               fontWeight: 700,
-                              color: 'var(--text-1, #18181B)',
+                              color: dmInfo?.isGroup ? 'var(--primary, #2563EB)' : 'var(--text-1, #18181B)',
                               overflow: 'hidden',
                             }}
                           >
                             {dmInfo?.isGroup ? (
-                              <Users size={16} style={{ color: '#7C3AED' }} />
+                              <Users size={16} style={{ color: 'var(--primary, #2563EB)' }} />
                             ) : dmInfo?.avatar ? (
                               <img
                                 src={dmInfo.avatar}
@@ -2099,9 +2126,9 @@ export default function GroupChatPage() {
                                   fontWeight: 700,
                                   padding: '1px 6px',
                                   borderRadius: 4,
-                                  background: '#F5F3FF',
-                                  color: '#6D28D9',
-                                  border: '1px solid #DDD6FE',
+                                  background: 'var(--primary-tint, #EFF6FF)',
+                                  color: 'var(--primary, #2563EB)',
+                                  border: '1px solid var(--primary-tint, #DBEAFE)',
                                   textTransform: 'uppercase',
                                   letterSpacing: '0.04em',
                                   flexShrink: 0,
@@ -2577,7 +2604,7 @@ export default function GroupChatPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                  <ShieldAlert size={15} style={{ color: 'var(--primary, #A238FF)' }} />
+                  <ShieldAlert size={15} style={{ color: 'var(--primary, #2563EB)' }} />
                   <span>
                     <strong>{activeChannel.pendingRequestUserIds.length}</strong> pending request
                     {activeChannel.pendingRequestUserIds.length === 1 ? '' : 's'} to join{' '}
@@ -2616,7 +2643,7 @@ export default function GroupChatPage() {
                             padding: '2px 7px',
                             borderRadius: 6,
                             border: 'none',
-                            background: 'var(--primary, #A238FF)',
+                            background: 'var(--primary, #2563EB)',
                             color: '#FFFFFF',
                             fontSize: 11,
                             cursor: 'pointer',
@@ -2720,7 +2747,7 @@ export default function GroupChatPage() {
                         fontSize: 12.5,
                       }}
                     >
-                      <Check size={14} style={{ color: 'var(--primary, #A238FF)' }} />
+                      <Check size={14} style={{ color: 'var(--primary, #2563EB)' }} />
                       <span>Access request sent · Pending admin approval</span>
                     </div>
                   ) : (
@@ -2837,8 +2864,8 @@ export default function GroupChatPage() {
                               width: 38,
                               height: 38,
                               borderRadius: '50%',
-                              background: '#FFFFFF',
-                              border: '1px solid var(--card-border, #E4E4E7)',
+                              background: dmInfo?.isGroup ? 'var(--primary-tint, #EFF6FF)' : '#FFFFFF',
+                              border: dmInfo?.isGroup ? '1px solid var(--primary-tint, #DBEAFE)' : '1px solid var(--card-border, #E4E4E7)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -2850,7 +2877,7 @@ export default function GroupChatPage() {
                             }}
                           >
                             {dmInfo?.isGroup ? (
-                              <Users size={18} style={{ color: '#7C3AED' }} />
+                              <Users size={18} style={{ color: 'var(--primary, #2563EB)' }} />
                             ) : dmInfo?.avatar ? (
                               <img
                                 src={dmInfo.avatar}
@@ -3038,7 +3065,7 @@ export default function GroupChatPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--primary, #A238FF)',
+                        color: 'var(--primary, #2563EB)',
                       }}
                     >
                       <MessageSquare size={20} />
@@ -3299,8 +3326,8 @@ export default function GroupChatPage() {
                                   fontSize: 10.5,
                                   padding: '1px 6px',
                                   borderRadius: 6,
-                                  background: 'var(--primary-light, #F5EBFF)',
-                                  color: 'var(--primary, #A238FF)',
+                                  background: 'var(--primary-tint, #EFF6FF)',
+                                  color: 'var(--primary, #2563EB)',
                                 }}
                               >
                                 <Pin size={10} />
@@ -3532,7 +3559,7 @@ export default function GroupChatPage() {
                                       title={`Download ${att.name}`}
                                     >
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                                        <FileText size={18} style={{ color: 'var(--primary, #A238FF)', flexShrink: 0 }} />
+                                        <FileText size={18} style={{ color: 'var(--primary, #2563EB)', flexShrink: 0 }} />
                                         <div style={{ overflow: 'hidden' }}>
                                           <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</div>
                                           {att.size && (
@@ -3549,8 +3576,8 @@ export default function GroupChatPage() {
                                           gap: 4,
                                           padding: '4px 8px',
                                           borderRadius: 6,
-                                          background: 'var(--primary-light, #F5EBFF)',
-                                          color: 'var(--primary, #A238FF)',
+                                          background: 'var(--primary-tint, #EFF6FF)',
+                                          color: 'var(--primary, #2563EB)',
                                           fontSize: 11,
                                           fontWeight: 600,
                                           flexShrink: 0,
@@ -3581,33 +3608,42 @@ export default function GroupChatPage() {
                               {Object.values(msg.reactions).map((r) => {
                                 const hasReacted =
                                   r.users.includes(currentUserId) || r.users.includes('user');
+                                const tooltipText = getReactionUsersTooltip(r.users, r.emoji);
                                 return (
-                                  <button
-                                    key={r.emoji}
-                                    type="button"
-                                    onClick={() => toggleReaction(msg.id, r.emoji)}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 5,
-                                      padding: '3px 9px',
-                                      borderRadius: 999,
-                                      fontSize: 12,
-                                      border: hasReacted
-                                        ? '1px solid var(--primary, #A238FF)'
-                                        : '1px solid var(--card-border, #E4E4E7)',
-                                      background: hasReacted
-                                        ? 'var(--primary-light, #F5EBFF)'
-                                        : '#FFFFFF',
-                                      color: hasReacted
-                                        ? 'var(--primary, #A238FF)'
-                                        : 'var(--text-1, #18181B)',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    <span>{r.emoji}</span>
-                                    <span style={{ fontSize: 11 }}>{r.count}</span>
-                                  </button>
+                                  <div key={r.emoji} className="tooltip-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleReaction(msg.id, r.emoji)}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        padding: '3px 9px',
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        border: hasReacted
+                                          ? '1px solid var(--primary, #2563EB)'
+                                          : '1px solid var(--card-border, #E4E4E7)',
+                                        background: hasReacted
+                                          ? 'var(--primary-tint, #EFF6FF)'
+                                          : '#FFFFFF',
+                                        color: hasReacted
+                                          ? 'var(--primary, #2563EB)'
+                                          : 'var(--text-1, #18181B)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.12s ease',
+                                      }}
+                                      aria-label={tooltipText || `${r.count} reactions`}
+                                    >
+                                      <span>{r.emoji}</span>
+                                      <span style={{ fontSize: 11, fontWeight: 600 }}>{r.count}</span>
+                                    </button>
+                                    {tooltipText && (
+                                      <span className="tooltip-bubble" style={{ bottom: 'calc(100% + 6px)' }}>
+                                        {tooltipText}
+                                      </span>
+                                    )}
+                                  </div>
                                 );
                               })}
                             </div>
@@ -3698,7 +3734,7 @@ export default function GroupChatPage() {
                                   })}
                                 </div>
 
-                                <span style={{ color: 'var(--primary, #A238FF)' }}>
+                                <span style={{ color: 'var(--primary, #2563EB)' }}>
                                   {msg.replyCount} {msg.replyCount === 1 ? 'Message' : 'Messages'}
                                 </span>
                                 <span style={{ color: 'var(--text-3, #A1A1AA)', fontSize: 11 }}>
@@ -3793,7 +3829,7 @@ export default function GroupChatPage() {
                                 border: 'none',
                                 background: 'transparent',
                                 color: msg.pinned
-                                  ? 'var(--primary, #A238FF)'
+                                  ? 'var(--primary, #2563EB)'
                                   : 'var(--text-2, #52525B)',
                                 borderRadius: 6,
                                 cursor: 'pointer',
@@ -3924,8 +3960,8 @@ export default function GroupChatPage() {
                             width: 26,
                             height: 26,
                             borderRadius: 7,
-                            background: 'var(--primary-light, #F5EBFF)',
-                            color: 'var(--primary, #A238FF)',
+                            background: 'var(--primary-tint, #EFF6FF)',
+                            color: 'var(--primary, #2563EB)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -4022,7 +4058,7 @@ export default function GroupChatPage() {
                                 gap: 4,
                                 fontSize: 11,
                                 fontWeight: 600,
-                                color: 'var(--primary, #A238FF)',
+                                color: 'var(--primary, #2563EB)',
                                 background: 'transparent',
                                 border: 'none',
                                 cursor: 'pointer',
@@ -4133,7 +4169,7 @@ export default function GroupChatPage() {
                             type="checkbox"
                             checked={pollAllowMultiple}
                             onChange={(e) => setPollAllowMultiple(e.target.checked)}
-                            style={{ accentColor: 'var(--primary, #A238FF)' }}
+                            style={{ accentColor: 'var(--primary, #2563EB)' }}
                           />
                           <span>Allow multiple choices</span>
                         </label>
@@ -4152,7 +4188,7 @@ export default function GroupChatPage() {
                             type="checkbox"
                             checked={pollAnonymous}
                             onChange={(e) => setPollAnonymous(e.target.checked)}
-                            style={{ accentColor: 'var(--primary, #A238FF)' }}
+                            style={{ accentColor: 'var(--primary, #2563EB)' }}
                           />
                           <span>Anonymous votes</span>
                         </label>
@@ -4218,7 +4254,7 @@ export default function GroupChatPage() {
                           background:
                             pollQuestion.trim() &&
                             pollOptions.filter((o) => o.trim()).length >= 2
-                              ? 'var(--primary, #A238FF)'
+                              ? 'var(--primary, #2563EB)'
                               : '#E4E4E7',
                           color:
                             pollQuestion.trim() &&
@@ -4357,7 +4393,7 @@ export default function GroupChatPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--primary, #A238FF)',
+                        color: 'var(--primary, #2563EB)',
                         flexShrink: 0,
                       }}
                     >
@@ -4418,9 +4454,9 @@ export default function GroupChatPage() {
                             gap: 8,
                             padding: '6px 10px',
                             borderRadius: 9,
-                            background: 'var(--primary-light, #F5EBFF)',
+                            background: 'var(--primary-tint, #EFF6FF)',
                             border: '1px solid rgba(162, 56, 255, 0.28)',
-                            color: 'var(--primary, #A238FF)',
+                            color: 'var(--primary, #2563EB)',
                             fontSize: 12,
                             fontWeight: 600,
                           }}
@@ -4435,7 +4471,7 @@ export default function GroupChatPage() {
                             style={{
                               border: 'none',
                               background: 'transparent',
-                              color: 'var(--primary, #A238FF)',
+                              color: 'var(--primary, #2563EB)',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
@@ -4513,7 +4549,7 @@ export default function GroupChatPage() {
                               fontSize: 12,
                             }}
                           >
-                            <Paperclip size={12} style={{ color: 'var(--primary, #A238FF)' }} />
+                            <Paperclip size={12} style={{ color: 'var(--primary, #2563EB)' }} />
                             <span>{att.name}</span>
                             <button
                               type="button"
@@ -4619,11 +4655,11 @@ export default function GroupChatPage() {
                           border: '1px solid var(--card-border, #E4E4E7)',
                           background:
                             showPicker && pickerTab === 'emoji'
-                              ? 'var(--primary-light, #F5EBFF)'
+                              ? 'var(--primary-tint, #EFF6FF)'
                               : '#FFFFFF',
                           color:
                             showPicker && pickerTab === 'emoji'
-                              ? 'var(--primary, #A238FF)'
+                              ? 'var(--primary, #2563EB)'
                               : 'var(--text-2, #52525B)',
                           fontSize: 11,
                           display: 'inline-flex',
@@ -4633,7 +4669,7 @@ export default function GroupChatPage() {
                         }}
                         title="Standard Emojis (520+)"
                       >
-                        <Smile size={12.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <Smile size={12.5} style={{ color: 'var(--primary, #2563EB)' }} />
                         <span>Emojis</span>
                       </button>
 
@@ -4651,11 +4687,11 @@ export default function GroupChatPage() {
                           border: '1px solid var(--card-border, #E4E4E7)',
                           background:
                             showPicker && pickerTab === 'animated'
-                              ? 'var(--primary-light, #F5EBFF)'
+                              ? 'var(--primary-tint, #EFF6FF)'
                               : '#FFFFFF',
                           color:
                             showPicker && pickerTab === 'animated'
-                              ? 'var(--primary, #A238FF)'
+                              ? 'var(--primary, #2563EB)'
                               : 'var(--text-2, #52525B)',
                           fontSize: 11,
                           display: 'inline-flex',
@@ -4665,7 +4701,7 @@ export default function GroupChatPage() {
                         }}
                         title="Animated Emojis"
                       >
-                        <AnimatedEmojiIcon size={12.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <AnimatedEmojiIcon size={12.5} style={{ color: 'var(--primary, #2563EB)' }} />
                         <span>Animated</span>
                       </button>
 
@@ -4683,11 +4719,11 @@ export default function GroupChatPage() {
                           border: '1px solid var(--card-border, #E4E4E7)',
                           background:
                             showPicker && pickerTab === 'gif'
-                              ? 'var(--primary-light, #F5EBFF)'
+                              ? 'var(--primary-tint, #EFF6FF)'
                               : '#FFFFFF',
                           color:
                             showPicker && pickerTab === 'gif'
-                              ? 'var(--primary, #A238FF)'
+                              ? 'var(--primary, #2563EB)'
                               : 'var(--text-2, #52525B)',
                           fontSize: 11,
                           display: 'inline-flex',
@@ -4697,7 +4733,7 @@ export default function GroupChatPage() {
                         }}
                         title="Search GIFs"
                       >
-                        <GifIcon size={13} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <GifIcon size={13} style={{ color: 'var(--primary, #2563EB)' }} />
                         <span>GIF</span>
                       </button>
 
@@ -4712,13 +4748,13 @@ export default function GroupChatPage() {
                           padding: '0 9px',
                           borderRadius: 6,
                           border: showPollBuilder
-                            ? '1px solid var(--primary, #A238FF)'
+                            ? '1px solid var(--primary, #2563EB)'
                             : '1px solid var(--card-border, #E4E4E7)',
                           background: showPollBuilder
-                            ? 'var(--primary-light, #F5EBFF)'
+                            ? 'var(--primary-tint, #EFF6FF)'
                             : '#FFFFFF',
                           color: showPollBuilder
-                            ? 'var(--primary, #A238FF)'
+                            ? 'var(--primary, #2563EB)'
                             : 'var(--text-2, #52525B)',
                           fontSize: 11,
                           fontWeight: 600,
@@ -4729,7 +4765,7 @@ export default function GroupChatPage() {
                         }}
                         title="Create Interactive Poll"
                       >
-                        <BarChart2 size={11.5} style={{ color: 'var(--primary, #A238FF)' }} />
+                        <BarChart2 size={11.5} style={{ color: 'var(--primary, #2563EB)' }} />
                         <span>Poll</span>
                       </button>
                     </div>
@@ -4749,7 +4785,7 @@ export default function GroupChatPage() {
                         border: 'none',
                         background:
                           inputText.trim() || uploadedAttachments.length > 0 || stagedPoll
-                            ? 'var(--primary, #A238FF)'
+                            ? 'var(--primary, #2563EB)'
                             : '#E4E4E7',
                         color:
                           inputText.trim() || uploadedAttachments.length > 0 || stagedPoll
@@ -5184,9 +5220,9 @@ export default function GroupChatPage() {
                     height: 26,
                     borderRadius: 7,
                     border: '1px solid var(--card-border, #E4E4E7)',
-                    background: showAddMemberInput ? 'var(--primary-light, #F5EBFF)' : '#FFFFFF',
+                    background: showAddMemberInput ? 'var(--primary-tint, #EFF6FF)' : '#FFFFFF',
                     color: showAddMemberInput
-                      ? 'var(--primary, #A238FF)'
+                      ? 'var(--primary, #2563EB)'
                       : 'var(--text-2, #52525B)',
                     display: 'flex',
                     alignItems: 'center',
@@ -5278,7 +5314,7 @@ export default function GroupChatPage() {
                             padding: '2px 8px',
                             borderRadius: 6,
                             border: 'none',
-                            background: 'var(--primary, #A238FF)',
+                            background: 'var(--primary, #2563EB)',
                             color: '#FFFFFF',
                             fontSize: 11,
                             cursor: 'pointer',

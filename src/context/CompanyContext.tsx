@@ -81,8 +81,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     const cleanColor = color.trim();
     if (!/^#[0-9A-Fa-f]{6}$/.test(cleanColor)) return;
     document.documentElement.style.setProperty("--primary", cleanColor);
-    document.documentElement.style.setProperty("--gradient", `linear-gradient(135deg, ${cleanColor} 0%, #2D144B 100%)`);
+    document.documentElement.style.setProperty("--gradient", `linear-gradient(135deg, ${cleanColor} 0%, color-mix(in srgb, ${cleanColor} 75%, black) 100%)`);
     document.documentElement.style.setProperty("--primary-tint", `${cleanColor}18`);
+    document.documentElement.style.setProperty("--primary-light", `${cleanColor}15`);
   }, []);
 
   // Hydrate cached company, userProfile, and locations on client mount (prevents SSR hydration mismatch #418)
@@ -218,7 +219,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           contactEmail: data.legalProfile?.contactEmail || data.user?.email || "",
           contactPhone: data.legalProfile?.contactPhone || "",
           industry: data.legalProfile?.industry || "",
-          brandColor: data.workspace?.brandColor || "#A238FF",
+          brandColor: data.workspace?.brandColor || "#2563EB",
           logoUrl: data.workspace?.logoUrl || "",
           subdomain: data.workspace?.subdomain || "",
           countryCode: data.organization?.countryCode || "UG",

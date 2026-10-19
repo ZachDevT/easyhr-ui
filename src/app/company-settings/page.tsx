@@ -49,7 +49,7 @@ export default function CompanySettingsPage() {
   const [industry, setIndustry] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [city, setCity] = useState("");
-  const [brandColor, setBrandColor] = useState("#A238FF");
+  const [brandColor, setBrandColor] = useState("#2563EB");
   const [logoDataUrl, setLogoDataUrl] = useState("");
 
   // Location modal states
@@ -78,7 +78,7 @@ export default function CompanySettingsPage() {
       setIndustry(company.industry || "Technology");
       setAddressLine1(company.addressLine1 || "");
       setCity(company.city || "Kampala");
-      setBrandColor(company.brandColor || "#A238FF");
+      setBrandColor(company.brandColor || "#2563EB");
       setLogoDataUrl(company.logoUrl || "");
     }
   }, [company]);
@@ -528,11 +528,11 @@ export default function CompanySettingsPage() {
                     <Input
                       value={brandColor}
                       onChange={(e) => setBrandColor(e.target.value)}
-                      placeholder="#A238FF"
+                      placeholder="#2563EB"
                     />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    {["#A238FF", "#2563EB", "#059669", "#EA580C", "#DC2626", "#4F46E5"].map((swatch) => (
+                    {["#2563EB", "#059669", "#EA580C", "#DC2626", "#4F46E5", "#0F172A"].map((swatch) => (
                       <button
                         key={swatch}
                         type="button"

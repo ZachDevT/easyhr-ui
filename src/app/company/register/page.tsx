@@ -312,7 +312,7 @@ export default function CompanyRegistration() {
         contactEmail: form.contactEmail || form.creatorEmail || undefined,
         contactPhone: form.contactPhone || form.creatorPhone || undefined,
         subdomain: cleanSubdomain,
-        brandColor: form.color && /^#[0-9A-Fa-f]{6}$/.test(form.color) ? form.color : "#A238FF",
+        brandColor: form.color && /^#[0-9A-Fa-f]{6}$/.test(form.color) ? form.color : "#2563EB",
         socialLinks: (() => {
           const links: Record<string, string> = {};
           const formatUrl = (u: string) => {

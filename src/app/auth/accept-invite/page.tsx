@@ -513,7 +513,7 @@ function AcceptInviteContent() {
             width: 44,
             height: 44,
             borderRadius: 10,
-            background: "var(--gradient, linear-gradient(135deg, #A238FF, #FF3EA5))",
+            background: "var(--gradient, var(--gradient))",
             color: "white",
             display: "grid",
             placeItems: "center",

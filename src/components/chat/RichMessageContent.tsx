@@ -38,7 +38,7 @@ function renderInlineTokens(text: string, keyPrefix = 'in'): React.ReactNode[] {
           target="_blank"
           rel="noreferrer"
           style={{
-            color: 'var(--primary, #A238FF)',
+            color: 'var(--primary, #2563EB)',
             textDecoration: 'underline',
             textUnderlineOffset: 2,
             fontWeight: 500,
@@ -126,7 +126,7 @@ function renderInlineTokens(text: string, keyPrefix = 'in'): React.ReactNode[] {
             padding: '1px 6px',
             borderRadius: 6,
             background: 'var(--primary-light, #F5EBFF)',
-            color: 'var(--primary, #A238FF)',
+            color: 'var(--primary, #2563EB)',
             fontSize: 12.5,
             fontWeight: 600,
           }}
@@ -145,7 +145,7 @@ function renderInlineTokens(text: string, keyPrefix = 'in'): React.ReactNode[] {
           target="_blank"
           rel="noreferrer"
           style={{
-            color: 'var(--primary, #A238FF)',
+            color: 'var(--primary, #2563EB)',
             textDecoration: 'underline',
             textUnderlineOffset: 2,
           }}
@@ -212,7 +212,7 @@ export function RichMessageContent({ content }: { content: string }) {
                   <div
                     key={lineKey}
                     style={{
-                      borderLeft: '3px solid var(--primary, #A238FF)',
+                      borderLeft: '3px solid var(--primary, #2563EB)',
                       paddingLeft: 10,
                       margin: '4px 0',
                       color: 'var(--text-2, #52525B)',
@@ -237,7 +237,7 @@ export function RichMessageContent({ content }: { content: string }) {
                       margin: '2px 0',
                     }}
                   >
-                    <span style={{ color: 'var(--primary, #A238FF)', fontWeight: 700 }}>•</span>
+                    <span style={{ color: 'var(--primary, #2563EB)', fontWeight: 700 }}>•</span>
                     <span>{renderInlineTokens(line.slice(2), lineKey)}</span>
                   </div>
                 );
@@ -339,7 +339,7 @@ export function PollCard({
               height: 32,
               borderRadius: 8,
               background: 'var(--primary-tint, #F5EBFF)',
-              color: 'var(--primary, #A238FF)',
+              color: 'var(--primary, #2563EB)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -419,7 +419,7 @@ export function PollCard({
                 padding: '10px 12px',
                 borderRadius: 10,
                 border: hasVoted
-                  ? '1.5px solid var(--primary, #A238FF)'
+                  ? '1.5px solid var(--primary, #2563EB)'
                   : '1px solid var(--card-border, #E4E4E7)',
                 background: '#FFFFFF',
                 cursor: poll.closed ? 'default' : 'pointer',
@@ -459,7 +459,7 @@ export function PollCard({
                       border: hasVoted
                         ? 'none'
                         : '1.5px solid var(--text-3, #A1A1AA)',
-                      background: hasVoted ? 'var(--primary, #A238FF)' : '#FFFFFF',
+                      background: hasVoted ? 'var(--primary, #2563EB)' : '#FFFFFF',
                       color: '#FFFFFF',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -527,7 +527,7 @@ export function PollCard({
                     style={{
                       fontSize: 11.5,
                       fontWeight: 700,
-                      color: hasVoted ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+                      color: hasVoted ? 'var(--primary, #2563EB)' : 'var(--text-2, #52525B)',
                       minWidth: 32,
                       textAlign: 'right',
                     }}

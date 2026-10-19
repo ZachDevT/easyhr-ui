@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X,
   Send,
@@ -36,6 +36,32 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
   const { sendMessage, deleteMessage, toggleReaction, votePoll, closePoll, activeChannel, allEmployees, uploadAttachment, fetchThreadReplies } = useChat();
   const { currentUser, isHRAdmin, role } = useRole();
   const currentUserId = String(currentUser?.id || 'user');
+
+  const getReactionUsersTooltip = useCallback((users: string[] = [], emoji: string) => {
+    if (!users || users.length === 0) return '';
+    const names = users.map((uid) => {
+      if (uid === currentUserId || uid === 'user') {
+        return 'You';
+      }
+      const emp = allEmployees.find((e) => String(e.id) === String(uid));
+      if (emp) {
+        const full = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+        return full || emp.firstName || 'Coworker';
+      }
+      return 'Coworker';
+    });
+
+    const uniqueNames = Array.from(new Set(names)).sort((a, b) => (a === 'You' ? -1 : b === 'You' ? 1 : 0));
+    if (uniqueNames.length === 0) return '';
+    if (uniqueNames.length === 1) {
+      return `${uniqueNames[0]} reacted with ${emoji}`;
+    }
+    if (uniqueNames.length === 2) {
+      return `${uniqueNames[0]} and ${uniqueNames[1]} reacted with ${emoji}`;
+    }
+    const remaining = uniqueNames.length - 2;
+    return `${uniqueNames[0]}, ${uniqueNames[1]} and ${remaining} other${remaining > 1 ? 's' : ''} reacted with ${emoji}`;
+  }, [allEmployees, currentUserId]);
   const isChannelAdmin =
     activeChannel?.adminIds.includes(currentUserId) ||
     activeChannel?.adminIds.includes('user') ||
@@ -396,10 +422,10 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                             title={`Download ${att.name}`}
                           >
                             <span style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                              <Paperclip size={13} style={{ color: 'var(--primary, #A238FF)', flexShrink: 0 }} />
+                              <Paperclip size={13} style={{ color: 'var(--primary, #2563EB)', flexShrink: 0 }} />
                               <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</span>
                             </span>
-                            <span style={{ fontSize: 11, color: 'var(--primary, #A238FF)', fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>Download</span>
+                            <span style={{ fontSize: 11, color: 'var(--primary, #2563EB)', fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>Download</span>
                           </button>
                         )}
                       </div>
@@ -650,10 +676,10 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                                   title={`Download ${att.name}`}
                                 >
                                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                                    <Paperclip size={12} style={{ color: 'var(--primary, #A238FF)', flexShrink: 0 }} />
+                                    <Paperclip size={12} style={{ color: 'var(--primary, #2563EB)', flexShrink: 0 }} />
                                     <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</span>
                                   </span>
-                                  <span style={{ fontSize: 10.5, color: 'var(--primary, #A238FF)', fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>Download</span>
+                                  <span style={{ fontSize: 10.5, color: 'var(--primary, #2563EB)', fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>Download</span>
                                 </button>
                               )}
                             </div>
@@ -665,28 +691,40 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                     {/* Reply Reactions */}
                     {reply.reactions && Object.values(reply.reactions).length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                        {Object.values(reply.reactions).map((r) => (
-                          <button
-                            key={r.emoji}
-                            type="button"
-                            onClick={() => toggleReaction(reply.id, r.emoji, parentMessage.id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              padding: '2px 7px',
-                              borderRadius: 999,
-                              fontSize: 11,
-                              background: '#F4F4F5',
-                              border: '1px solid var(--card-border, #E4E4E7)',
-                              color: 'var(--text-1, #18181B)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <span>{r.emoji}</span>
-                            <span>{r.count}</span>
-                          </button>
-                        ))}
+                        {Object.values(reply.reactions).map((r) => {
+                          const hasReacted = r.users.includes(currentUserId) || r.users.includes('user');
+                          const tooltipText = getReactionUsersTooltip(r.users, r.emoji);
+                          return (
+                            <div key={r.emoji} className="tooltip-wrap">
+                              <button
+                                type="button"
+                                onClick={() => toggleReaction(reply.id, r.emoji, parentMessage.id)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '2px 7px',
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  background: hasReacted ? 'var(--primary-tint, #EFF6FF)' : '#F4F4F5',
+                                  border: hasReacted ? '1px solid var(--primary, #2563EB)' : '1px solid var(--card-border, #E4E4E7)',
+                                  color: hasReacted ? 'var(--primary, #2563EB)' : 'var(--text-1, #18181B)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.12s ease',
+                                }}
+                                aria-label={tooltipText || `${r.count} reactions`}
+                              >
+                                <span>{r.emoji}</span>
+                                <span style={{ fontWeight: 600 }}>{r.count}</span>
+                              </button>
+                              {tooltipText && (
+                                <span className="tooltip-bubble" style={{ bottom: 'calc(100% + 5px)' }}>
+                                  {tooltipText}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -931,7 +969,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                   borderRadius: 6,
                   border: 'none',
                   background: 'transparent',
-                  color: 'var(--primary, #A238FF)',
+                  color: 'var(--primary, #2563EB)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -953,7 +991,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                   borderRadius: 6,
                   border: 'none',
                   background: 'transparent',
-                  color: 'var(--primary, #A238FF)',
+                  color: 'var(--primary, #2563EB)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1003,7 +1041,7 @@ export function ThreadDrawer({ parentMessage, onClose }: ThreadDrawerProps) {
                 border: 'none',
                 background:
                   replyText.trim() || stagedAttachments.length > 0
-                    ? 'var(--primary, #A238FF)'
+                    ? 'var(--primary, #2563EB)'
                     : '#E4E4E7',
                 color:
                   replyText.trim() || stagedAttachments.length > 0 ? '#FFFFFF' : '#A1A1AA',

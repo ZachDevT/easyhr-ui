@@ -353,7 +353,7 @@ export const WysiwygChatEditor = forwardRef<WysiwygEditorRef, WysiwygChatEditorP
         const a = document.createElement('a');
         a.href = url;
         a.textContent = url;
-        a.style.color = 'var(--primary, #A238FF)';
+        a.style.color = 'var(--primary, #2563EB)';
         a.style.textDecoration = 'underline';
         const s = window.getSelection();
         if (s && s.rangeCount > 0) {
@@ -572,7 +572,7 @@ export const WysiwygChatEditor = forwardRef<WysiwygEditorRef, WysiwygChatEditorP
                       ? 'var(--primary-light, #F5EBFF)'
                       : 'transparent',
                     color: item.active
-                      ? 'var(--primary, #A238FF)'
+                      ? 'var(--primary, #2563EB)'
                       : 'var(--text-2, #52525B)',
                     display: 'flex',
                     alignItems: 'center',
@@ -683,7 +683,7 @@ export const WysiwygChatEditor = forwardRef<WysiwygEditorRef, WysiwygChatEditorP
           .wysiwyg-chat-input blockquote {
             margin: 4px 0;
             padding: 2px 10px;
-            border-left: 3px solid var(--primary, #A238FF);
+            border-left: 3px solid var(--primary, #2563EB);
             color: var(--text-2, #52525B);
             background: rgba(162, 56, 255, 0.04);
             border-radius: 0 6px 6px 0;

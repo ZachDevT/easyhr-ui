@@ -106,9 +106,9 @@ function ToolbarBtn({ onClick, title, active, children }: ToolbarBtnProps) {
         width: 32,
         height: 32,
         borderRadius: 6,
-        border: active ? "1.5px solid var(--primary, #A238FF)" : "1px solid transparent",
+        border: active ? "1.5px solid var(--primary, #2563EB)" : "1px solid transparent",
         background: active ? "var(--primary-tint, #F3E8FF)" : "transparent",
-        color: active ? "var(--primary, #A238FF)" : "var(--text-3, #6B6B63)",
+        color: active ? "var(--primary, #2563EB)" : "var(--text-3, #6B6B63)",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
@@ -498,7 +498,7 @@ export function RichTextEditor({
         transition: "border-color 0.15s ease",
       }}
       onFocusCapture={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "var(--primary, #A238FF)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "var(--primary, #2563EB)";
       }}
       onBlurCapture={(e) => {
         (e.currentTarget as HTMLDivElement).style.borderColor = "var(--card-border, #EAEAE4)";
@@ -628,7 +628,7 @@ export function RichTextEditor({
               borderRadius: 6,
               border: "1px solid var(--card-border, #EAEAE4)",
               background: isExpanded ? "var(--primary-tint, #F3E8FF)" : "white",
-              color: isExpanded ? "var(--primary, #A238FF)" : "var(--text-3, #6B6B63)",
+              color: isExpanded ? "var(--primary, #2563EB)" : "var(--text-3, #6B6B63)",
               cursor: "pointer",
               fontSize: 11,
               fontWeight: 600,
@@ -714,9 +714,9 @@ export function RichTextEditor({
                   fontSize: 10.5,
                   borderRadius: 4,
                   border: "1px solid",
-                  borderColor: editorHeight === p.h && !isExpanded ? "var(--primary, #A238FF)" : "var(--card-border, #EAEAE4)",
+                  borderColor: editorHeight === p.h && !isExpanded ? "var(--primary, #2563EB)" : "var(--card-border, #EAEAE4)",
                   background: editorHeight === p.h && !isExpanded ? "var(--primary-tint, #F3E8FF)" : "white",
-                  color: editorHeight === p.h && !isExpanded ? "var(--primary, #A238FF)" : "var(--text-3, #6B6B63)",
+                  color: editorHeight === p.h && !isExpanded ? "var(--primary, #2563EB)" : "var(--text-3, #6B6B63)",
                   cursor: "pointer",
                   fontWeight: editorHeight === p.h && !isExpanded ? 700 : 500,
                 }}
@@ -755,7 +755,7 @@ export function RichTextEditor({
             width: 340,
             maxWidth: "calc(100% - 24px)",
             background: "#FFFFFF",
-            border: "1.5px solid var(--primary, #A238FF)",
+            border: "1.5px solid var(--primary, #2563EB)",
             borderRadius: 12,
             boxShadow: "0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08)",
             zIndex: 1000,
@@ -778,14 +778,14 @@ export function RichTextEditor({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Sparkles size={13} style={{ color: "var(--primary, #A238FF)" }} />
+              <Sparkles size={13} style={{ color: "var(--primary, #2563EB)" }} />
               <span>TEMPLATES {slashState.query ? `MATCHING "/${slashState.query}"` : "LIST"}</span>
             </div>
             <span
               style={{
                 fontSize: 10,
                 background: "var(--primary-tint, #F3E8FF)",
-                color: "var(--primary, #A238FF)",
+                color: "var(--primary, #2563EB)",
                 padding: "2px 8px",
                 borderRadius: 4,
                 fontWeight: 800,
@@ -823,7 +823,7 @@ export function RichTextEditor({
                           fontSize: 11,
                           fontWeight: 800,
                           fontFamily: "monospace",
-                          color: "var(--primary, #A238FF)",
+                          color: "var(--primary, #2563EB)",
                           background: isSelected ? "white" : "rgba(162, 56, 255, 0.08)",
                           padding: "2px 6px",
                           borderRadius: 4,
@@ -885,8 +885,8 @@ export function RichTextEditor({
                           gap: 3,
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "var(--primary, #A238FF)";
-                          e.currentTarget.style.color = "var(--primary, #A238FF)";
+                          e.currentTarget.style.borderColor = "var(--primary, #2563EB)";
+                          e.currentTarget.style.color = "var(--primary, #2563EB)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.borderColor = "var(--card-border, #EAEAE4)";
@@ -910,7 +910,7 @@ export function RichTextEditor({
                         fontWeight: 700,
                         borderRadius: 6,
                         border: "none",
-                        background: "var(--primary, #A238FF)",
+                        background: "var(--primary, #2563EB)",
                         color: "white",
                         cursor: "pointer",
                         display: "inline-flex",

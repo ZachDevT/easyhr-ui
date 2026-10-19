@@ -285,7 +285,7 @@ export default function EmployeeProfile() {
                   }}
                 />
               ) : (
-                <span style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #A238FF)" }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #2563EB)" }}>
                   {employee.firstName.slice(0, 1).toUpperCase()}
                   {employee.lastName.slice(0, 1).toUpperCase()}
                 </span>
@@ -350,16 +350,16 @@ export default function EmployeeProfile() {
                 }}
               >
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <Building2 size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <Building2 size={13} style={{ color: "var(--primary, #2563EB)" }} />
                   <span>{employee.department}</span>
                 </span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <MapPin size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <MapPin size={13} style={{ color: "var(--primary, #2563EB)" }} />
                   <span>{employee.location || "Headquarters"}</span>
                 </span>
                 {employee.workEmail && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <Mail size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                    <Mail size={13} style={{ color: "var(--primary, #2563EB)" }} />
                     <span>{employee.workEmail}</span>
                   </span>
                 )}

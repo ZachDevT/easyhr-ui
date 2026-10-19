@@ -130,7 +130,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
                 height: 38,
                 borderRadius: 10,
                 background: 'var(--primary-light, #F5EBFF)',
-                color: 'var(--primary, #A238FF)',
+                color: 'var(--primary, #2563EB)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -293,7 +293,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
                 gap: 12,
                 padding: '12px 14px',
                 borderRadius: 12,
-                border: isPrivate ? '1px solid var(--primary, #A238FF)' : '1px solid var(--card-border, #E4E4E7)',
+                border: isPrivate ? '1px solid var(--primary, #2563EB)' : '1px solid var(--card-border, #E4E4E7)',
                 background: isPrivate ? 'var(--primary-light, #F5EBFF)' : '#FAF9F7',
                 cursor: 'pointer',
               }}
@@ -327,7 +327,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
                 checked={isPrivate}
                 onChange={(e) => setIsPrivate(e.target.checked)}
                 onClick={(e) => e.stopPropagation()}
-                style={{ width: 16, height: 16, accentColor: 'var(--primary, #A238FF)', marginTop: 4, cursor: 'pointer' }}
+                style={{ width: 16, height: 16, accentColor: 'var(--primary, #2563EB)', marginTop: 4, cursor: 'pointer' }}
               />
             </div>
 
@@ -342,7 +342,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
                 padding: '12px 14px',
                 borderRadius: 12,
                 border: departmentRestricted
-                  ? '1px solid var(--primary, #A238FF)'
+                  ? '1px solid var(--primary, #2563EB)'
                   : '1px solid var(--card-border, #E4E4E7)',
                 background: departmentRestricted ? 'var(--primary-light, #F5EBFF)' : '#FAF9F7',
                 cursor: 'pointer',
@@ -377,7 +377,7 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
                 checked={departmentRestricted}
                 onChange={(e) => setDepartmentRestricted(e.target.checked)}
                 onClick={(e) => e.stopPropagation()}
-                style={{ width: 16, height: 16, accentColor: 'var(--primary, #A238FF)', marginTop: 4, cursor: 'pointer' }}
+                style={{ width: 16, height: 16, accentColor: 'var(--primary, #2563EB)', marginTop: 4, cursor: 'pointer' }}
               />
             </div>
 
@@ -518,9 +518,9 @@ export function CreateChannelModal({ isOpen, onClose }: CreateChannelModalProps)
                         height: 18,
                         borderRadius: 5,
                         border: isSelected
-                          ? '1px solid var(--primary, #A238FF)'
+                          ? '1px solid var(--primary, #2563EB)'
                           : '1px solid var(--card-border, #E4E4E7)',
-                        background: isSelected ? 'var(--primary, #A238FF)' : '#FFFFFF',
+                        background: isSelected ? 'var(--primary, #2563EB)' : '#FFFFFF',
                         color: '#FFFFFF',
                         display: 'flex',
                         alignItems: 'center',

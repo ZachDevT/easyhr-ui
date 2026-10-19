@@ -38,7 +38,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     const borderColor = hasError
       ? 'var(--danger, #D14343)'
       : isFocused
-      ? 'var(--primary, #A238FF)'
+      ? 'var(--primary, #2563EB)'
       : 'var(--card-border, #EAEAE4)';
     const boxShadow = isFocused
       ? hasError

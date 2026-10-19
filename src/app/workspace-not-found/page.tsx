@@ -110,7 +110,7 @@ function WorkspaceNotFoundContent() {
                 justifyContent: "center",
                 gap: "8px",
                 padding: "14px 20px",
-                background: "var(--primary, #A238FF)",
+                background: "var(--primary, #2563EB)",
                 color: "#ffffff",
                 borderRadius: "10px",
                 fontWeight: 700,

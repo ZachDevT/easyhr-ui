@@ -183,8 +183,8 @@ export default function NotFound() {
               transition: "all 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--primary, #A238FF)";
-              e.currentTarget.style.color = "var(--primary, #A238FF)";
+              e.currentTarget.style.borderColor = "var(--primary, #2563EB)";
+              e.currentTarget.style.color = "var(--primary, #2563EB)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = "var(--card-border, #E2E8F0)";

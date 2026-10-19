@@ -250,7 +250,7 @@ export function TopBar() {
             fontSize: 12.5,
             fontWeight: 600,
             transition: 'all 0.16s ease',
-            boxShadow: isChatActive ? '0 4px 12px rgba(162, 56, 255, 0.22)' : '0 1px 2px rgba(0, 0, 0, 0.03)',
+            boxShadow: isChatActive ? '0 4px 12px rgba(37, 99, 235, 0.22)' : '0 1px 2px rgba(0, 0, 0, 0.03)',
           }}
         >
           {/* Custom Dual-Bubble Workspace Chat Icon */}
@@ -272,15 +272,15 @@ export function TopBar() {
             />
             <path
               d="M14.5 9.5C10.9101 9.5 8 11.9624 8 15C8 18.0376 10.9101 20.5 14.5 20.5C15.5071 20.5 16.4608 20.3061 17.3115 19.9601C18.1762 20.4912 19.373 20.9154 20.5246 21.0369C20.8878 21.0752 21.0954 20.6353 20.8387 20.376C20.2442 19.7755 19.6776 18.8199 19.3765 17.92C20.391 17.0085 21 15.7745 21 14.4167C21 11.7013 18.0899 9.5 14.5 9.5Z"
-              fill={isChatActive ? 'rgba(255,255,255,0.2)' : 'var(--primary-tint, #F5EBFF)'}
-              stroke={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'}
+              fill={isChatActive ? 'rgba(255,255,255,0.2)' : 'var(--primary-tint, #EFF6FF)'}
+              stroke={isChatActive ? '#FFFFFF' : 'var(--primary, #2563EB)'}
               strokeWidth="1.85"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            <circle cx="12.3" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'} />
-            <circle cx="14.6" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'} />
-            <circle cx="16.9" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #A238FF)'} />
+            <circle cx="12.3" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #2563EB)'} />
+            <circle cx="14.6" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #2563EB)'} />
+            <circle cx="16.9" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #2563EB)'} />
           </svg>
           <span>Chat</span>
           {chatActivityCount > 0 && (

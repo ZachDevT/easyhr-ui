@@ -664,7 +664,7 @@ function ProfileContent() {
                     style={{
                       fontSize: 24,
                       fontWeight: 700,
-                      color: "var(--primary, #A238FF)",
+                      color: "var(--primary, #2563EB)",
                     }}
                   >
                     {displayFirstName.slice(0, 1).toUpperCase()}
@@ -705,7 +705,7 @@ function ProfileContent() {
                   width: 24,
                   height: 24,
                   borderRadius: "50%",
-                  background: "var(--primary, #A238FF)",
+                  background: "var(--primary, #2563EB)",
                   color: "#FFFFFF",
                   border: "2px solid #FFFFFF",
                   display: "flex",
@@ -809,16 +809,16 @@ function ProfileContent() {
                 }}
               >
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <Building size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <Building size={13} style={{ color: "var(--primary, #2563EB)" }} />
                   <span>{employee?.department || "General"}</span>
                 </span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <MapPin size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                  <MapPin size={13} style={{ color: "var(--primary, #2563EB)" }} />
                   <span>{displayLocation}</span>
                 </span>
                 {displayEmail && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <Mail size={13} style={{ color: "var(--primary, #A238FF)" }} />
+                    <Mail size={13} style={{ color: "var(--primary, #2563EB)" }} />
                     <span>{displayEmail}</span>
                   </span>
                 )}
@@ -891,11 +891,11 @@ function ProfileContent() {
                   padding: "11px 14px",
                   fontSize: 12.5,
                   fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "var(--primary, #A238FF)" : "var(--text-2, #52525B)",
+                  color: isActive ? "var(--primary, #2563EB)" : "var(--text-2, #52525B)",
                   background: "transparent",
                   border: "none",
                   borderBottom: isActive
-                    ? "2.5px solid var(--primary, #A238FF)"
+                    ? "2.5px solid var(--primary, #2563EB)"
                     : "2.5px solid transparent",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
@@ -1082,7 +1082,7 @@ function ProfileContent() {
                 gap: 10,
               }}
             >
-              <Calendar size={15} style={{ color: "var(--primary, #A238FF)", flexShrink: 0 }} />
+              <Calendar size={15} style={{ color: "var(--primary, #2563EB)", flexShrink: 0 }} />
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Badge variant={employee?.status === "active" ? "success" : "warning"}>

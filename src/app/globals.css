@@ -29,11 +29,12 @@
    DESIGN TOKENS
    ============================================================ */
 :root {
-  --primary: #A238FF;
-  --primary-dark: #8B1FE8;
-  --primary-tint: #F3E8FF;
-  --gradient: linear-gradient(135deg, #A238FF 0%, #FF3EA5 100%);
-  --gradient-pink: linear-gradient(135deg, #FF3EA5 0%, #A238FF 100%);
+  --primary: #2563EB;
+  --primary-dark: #1D4ED8;
+  --primary-tint: #EFF6FF;
+  --primary-light: #EFF6FF;
+  --gradient: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  --gradient-pink: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
 
   /* BambooHR-inspired warm canvas & crisp elevated containers */
   --page-bg: #F5F7F5;
@@ -1212,12 +1213,12 @@ tr:hover td { background: #FAFAF8; }
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(162, 56, 255, 0.22);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.22);
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 .widget-add-btn:hover {
   transform: scale(1.08);
-  box-shadow: 0 4px 14px rgba(162, 56, 255, 0.38);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   opacity: 0.96;
 }
 .widget-add-btn:active {

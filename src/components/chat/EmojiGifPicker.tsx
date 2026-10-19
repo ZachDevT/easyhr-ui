@@ -458,7 +458,7 @@ export function EmojiGifPicker({
               borderBottom: activeTab === 'emoji' ? '1px solid #FFFFFF' : 'none',
               marginBottom: -1,
               background: activeTab === 'emoji' ? '#FFFFFF' : 'transparent',
-              color: activeTab === 'emoji' ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+              color: activeTab === 'emoji' ? 'var(--primary, #2563EB)' : 'var(--text-2, #52525B)',
               cursor: 'pointer',
             }}
           >
@@ -481,7 +481,7 @@ export function EmojiGifPicker({
               borderBottom: activeTab === 'animated' ? '1px solid #FFFFFF' : 'none',
               marginBottom: -1,
               background: activeTab === 'animated' ? '#FFFFFF' : 'transparent',
-              color: activeTab === 'animated' ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+              color: activeTab === 'animated' ? 'var(--primary, #2563EB)' : 'var(--text-2, #52525B)',
               cursor: 'pointer',
             }}
           >
@@ -504,7 +504,7 @@ export function EmojiGifPicker({
               borderBottom: activeTab === 'gif' ? '1px solid #FFFFFF' : 'none',
               marginBottom: -1,
               background: activeTab === 'gif' ? '#FFFFFF' : 'transparent',
-              color: activeTab === 'gif' ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+              color: activeTab === 'gif' ? 'var(--primary, #2563EB)' : 'var(--text-2, #52525B)',
               cursor: 'pointer',
             }}
           >
@@ -591,9 +591,9 @@ export function EmojiGifPicker({
                     borderRadius: 999,
                     fontSize: 11,
                     fontWeight: active ? 700 : 500,
-                    border: active ? '1px solid var(--primary, #A238FF)' : '1px solid transparent',
+                    border: active ? '1px solid var(--primary, #2563EB)' : '1px solid transparent',
                     background: active ? 'var(--primary-tint, #F5EBFF)' : '#F4F4F5',
-                    color: active ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+                    color: active ? 'var(--primary, #2563EB)' : 'var(--text-2, #52525B)',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
@@ -719,7 +719,7 @@ export function EmojiGifPicker({
                     transition: 'all 0.12s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--primary, #A238FF)';
+                    e.currentTarget.style.borderColor = 'var(--primary, #2563EB)';
                     e.currentTarget.style.background = 'var(--primary-tint, #F5EBFF)';
                     e.currentTarget.style.transform = 'scale(1.14)';
                   }}
@@ -782,7 +782,7 @@ export function EmojiGifPicker({
                   right: 10,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: 'var(--primary, #A238FF)',
+                  color: 'var(--primary, #2563EB)',
                 }}
               />
             )}
@@ -814,9 +814,9 @@ export function EmojiGifPicker({
                     borderRadius: 999,
                     fontSize: 10.5,
                     fontWeight: isSelected ? 700 : 500,
-                    border: isSelected ? '1px solid var(--primary, #A238FF)' : '1px solid transparent',
+                    border: isSelected ? '1px solid var(--primary, #2563EB)' : '1px solid transparent',
                     background: isSelected ? 'var(--primary-tint, #F5EBFF)' : '#F4F4F5',
-                    color: isSelected ? 'var(--primary, #A238FF)' : 'var(--text-2, #52525B)',
+                    color: isSelected ? 'var(--primary, #2563EB)' : 'var(--text-2, #52525B)',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,

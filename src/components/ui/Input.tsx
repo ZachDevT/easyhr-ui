@@ -46,7 +46,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const borderColor = hasError
       ? 'var(--danger, #D14343)'
       : isFocused
-      ? 'var(--primary, #A238FF)'
+      ? 'var(--primary, #2563EB)'
       : 'var(--card-border, #E4E4E7)';
     const boxShadow = isFocused
       ? hasError
@@ -142,7 +142,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 border: 'none',
                 cursor: 'pointer',
                 padding: '0 12px',
-                color: isFocused ? 'var(--primary, #A238FF)' : 'var(--text-3, #A1A1AA)',
+                color: isFocused ? 'var(--primary, #2563EB)' : 'var(--text-3, #A1A1AA)',
                 transition: 'color 0.15s ease',
               }}
               title="Select date"

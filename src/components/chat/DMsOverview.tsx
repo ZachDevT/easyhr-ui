@@ -175,8 +175,8 @@ export function DMsOverview({
               height: 44,
               borderRadius: 12,
               background: '#F5EEFF',
-              border: '1px solid #DDD6FE',
-              color: '#7C3AED',
+              border: '1px solid var(--primary-tint, #DBEAFE)',
+              color: 'var(--primary, #2563EB)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -205,7 +205,7 @@ export function DMsOverview({
                     fontWeight: 700,
                     padding: '2px 9px',
                     borderRadius: 999,
-                    background: '#7C3AED',
+                    background: 'var(--primary, #2563EB)',
                     color: '#FFFFFF',
                   }}
                 >
@@ -249,7 +249,7 @@ export function DMsOverview({
             padding: '9px 16px',
             borderRadius: 10,
             border: 'none',
-            background: 'var(--primary, #A238FF)',
+            background: 'var(--primary, #2563EB)',
             color: '#FFFFFF',
             fontSize: 13,
             fontWeight: 600,
@@ -353,7 +353,7 @@ export function DMsOverview({
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#F5EEFF';
-                    e.currentTarget.style.borderColor = '#DDD6FE';
+                    e.currentTarget.style.borderColor = 'var(--primary-tint, #DBEAFE)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = '#FAF9F7';
@@ -403,7 +403,7 @@ export function DMsOverview({
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-1, #18181B)' }}>
                     {emp.firstName}
                   </span>
-                  <span style={{ fontSize: 11, color: 'var(--primary, #A238FF)', fontWeight: 600 }}>
+                  <span style={{ fontSize: 11, color: 'var(--primary, #2563EB)', fontWeight: 600 }}>
                     + Chat
                   </span>
                 </div>
@@ -453,8 +453,8 @@ export function DMsOverview({
                   height: 52,
                   borderRadius: 16,
                   background: '#F5EEFF',
-                  border: '1px solid #DDD6FE',
-                  color: '#7C3AED',
+                  border: '1px solid var(--primary-tint, #DBEAFE)',
+                  color: 'var(--primary, #2563EB)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -497,7 +497,7 @@ export function DMsOverview({
                   padding: '9px 18px',
                   borderRadius: 10,
                   border: 'none',
-                  background: 'var(--primary, #A238FF)',
+                  background: 'var(--primary, #2563EB)',
                   color: '#FFFFFF',
                   fontSize: 13,
                   fontWeight: 600,
@@ -522,9 +522,9 @@ export function DMsOverview({
                       background: '#FFFFFF',
                       borderRadius: 12,
                       border: isSelected
-                        ? '1.5px solid var(--primary, #A238FF)'
+                        ? '1.5px solid var(--primary, #2563EB)'
                         : hasUnread
-                        ? '1px solid #DDD6FE'
+                        ? '1px solid var(--primary-tint, #DBEAFE)'
                         : '1px solid var(--card-border, #E4E4E7)',
                       padding: '14px 18px',
                       display: 'flex',
@@ -539,14 +539,14 @@ export function DMsOverview({
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.borderColor = '#DDD6FE';
+                        e.currentTarget.style.borderColor = 'var(--primary-tint, #DBEAFE)';
                         e.currentTarget.style.transform = 'translateY(-1px)';
                         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.04)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.borderColor = hasUnread ? '#DDD6FE' : 'var(--card-border, #E4E4E7)';
+                        e.currentTarget.style.borderColor = hasUnread ? 'var(--primary-tint, #DBEAFE)' : 'var(--card-border, #E4E4E7)';
                         e.currentTarget.style.transform = 'translateY(0)';
                         e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
                       }
@@ -578,7 +578,7 @@ export function DMsOverview({
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                           ) : item.dmInfo?.isGroup ? (
-                            <Users size={18} style={{ color: 'var(--primary, #A238FF)' }} />
+                            <Users size={18} style={{ color: 'var(--primary, #2563EB)' }} />
                           ) : (
                             (item.dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
                           )}
@@ -619,8 +619,8 @@ export function DMsOverview({
                                 padding: '1px 7px',
                                 borderRadius: 999,
                                 background: '#F5EEFF',
-                                border: '1px solid #DDD6FE',
-                                color: '#7C3AED',
+                                border: '1px solid var(--primary-tint, #DBEAFE)',
+                                color: 'var(--primary, #2563EB)',
                                 fontWeight: 600,
                               }}
                             >
@@ -681,7 +681,7 @@ export function DMsOverview({
                           <div
                             style={{
                               fontSize: 11.5,
-                              color: hasUnread ? '#7C3AED' : 'var(--text-3, #A1A1AA)',
+                              color: hasUnread ? 'var(--primary, #2563EB)' : 'var(--text-3, #A1A1AA)',
                               fontWeight: hasUnread ? 600 : 400,
                               marginBottom: 4,
                             }}
@@ -697,7 +697,7 @@ export function DMsOverview({
                               fontSize: 10.5,
                               padding: '2px 8px',
                               borderRadius: 999,
-                              background: '#7C3AED',
+                              background: 'var(--primary, #2563EB)',
                               color: '#FFFFFF',
                               fontWeight: 700,
                             }}

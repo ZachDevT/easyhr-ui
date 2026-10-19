@@ -528,7 +528,7 @@ function SignInContent() {
             <strong>Starting your onboarding?</strong> If you have not created your password yet,{' '}
             <Link
               href={`/auth/accept-invite?redirect_url=${encodeURIComponent(redirectUrl)}${emailAddress ? `&email=${encodeURIComponent(emailAddress)}` : ''}`}
-              style={{ color: 'var(--primary, #A238FF)', fontWeight: 700, textDecoration: 'underline' }}
+              style={{ color: 'var(--primary, #2563EB)', fontWeight: 700, textDecoration: 'underline' }}
             >
               activate your invitation here →
             </Link>

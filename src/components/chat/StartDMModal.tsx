@@ -151,7 +151,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                 borderRadius: 8,
                 background: '#FFFFFF',
                 border: '1px solid var(--card-border, #E4E4E7)',
-                color: 'var(--primary, #A238FF)',
+                color: 'var(--primary, #2563EB)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -272,7 +272,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                     padding: '2px 8px',
                     borderRadius: 999,
                     background: '#F5EEFF',
-                    color: '#7C3AED',
+                    color: 'var(--primary, #2563EB)',
                     fontSize: 11.5,
                     fontWeight: 600,
                   }}
@@ -284,7 +284,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                     style={{
                       border: 'none',
                       background: 'none',
-                      color: '#7C3AED',
+                      color: 'var(--primary, #2563EB)',
                       cursor: 'pointer',
                       padding: 0,
                       display: 'flex',
@@ -337,7 +337,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                     padding: '9px 18px',
                     cursor: 'pointer',
                     background: isSelected ? '#FAF5FF' : 'transparent',
-                    borderLeft: isSelected ? '3px solid var(--primary, #A238FF)' : '3px solid transparent',
+                    borderLeft: isSelected ? '3px solid var(--primary, #2563EB)' : '3px solid transparent',
                     transition: 'background 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
@@ -448,9 +448,9 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                           height: 18,
                           borderRadius: 5,
                           border: isSelected
-                            ? '1px solid var(--primary, #A238FF)'
+                            ? '1px solid var(--primary, #2563EB)'
                             : '1px solid var(--card-border, #E4E4E7)',
-                          background: isSelected ? 'var(--primary, #A238FF)' : '#FFFFFF',
+                          background: isSelected ? 'var(--primary, #2563EB)' : '#FFFFFF',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -514,7 +514,7 @@ export function StartDMModal({ isOpen, onClose, onDMStarted }: StartDMModalProps
                 padding: '6px 14px',
                 borderRadius: 8,
                 border: 'none',
-                background: selectedIds.length > 0 ? 'var(--primary, #A238FF)' : '#E4E4E7',
+                background: selectedIds.length > 0 ? 'var(--primary, #2563EB)' : '#E4E4E7',
                 color: '#FFFFFF',
                 fontSize: 12.5,
                 fontWeight: 600,
