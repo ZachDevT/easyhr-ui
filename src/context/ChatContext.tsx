@@ -116,6 +116,7 @@ interface ChatContextType {
   rejectJoinRequest: (channelId: string, userId: string) => Promise<void>;
   addMemberToChannel: (channelId: string, userId: string) => Promise<void>;
   removeMemberFromChannel: (channelId: string, userId: string) => Promise<void>;
+  openOrCreateDM: (participantId: string, participantName?: string) => Promise<ChatChannel>;
   typingUsers: string[];
   setTyping: (isTyping: boolean) => void;
   allEmployees: Employee[];
@@ -502,6 +503,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   body: newMsg.content || 'Sent an attachment',
                   tag: `mention-${newMsg.id}`,
                 });
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('easyhr_notification_refresh'));
+                }
               } else if (newMsg.channelId === activeChannelId) {
                 if (typeof document !== 'undefined' && document.hidden) {
                   playNotificationSound('message');
@@ -521,6 +525,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   });
                 }
               }
+            }
+          } catch {}
+        });
+
+        // Realtime Notification Created (e.g. mention or DM notification)
+        sse.addEventListener('notification.created', () => {
+          try {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('easyhr_notification_refresh'));
             }
           } catch {}
         });
@@ -1514,6 +1527,57 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [currentUser, getToken]
   );
 
+  // 12b. Open or Create Direct Message
+  const openOrCreateDM = useCallback(
+    async (participantId: string, participantName?: string): Promise<ChatChannel> => {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Please sign in to start a direct message');
+      }
+
+      // Check if we already have a DM channel locally with this participant
+      const existingChannel = channels.find(
+        (c) =>
+          (c.channelType === 'dm' || c.channelType === 'group_dm') &&
+          c.memberIds.includes(participantId)
+      );
+      if (existingChannel) {
+        handleSetActiveChannelId(existingChannel.id);
+        return existingChannel;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat/channels/dm`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          participantId,
+          name: participantName || '',
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const msg = errJson.detail || errJson.title || errJson.message || 'Failed to start direct message';
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      const serverChannel = mapBackendChannel(data);
+      setChannels((prev) => {
+        if (prev.some((c) => c.id === serverChannel.id)) {
+          return prev.map((c) => (c.id === serverChannel.id ? serverChannel : c));
+        }
+        return [...prev, serverChannel];
+      });
+      handleSetActiveChannelId(serverChannel.id);
+      return serverChannel;
+    },
+    [channels, getToken, handleSetActiveChannelId]
+  );
+
   // 13. Join Channel Request
   const requestToJoinChannel = useCallback(
     async (channelId: string) => {
@@ -1739,6 +1803,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         rejectJoinRequest,
         addMemberToChannel,
         removeMemberFromChannel,
+        openOrCreateDM,
         typingUsers,
         setTyping,
         allEmployees,

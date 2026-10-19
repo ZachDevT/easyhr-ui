@@ -51,6 +51,7 @@ import { useRole } from '@/context/RoleContext';
 import { useCompany } from '@/context/CompanyContext';
 import { Employee } from '@/data/employees';
 import { CreateChannelModal } from '@/components/chat/CreateChannelModal';
+import { StartDMModal } from '@/components/chat/StartDMModal';
 import { ThreadDrawer } from '@/components/chat/ThreadDrawer';
 import { EmojiGifPicker, PickerTab } from '@/components/chat/EmojiGifPicker';
 import { MediaLightbox, LightboxMediaItem } from '@/components/chat/MediaLightbox';
@@ -87,6 +88,7 @@ export default function GroupChatPage() {
     rejectJoinRequest,
     addMemberToChannel,
     removeMemberFromChannel,
+    openOrCreateDM,
     typingUsers,
     setTyping,
     allEmployees,
@@ -115,6 +117,7 @@ export default function GroupChatPage() {
   const [searchMessageTerm, setSearchMessageTerm] = useState('');
   const [viewFilter, setViewFilter] = useState<'all' | 'threads' | 'pinned'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showStartDMModal, setShowStartDMModal] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState<PickerTab>('emoji');
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMediaItem | null>(null);
@@ -154,7 +157,7 @@ export default function GroupChatPage() {
     if (perm === 'granted') {
       showDesktopNotification({
         title: '🔔 Desktop Notifications Active!',
-        body: 'You will now receive Slack-style sound alerts and notifications when tagged or replied to.',
+        body: 'You will now receive sound alerts and notifications when tagged or replied to.',
       });
     }
   };
@@ -201,6 +204,7 @@ export default function GroupChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const pendingUnreadCountRef = useRef<number>(0);
   const prevChannelIdRef = useRef<string>('');
   const [firstUnreadMsgId, setFirstUnreadMsgId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -211,23 +215,25 @@ export default function GroupChatPage() {
     if (!activeChannel) return;
     if (activeChannel.id !== prevChannelIdRef.current) {
       prevChannelIdRef.current = activeChannel.id;
-      const count = activeChannel.unreadCount || 0;
+      const count = pendingUnreadCountRef.current || activeChannel.unreadCount || 0;
       if (count > 0 && messages.length > 0) {
         const unreadIdx = Math.max(0, messages.length - count);
         const target = messages[unreadIdx];
         if (target) {
           setFirstUnreadMsgId(target.id);
+          pendingUnreadCountRef.current = 0;
           return;
         }
       }
       setFirstUnreadMsgId(null);
+      pendingUnreadCountRef.current = 0;
     }
   }, [activeChannel?.id, messages]);
 
-  // Scroll to first unread message so user starts from unseen messages, otherwise scroll to latest
+  // Scroll to first unread message from top so user starts from unseen messages, otherwise scroll to latest
   useEffect(() => {
     if (firstUnreadMsgId && firstUnreadRef.current) {
-      firstUnreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstUnreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
@@ -266,15 +272,31 @@ export default function GroupChatPage() {
     [channels, searchChannelTerm]
   );
 
+  const directMessageChannels = useMemo(
+    () => filteredChannels.filter((c) => c.channelType === 'dm' || c.channelType === 'group_dm'),
+    [filteredChannels]
+  );
+
   const generalChannels = useMemo(
-    () => filteredChannels.filter((c) => !c.departmentRestricted),
+    () =>
+      filteredChannels.filter(
+        (c) =>
+          !c.departmentRestricted &&
+          c.channelType !== 'dm' &&
+          c.channelType !== 'group_dm'
+      ),
     [filteredChannels]
   );
 
   const departmentGroups = useMemo(() => {
     const groups: Record<string, typeof filteredChannels> = {};
     filteredChannels
-      .filter((c) => c.departmentRestricted)
+      .filter(
+        (c) =>
+          c.departmentRestricted &&
+          c.channelType !== 'dm' &&
+          c.channelType !== 'group_dm'
+      )
       .forEach((c) => {
         const dept = c.department || 'General';
         if (!groups[dept]) groups[dept] = [];
@@ -282,6 +304,55 @@ export default function GroupChatPage() {
       });
     return groups;
   }, [filteredChannels]);
+
+  // Helper to resolve DM participant info (name, avatar, title, presence)
+  const getDMParticipant = (ch: typeof activeChannel) => {
+    if (!ch) return null;
+    const isGroup = ch.channelType === 'group_dm';
+    const myId = String(currentUser?.id || '');
+    const myEmpId = (currentUser as any)?.employeeId ? String((currentUser as any).employeeId) : '';
+
+    const otherMemberIds = ch.memberIds.filter(
+      (id) => id !== myId && id !== myEmpId && id !== 'user'
+    );
+
+    const otherEmployees = allEmployees.filter((emp) =>
+      otherMemberIds.includes(String(emp.id))
+    );
+
+    if (otherEmployees.length === 0) {
+      return {
+        name: ch.name || 'Direct Message',
+        avatar: undefined,
+        title: 'Coworker',
+        department: '',
+        isGroup,
+        memberCount: ch.memberIds.length,
+      };
+    }
+
+    if (isGroup || otherEmployees.length > 1) {
+      return {
+        name: otherEmployees.map((e) => e.firstName).join(', ') || ch.name,
+        avatar: undefined,
+        title: `${otherEmployees.length} participants`,
+        department: '',
+        isGroup: true,
+        memberCount: otherEmployees.length,
+      };
+    }
+
+    const target = otherEmployees[0];
+    return {
+      name: `${target.firstName} ${target.lastName}`.trim(),
+      avatar: target.avatar,
+      title: target.title || 'Team Member',
+      department: target.department || '',
+      isGroup: false,
+      memberCount: 2,
+      employee: target,
+    };
+  };
 
   // Visible messages based on search + viewFilter
   const visibleMessages = useMemo(() => {
@@ -758,6 +829,8 @@ export default function GroupChatPage() {
                       key={ch.id}
                       type="button"
                       onClick={() => {
+                        const targetCh = channels.find((c) => c.id === ch.id);
+                        pendingUnreadCountRef.current = targetCh?.unreadCount || 0;
                         setActiveChannelId(ch.id);
                         setActiveThread(null);
                         setViewFilter('all');
@@ -869,6 +942,217 @@ export default function GroupChatPage() {
                 >
                   <Plus size={13} />
                   <span>Add channels</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Direct Messages Section */}
+          <div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 8px',
+                marginBottom: 6,
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--text-3, #A1A1AA)',
+              }}
+            >
+              <div
+                onClick={() => toggleSection('direct_messages')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                  flex: 1,
+                }}
+              >
+                <span>Direct Messages</span>
+                {directMessageChannels.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: '1px 5px',
+                      borderRadius: 10,
+                      background: '#F4F4F5',
+                      color: 'var(--text-2, #52525B)',
+                    }}
+                  >
+                    {directMessageChannels.length}
+                  </span>
+                )}
+                {collapsedSections['direct_messages'] ? (
+                  <ChevronRight size={13} />
+                ) : (
+                  <ChevronDown size={13} />
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowStartDMModal(true)}
+                title="Start a new direct message"
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-3, #A1A1AA)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+
+            {!collapsedSections['direct_messages'] && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {directMessageChannels.map((ch) => {
+                  const isActive = activeChannel?.id === ch.id;
+                  const dmInfo = getDMParticipant(ch);
+                  return (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => {
+                        const targetCh = channels.find((c) => c.id === ch.id);
+                        pendingUnreadCountRef.current = targetCh?.unreadCount || 0;
+                        setActiveChannelId(ch.id);
+                        setActiveThread(null);
+                        setViewFilter('all');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '6px 8px',
+                        borderRadius: 8,
+                        border: isActive
+                          ? '1px solid var(--card-border, #E4E4E7)'
+                          : '1px solid transparent',
+                        background: isActive ? '#FFFFFF' : 'transparent',
+                        boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                        color: isActive ? 'var(--text-1, #18181B)' : 'var(--text-2, #52525B)',
+                        fontSize: 12.5,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Avatar or Group Icon with Presence dot */}
+                        <span style={{ position: 'relative', flexShrink: 0 }}>
+                          <span
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: '50%',
+                              background: '#FFFFFF',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 10,
+                              fontWeight: 700,
+                              overflow: 'hidden',
+                              color: 'var(--text-1, #18181B)',
+                            }}
+                          >
+                            {dmInfo?.avatar ? (
+                              <img
+                                src={dmInfo.avatar}
+                                alt={dmInfo.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : dmInfo?.isGroup ? (
+                              <Users size={11} style={{ color: 'var(--primary, #A238FF)' }} />
+                            ) : (
+                              (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
+                            )}
+                          </span>
+                          {!dmInfo?.isGroup && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                right: -1,
+                                bottom: -1,
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: '#10B981',
+                                border: '1.5px solid #FAF9F7',
+                              }}
+                            />
+                          )}
+                        </span>
+
+                        <span
+                          style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            fontWeight: isActive ? 600 : 400,
+                          }}
+                        >
+                          {dmInfo?.name}
+                        </span>
+                      </span>
+
+                      {ch.unreadCount && !isActive ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            padding: '1px 6px',
+                            borderRadius: 999,
+                            background: 'var(--primary, #A238FF)',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {ch.unreadCount}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => setShowStartDMModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-3, #A1A1AA)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    marginTop: 2,
+                  }}
+                >
+                  <Plus size={13} />
+                  <span>Start a direct message</span>
                 </button>
               </div>
             )}
@@ -1270,77 +1554,189 @@ export default function GroupChatPage() {
                 flexShrink: 0,
               }}
             >
-              {/* Left: Channel Breadcrumb & Topic */}
+              {/* Left: Channel Breadcrumb & Topic or DM User Profile */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: '#FAF9F7',
-                    border: '1px solid var(--card-border, #E4E4E7)',
-                    color: 'var(--text-1, #18181B)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  {activeChannel.isPrivate ? <Lock size={15} /> : <Hash size={16} />}
-                </div>
-
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {activeChannel.department && (
+                {activeChannel.channelType === 'dm' || activeChannel.channelType === 'group_dm' ? (
+                  (() => {
+                    const dmInfo = getDMParticipant(activeChannel);
+                    return (
                       <>
-                        <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>
-                          {activeChannel.department}
-                        </span>
-                        <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>/</span>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: '50%',
+                              background: '#FAF9F7',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: 'var(--text-1, #18181B)',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {dmInfo?.avatar ? (
+                              <img
+                                src={dmInfo.avatar}
+                                alt={dmInfo.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : dmInfo?.isGroup ? (
+                              <Users size={16} style={{ color: 'var(--primary, #A238FF)' }} />
+                            ) : (
+                              (dmInfo?.name || 'DM').slice(0, 2).toUpperCase()
+                            )}
+                          </div>
+                          {!dmInfo?.isGroup && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                bottom: 0,
+                                width: 9.5,
+                                height: 9.5,
+                                borderRadius: '50%',
+                                background: '#10B981',
+                                border: '2px solid #FFFFFF',
+                              }}
+                            />
+                          )}
+                        </div>
+
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span
+                              style={{
+                                fontSize: 15,
+                                color: 'var(--text-1, #18181B)',
+                                fontFamily: 'var(--font-title)',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {dmInfo?.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10.5,
+                                padding: '2px 8px',
+                                borderRadius: 999,
+                                background: '#F5EEFF',
+                                border: '1px solid #DDD6FE',
+                                color: '#7C3AED',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {dmInfo?.isGroup ? 'Group DM' : 'Direct Message'}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: 11.5,
+                              color: 'var(--text-3, #A1A1AA)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: 420,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <span>{dmInfo?.title}</span>
+                            {dmInfo?.department && (
+                              <>
+                                <span>·</span>
+                                <span>{dmInfo.department}</span>
+                              </>
+                            )}
+                            {!dmInfo?.isGroup && (
+                              <>
+                                <span>·</span>
+                                <span style={{ color: '#059669', fontWeight: 500 }}>Active now</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </>
-                    )}
-                    <span
-                      style={{
-                        fontSize: 15,
-                        color: 'var(--text-1, #18181B)',
-                        fontFamily: 'var(--font-title)',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {activeChannel.name}
-                    </span>
-
-                    {activeChannel.isPrivate && (
-                      <span
-                        style={{
-                          fontSize: 10.5,
-                          padding: '2px 8px',
-                          borderRadius: 999,
-                          background: '#FAF9F7',
-                          border: '1px solid var(--card-border, #E4E4E7)',
-                          color: 'var(--text-2, #52525B)',
-                        }}
-                      >
-                        Private
-                      </span>
-                    )}
-                  </div>
-
-                  {activeChannel.topic && (
+                    );
+                  })()
+                ) : (
+                  <>
                     <div
                       style={{
-                        fontSize: 11.5,
-                        color: 'var(--text-3, #A1A1AA)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: 420,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: '#FAF9F7',
+                        border: '1px solid var(--card-border, #E4E4E7)',
+                        color: 'var(--text-1, #18181B)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
                       }}
                     >
-                      {activeChannel.topic}
+                      {activeChannel.isPrivate ? <Lock size={15} /> : <Hash size={16} />}
                     </div>
-                  )}
-                </div>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {activeChannel.department && (
+                          <>
+                            <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>
+                              {activeChannel.department}
+                            </span>
+                            <span style={{ fontSize: 12, color: 'var(--text-3, #A1A1AA)' }}>/</span>
+                          </>
+                        )}
+                        <span
+                          style={{
+                            fontSize: 15,
+                            color: 'var(--text-1, #18181B)',
+                            fontFamily: 'var(--font-title)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {activeChannel.name}
+                        </span>
+
+                        {activeChannel.isPrivate && (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              background: '#FAF9F7',
+                              border: '1px solid var(--card-border, #E4E4E7)',
+                              color: 'var(--text-2, #52525B)',
+                            }}
+                          >
+                            Private
+                          </span>
+                        )}
+                      </div>
+
+                      {activeChannel.topic && (
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            color: 'var(--text-3, #A1A1AA)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: 420,
+                          }}
+                        >
+                          {activeChannel.topic}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Right: Pinned, Thread Popover, Search in Channel, Member Avatars */}
@@ -1352,7 +1748,7 @@ export default function GroupChatPage() {
                   title={
                     notificationPermission === 'granted'
                       ? (soundEnabled ? 'Desktop notifications & sound alerts active (click to mute sound)' : 'Audio muted (click to unmute)')
-                      : 'Enable desktop notifications & Slack-style chimes'
+                      : 'Enable desktop notifications & sound alerts'
                   }
                   style={{
                     display: 'inline-flex',
@@ -3426,7 +3822,11 @@ export default function GroupChatPage() {
                   {/* Live ContentEditable WYSIWYG Editor (No separate preview box) */}
                   <WysiwygChatEditor
                     ref={editorRef}
-                    placeholder={`Write a message to #${activeChannel.name}... (type @ to mention, select Bold/Italic/Lists to type live, or add animated emojis & GIFs)`}
+                    placeholder={
+                      activeChannel.channelType === 'dm' || activeChannel.channelType === 'group_dm'
+                        ? `Write a direct message to ${getDMParticipant(activeChannel)?.name || 'coworker'}... (type @ to mention, format text, or add animated emojis & GIFs)`
+                        : `Write a message to #${activeChannel.name}... (type @ to mention, select Bold/Italic/Lists to type live, or add animated emojis & GIFs)`
+                    }
                     onChange={(serialized) => {
                       setInputText(serialized);
                       setTyping(serialized.length > 0);
@@ -3953,53 +4353,87 @@ export default function GroupChatPage() {
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', marginTop: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', marginTop: 16 }}>
               <button
                 type="button"
-                onClick={() => {
-                  const fullName = `${selectedProfileMember.firstName} ${selectedProfileMember.lastName}`.trim();
-                  editorRef.current?.insertMention(fullName);
+                onClick={async () => {
+                  try {
+                    const fullName = `${selectedProfileMember.firstName} ${selectedProfileMember.lastName}`.trim();
+                    await openOrCreateDM(String(selectedProfileMember.id), fullName);
+                    setSelectedProfileMember(null);
+                  } catch (err) {
+                    console.error('Failed to open DM:', err);
+                  }
                 }}
                 style={{
-                  flex: 1,
-                  height: 34,
+                  width: '100%',
+                  height: 36,
                   borderRadius: 9,
-                  border: '1px solid var(--card-border, #E4E4E7)',
-                  background: '#FFFFFF',
-                  color: 'var(--text-1, #18181B)',
-                  fontSize: 12,
+                  border: 'none',
+                  background: 'var(--primary, #A238FF)',
+                  color: '#FFFFFF',
+                  fontSize: 12.5,
+                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 6,
+                  gap: 7,
                   cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(162, 56, 255, 0.25)',
                 }}
               >
-                <AtSign size={13} />
-                <span>Mention</span>
+                <MessageSquare size={14} />
+                <span>Direct Message</span>
               </button>
 
-              {(isHRAdmin || role === 'Manager') && (
-                <Link
-                  href={`/people/${selectedProfileMember.id}`}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullName = `${selectedProfileMember.firstName} ${selectedProfileMember.lastName}`.trim();
+                    editorRef.current?.insertMention(fullName);
+                  }}
                   style={{
                     flex: 1,
-                    height: 34,
-                    borderRadius: 9,
+                    height: 32,
+                    borderRadius: 8,
                     border: '1px solid var(--card-border, #E4E4E7)',
-                    background: '#FAF9F7',
+                    background: '#FFFFFF',
                     color: 'var(--text-1, #18181B)',
                     fontSize: 12,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
+                    cursor: 'pointer',
                   }}
                 >
-                  <span>Directory</span>
-                  <ExternalLink size={12} />
-                </Link>
-              )}
+                  <AtSign size={13} />
+                  <span>Mention</span>
+                </button>
+
+                {(isHRAdmin || role === 'Manager') && (
+                  <Link
+                    href={`/people/${selectedProfileMember.id}`}
+                    style={{
+                      flex: 1,
+                      height: 32,
+                      borderRadius: 8,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      background: '#FAF9F7',
+                      color: 'var(--text-1, #18181B)',
+                      fontSize: 12,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>Directory</span>
+                    <ExternalLink size={12} />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
 
@@ -4362,6 +4796,9 @@ export default function GroupChatPage() {
 
       {/* Create Channel Modal */}
       <CreateChannelModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} />
+
+      {/* Start Direct Message Modal */}
+      <StartDMModal isOpen={showStartDMModal} onClose={() => setShowStartDMModal(false)} />
 
       {/* Full-Screen Media Lightbox (Images & Videos) */}
       <MediaLightbox item={lightboxMedia} onClose={() => setLightboxMedia(null)} />

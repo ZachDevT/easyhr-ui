@@ -119,7 +119,12 @@ export function TopBar() {
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 25000);
-    return () => clearInterval(interval);
+    const handleCustomRefresh = () => fetchNotifications();
+    window.addEventListener('easyhr_notification_refresh', handleCustomRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('easyhr_notification_refresh', handleCustomRefresh);
+    };
   }, [isSignedIn]);
 
   // Mark notifications as read
@@ -174,6 +179,8 @@ export function TopBar() {
 
   const getNotificationIcon = (cat: string) => {
     switch (cat) {
+      case 'chat':
+        return <MessageSquare size={16} style={{ color: '#7c3aed' }} />;
       case 'wish':
         return <Gift size={16} className="text-primary" />;
       case 'announcement':
@@ -389,6 +396,7 @@ export function TopBar() {
               >
                 {[
                   { id: 'all',          label: 'All' },
+                  { id: 'chat',         label: 'Chat' },
                   { id: 'wish',         label: 'Wishes' },
                   { id: 'announcement', label: 'News' },
                 ].map((f) => (
