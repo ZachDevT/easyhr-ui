@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { DollarSign, User, Calendar, FileText, Loader2 } from "lucide-react";
-import { PayrollEmployee, toMinor } from "./payrollModel";
+import { DollarSign, Clock, Calendar, Info, Loader2 } from "lucide-react";
+import { PayrollEmployee, toMinor, formatMoney } from "./payrollModel";
 
 interface CompensationModalProps {
   isOpen: boolean;
@@ -32,45 +32,75 @@ export function CompensationModal({
   onSave,
 }: CompensationModalProps) {
   const [employeeId, setEmployeeId] = useState(defaultEmployeeId || (employees[0]?.id || ""));
-  const [amount, setAmount] = useState("");
+  const [payModel, setPayModel] = useState<"hourly" | "monthly_salary">("monthly_salary");
+  const [rateOrSalary, setRateOrSalary] = useState("");
+  const [productiveHours, setProductiveHours] = useState("173.33");
   const [effectiveDate, setEffectiveDate] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   });
-  const [reason, setReason] = useState("Regular monthly salary");
+  const [reason, setReason] = useState("Regular base compensation");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Live calculation of estimated monthly base
+  const calculatedMonthlyTotalMinor = useMemo(() => {
+    const val = parseFloat(rateOrSalary);
+    if (isNaN(val) || val <= 0) return 0;
+    if (payModel === "hourly") {
+      const hrs = parseFloat(productiveHours) || 173.33;
+      return toMinor(val * hrs);
+    }
+    return toMinor(val);
+  }, [payModel, rateOrSalary, productiveHours]);
+
+  const effectiveHourlyRateMinor = useMemo(() => {
+    const val = parseFloat(rateOrSalary);
+    if (isNaN(val) || val <= 0) return 0;
+    if (payModel === "hourly") return toMinor(val);
+    const hrs = parseFloat(productiveHours) || 173.33;
+    return toMinor(val / hrs);
+  }, [payModel, rateOrSalary, productiveHours]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const num = parseFloat(amount);
+
     if (!employeeId) {
       setError("Please select an employee.");
       return;
     }
-    if (isNaN(num) || num <= 0) {
-      setError("Please enter a valid monthly salary amount greater than zero.");
+
+    const val = parseFloat(rateOrSalary);
+    if (isNaN(val) || val <= 0) {
+      setError(`Please enter a valid ${payModel === "hourly" ? "hourly pay rate" : "monthly base salary"} greater than zero.`);
       return;
     }
+
     if (!effectiveDate) {
-      setError("Please pick an effective date.");
+      setError("Please pick an effective start date.");
       return;
     }
+
+    const hrs = parseFloat(productiveHours) || 173.33;
+    const finalReason =
+      payModel === "hourly"
+        ? `HOURLY: ${val} ${currency}/hr (${hrs} standard hrs) - ${reason.trim()}`
+        : `SALARY: ${val} ${currency}/mo - ${reason.trim()}`;
 
     try {
       setIsSubmitting(true);
       await onSave({
         employeeId,
-        baseAmountMinor: toMinor(num),
+        baseAmountMinor: calculatedMonthlyTotalMinor,
         currency,
         country,
         effectiveDate,
-        reason: reason.trim(),
+        reason: finalReason,
       });
       onClose();
     } catch (err: any) {
-      setError(err?.message || "Failed to save salary.");
+      setError(err?.message || "Failed to save compensation.");
     } finally {
       setIsSubmitting(false);
     }
@@ -80,9 +110,9 @@ export function CompensationModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Set Employee Salary"
-      subtitle="Record the monthly base salary used for payroll calculations."
-      width={500}
+      title="Set Employee Compensation"
+      subtitle="Configure hourly pay rates or fixed monthly base salaries for payroll."
+      width={520}
     >
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {error && (
@@ -122,10 +152,62 @@ export function CompensationModal({
           </select>
         </div>
 
-        {/* Monthly Base Salary */}
+        {/* Pay Model Selection */}
         <div>
           <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
-            Monthly Base Salary ({currency}) <span style={{ color: "#DC2626" }}>*</span>
+            Compensation Model
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setPayModel("monthly_salary")}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid",
+                borderColor: payModel === "monthly_salary" ? "var(--primary)" : "var(--card-border)",
+                background: payModel === "monthly_salary" ? "var(--primary-tint)" : "#FFFFFF",
+                color: payModel === "monthly_salary" ? "var(--primary)" : "var(--text-2)",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <DollarSign size={14} /> Monthly Salaried
+            </button>
+            <button
+              type="button"
+              onClick={() => setPayModel("hourly")}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid",
+                borderColor: payModel === "hourly" ? "var(--primary)" : "var(--card-border)",
+                background: payModel === "hourly" ? "var(--primary-tint)" : "#FFFFFF",
+                color: payModel === "hourly" ? "var(--primary)" : "var(--text-2)",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <Clock size={14} /> Hourly Pay Rate
+            </button>
+          </div>
+        </div>
+
+        {/* Amount Input */}
+        <div>
+          <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+            {payModel === "hourly" ? `Hourly Pay Rate (${currency})` : `Monthly Base Salary (${currency})`}{" "}
+            <span style={{ color: "#DC2626" }}>*</span>
           </label>
           <div style={{ position: "relative" }}>
             <span
@@ -133,7 +215,7 @@ export function CompensationModal({
                 position: "absolute",
                 left: 12,
                 top: 10,
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: 700,
                 color: "var(--text-4)",
               }}
@@ -146,21 +228,78 @@ export function CompensationModal({
               min="1"
               className="input"
               style={{ paddingLeft: currency.length > 3 ? 55 : 46 }}
-              placeholder="e.g. 3500000"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              placeholder={payModel === "hourly" ? "e.g. 18500" : "e.g. 3500000"}
+              value={rateOrSalary}
+              onChange={(e) => setRateOrSalary(e.target.value)}
               required
             />
           </div>
           <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
-            Gross base pay before taxes or deductions.
+            {payModel === "hourly"
+              ? "Base pay rate per productive hour worked."
+              : "Fixed monthly compensation before taxes or statutory withholdings."}
           </small>
+        </div>
+
+        {/* Standard Monthly Hours */}
+        <div>
+          <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+            Standard Monthly Hours
+          </label>
+          <input
+            type="number"
+            step="any"
+            min="1"
+            className="input"
+            placeholder="173.33"
+            value={productiveHours}
+            onChange={(e) => setProductiveHours(e.target.value)}
+          />
+          <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
+            Standard monthly work hours benchmark (Uganda labor standard: 40 hrs/week × 4.33 weeks = 173.33 hrs).
+          </small>
+        </div>
+
+        {/* Dynamic Calculation Formula Preview */}
+        <div
+          style={{
+            padding: "12px 14px",
+            background: "#FAF9F7",
+            border: "1px solid var(--card-border)",
+            borderRadius: 8,
+            fontSize: 12,
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>
+            Uganda Chargeable Formula Summary
+          </div>
+          <div style={{ color: "var(--text-2)", marginBottom: 4 }}>
+            {payModel === "hourly" ? (
+              <>
+                <strong>Total Monthly Base</strong> = Pay Rate ({rateOrSalary || 0} {currency}) × Productive Hours ({productiveHours} hrs) ={" "}
+                <strong>{formatMoney(calculatedMonthlyTotalMinor, currency)}</strong>
+              </>
+            ) : (
+              <>
+                <strong>Monthly Base</strong> = {formatMoney(calculatedMonthlyTotalMinor, currency)} (Equivalent hourly rate:{" "}
+                {formatMoney(effectiveHourlyRateMinor, currency)}/hr)
+              </>
+            )}
+          </div>
+          <div style={{ color: "var(--text-3)", fontSize: 11 }}>
+            • Overtime Hours: calculated at 1.5× regular pay rate during payroll review.
+            <br />
+            • Public Holidays &amp; Sundays: calculated at 2.0× regular pay rate.
+            <br />
+            • Chargeable Gross = [Total monthly compensation] + [Bonuses] + [Higher rates] + [Insurance] - [Penalties].
+          </div>
         </div>
 
         {/* Effective Date */}
         <div>
           <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
-            Effective Date <span style={{ color: "#DC2626" }}>*</span>
+            Effective Start Date <span style={{ color: "#DC2626" }}>*</span>
           </label>
           <input
             type="date"
@@ -169,32 +308,35 @@ export function CompensationModal({
             onChange={(e) => setEffectiveDate(e.target.value)}
             required
           />
-          <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
-            The salary will be applied to any pay cycle whose end date is on or after this date.
-          </small>
         </div>
 
         {/* Reason / Note */}
         <div>
           <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
-            Reason or Adjustment Note
+            Compensation Memo / Reason
           </label>
           <input
             type="text"
             className="input"
-            placeholder="e.g. Annual compensation review, Promotion adjustment"
+            placeholder="e.g. Annual compensation review, Promotion, New hire offer"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
         </div>
 
+        {/* Actions */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
           <button type="button" className="btn-neutral" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </button>
           <button type="submit" className="btn-primary" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 size={14} className="animate-spin mr-6" /> : null}
-            Save Compensation
+            {isSubmitting ? (
+              <>
+                <Loader2 size={14} className="animate-spin mr-6" /> Saving...
+              </>
+            ) : (
+              "Save Compensation"
+            )}
           </button>
         </div>
       </form>

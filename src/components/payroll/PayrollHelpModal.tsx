@@ -10,12 +10,15 @@ import {
   FileText,
   Mail,
   ShieldCheck,
+  Building2,
   Building,
   ArrowRight,
   BookOpen,
   Sparkles,
   ChevronDown,
   ChevronUp,
+  Plus,
+  Receipt,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
@@ -24,6 +27,8 @@ interface PayrollHelpModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateTab: (tab: string) => void;
+  onOpenAssignSalary?: () => void;
+  onOpenAddDeduction?: () => void;
   hasConfig: boolean;
   configuredCountry?: string;
   configuredCurrency?: string;
@@ -37,6 +42,8 @@ export function PayrollHelpModal({
   isOpen,
   onClose,
   onNavigateTab,
+  onOpenAssignSalary,
+  onOpenAddDeduction,
   hasConfig,
   configuredCountry,
   configuredCurrency,
@@ -129,35 +136,60 @@ export function PayrollHelpModal({
         {activeSection === "checklist" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <p style={{ fontSize: 13, color: "var(--text-3)", margin: "0 0 4px 0" }}>
-              Here is your live status. Once these items are checked, you can run payroll with a single click.
+              Here is your live payroll readiness status. Once all three steps are active, you can calculate and run payroll anytime.
             </p>
 
-            {/* Check 1 */}
+            {/* Check 1: Settings */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: hasConfig ? "1px solid #BBF7D0" : "1px solid #FDE68A",
-                background: hasConfig ? "#F0FDF4" : "#FFFBEB",
+                padding: "13px 16px",
+                borderRadius: 12,
+                border: "1px solid var(--card-border, #E8ECE8)",
+                background: "#FFFFFF",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {hasConfig ? (
-                  <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
-                ) : (
-                  <AlertCircle size={18} style={{ color: "#D97706" }} />
-                )}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    background: hasConfig ? "#DCFCE7" : "var(--primary-tint, #EFF6FF)",
+                    color: hasConfig ? "#15803D" : "var(--primary, #2563EB)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {hasConfig ? <CheckCircle2 size={18} /> : <Building2 size={18} />}
+                </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>
-                    1. Company Payroll Settings
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }}>
+                      1. Company Payroll Settings
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        padding: "1px 8px",
+                        borderRadius: 999,
+                        background: hasConfig ? "#DCFCE7" : "#F4F4F5",
+                        color: hasConfig ? "#15803D" : "var(--text-3)",
+                      }}
+                    >
+                      {hasConfig ? "Configured" : "Setup needed"}
+                    </span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>
                     {hasConfig
-                      ? `Configured: ${configuredCountry} · ${configuredCurrency}`
-                      : "Country and disbursement currency not saved yet."}
+                      ? `Active country: ${configuredCountry} · Currency: ${configuredCurrency}`
+                      : "Country, monthly hours, and disbursement currency not saved yet."}
                   </div>
                 </div>
               </div>
@@ -173,85 +205,172 @@ export function PayrollHelpModal({
               </button>
             </div>
 
-            {/* Check 2 */}
+            {/* Check 2: Base Salaries */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: employeesWithComp > 0 && missingCompCount === 0 ? "1px solid #BBF7D0" : "1px solid #FDE68A",
-                background: employeesWithComp > 0 && missingCompCount === 0 ? "#F0FDF4" : "#FFFBEB",
+                padding: "13px 16px",
+                borderRadius: 12,
+                border: "1px solid var(--card-border, #E8ECE8)",
+                background: "#FFFFFF",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {employeesWithComp > 0 && missingCompCount === 0 ? (
-                  <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
-                ) : (
-                  <AlertCircle size={18} style={{ color: "#D97706" }} />
-                )}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    background: employeesWithComp > 0 && missingCompCount === 0 ? "#DCFCE7" : "var(--primary-tint, #EFF6FF)",
+                    color: employeesWithComp > 0 && missingCompCount === 0 ? "#15803D" : "var(--primary, #2563EB)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {employeesWithComp > 0 && missingCompCount === 0 ? (
+                    <CheckCircle2 size={18} />
+                  ) : (
+                    <DollarSign size={18} />
+                  )}
+                </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>
-                    2. Employee Base Salaries
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }}>
+                      2. Employee Compensation (Hourly / Salaried)
+                    </span>
+                    {missingCompCount > 0 ? (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: "1px 8px",
+                          borderRadius: 999,
+                          background: "#FEF3C7",
+                          color: "#B45309",
+                        }}
+                      >
+                        {missingCompCount} missing
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: "1px 8px",
+                          borderRadius: 999,
+                          background: "#DCFCE7",
+                          color: "#15803D",
+                        }}
+                      >
+                        All Assigned
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>
                     {employeesWithComp > 0
-                      ? `${employeesWithComp} of ${totalEmployees} active employees have salaries recorded.`
-                      : "No employee compensation recorded yet."}
-                    {missingCompCount > 0 && ` (${missingCompCount} missing)`}
+                      ? `${employeesWithComp} of ${totalEmployees} active employee(s) have pay rates recorded.`
+                      : "No employee compensation recorded yet. Supports hourly pay rates and monthly salaries."}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
-                className="btn-neutral btn-sm"
+                className="btn-primary btn-sm"
                 onClick={() => {
                   onClose();
-                  onNavigateTab("Compensation");
+                  onNavigateTab("Salaries");
+                  onOpenAssignSalary?.();
                 }}
               >
+                <DollarSign size={13} className="mr-4" />
                 Assign Salaries
               </button>
             </div>
 
-            {/* Check 3 */}
+            {/* Check 3: Statutory Taxes & Deductions */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: ruleCount > 0 ? "1px solid #BBF7D0" : "1px solid #FDE68A",
-                background: ruleCount > 0 ? "#F0FDF4" : "#FFFBEB",
+                padding: "13px 16px",
+                borderRadius: 12,
+                border: "1px solid var(--card-border, #E8ECE8)",
+                background: "#FFFFFF",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {ruleCount > 0 ? (
-                  <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
-                ) : (
-                  <AlertCircle size={18} style={{ color: "#D97706" }} />
-                )}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    background: ruleCount > 0 ? "#DCFCE7" : "var(--primary-tint, #EFF6FF)",
+                    color: ruleCount > 0 ? "#15803D" : "var(--primary, #2563EB)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {ruleCount > 0 ? <CheckCircle2 size={18} /> : <Receipt size={18} />}
+                </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>
-                    3. Statutory Taxes &amp; Company Deductions
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)" }}>
+                      3. Statutory Taxes &amp; Company Deductions
+                    </span>
+                    {ruleCount > 0 ? (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: "1px 8px",
+                          borderRadius: 999,
+                          background: "#DCFCE7",
+                          color: "#15803D",
+                        }}
+                      >
+                        {ruleCount} Active
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: "1px 8px",
+                          borderRadius: 999,
+                          background: "#F4F4F5",
+                          color: "var(--text-3)",
+                        }}
+                      >
+                        Needs rules
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>
                     {ruleCount > 0
-                      ? `${ruleCount} active deduction rule${ruleCount === 1 ? "" : "s"} configured.`
-                      : "No statutory rules set. You need at least one tax or deduction rule to calculate net pay."}
+                      ? `${ruleCount} active statutory rule${ruleCount === 1 ? "" : "s"} configured (PAYE, NSSF, or custom).`
+                      : "Add progressive tax (PAYE), pension (NSSF), or company deductions to calculate net pay."}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
-                className="btn-neutral btn-sm"
+                className={ruleCount > 0 ? "btn-neutral btn-sm" : "btn-primary btn-sm"}
                 onClick={() => {
                   onClose();
-                  onNavigateTab("Rules");
+                  onNavigateTab("Deductions & Rules");
+                  onOpenAddDeduction?.();
                 }}
               >
+                <Plus size={13} className="mr-4" />
                 {ruleCount > 0 ? "View Rules" : "Add Deduction"}
               </button>
             </div>

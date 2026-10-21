@@ -33,6 +33,9 @@ import {
   UserCheck,
   ArrowRight,
   TrendingUp,
+  Receipt,
+  HeartPulse,
+  Percent,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
@@ -42,6 +45,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatRibbon } from "@/components/ui/StatRibbon";
 import { toast } from "@/components/ui/Toast";
+import { Modal } from "@/components/ui/Modal";
 import { usePayroll } from "@/context/PayrollContext";
 
 import {
@@ -65,6 +69,10 @@ import {
   countryName,
   describeRule,
   PAYROLL_STATUSES,
+  parseCompensationDetails,
+  calculateChargeableGross,
+  calculateUgandaPAYE,
+  calculateNSSF,
 } from "@/components/payroll/payrollModel";
 
 import { PayrollWalkthroughWidget } from "@/components/payroll/PayrollWalkthroughWidget";
@@ -99,7 +107,7 @@ export default function PayrollPage() {
   const [isCompModalOpen, setIsCompModalOpen] = useState(false);
   const [selectedCompEmployeeId, setSelectedCompEmployeeId] = useState<string>("");
   const [isTaxRuleModalOpen, setIsTaxRuleModalOpen] = useState(false);
-  const [statementPayslip, setStatementPayslip] = useState<PayrollPayslip | PayrollRunItem | null>(null);
+  const [statementPayslip, setStatementPayslip] = useState<any | null>(null);
 
   // Wizard state (Run Payroll)
   const [wizardStep, setWizardStep] = useState<number>(0);
@@ -111,6 +119,28 @@ export default function PayrollPage() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
+
+  // Dynamic hourly/overtime/holiday/bonus adjustments per employee in active run
+  const [employeeAdjustments, setEmployeeAdjustments] = useState<
+    Record<
+      string,
+      {
+        productiveHours: number;
+        overtimeHours: number;
+        holidayHours: number;
+        bonusesMinor: number;
+        penaltiesMinor: number;
+        insuranceMinor: number;
+      }
+    >
+  >({});
+  const [editingAdjItem, setEditingAdjItem] = useState<PayrollRunItem | null>(null);
+  const [formProductiveHours, setFormProductiveHours] = useState("173.33");
+  const [formOvertimeHours, setFormOvertimeHours] = useState("0");
+  const [formHolidayHours, setFormHolidayHours] = useState("0");
+  const [formBonuses, setFormBonuses] = useState("0");
+  const [formPenalties, setFormPenalties] = useState("0");
+  const [formInsurance, setFormInsurance] = useState("0");
 
   // Paystubs tab search & filter
   const [paystubSearch, setPaystubSearch] = useState("");
@@ -329,6 +359,22 @@ export default function PayrollPage() {
   const employeesMissingSalary = useMemo(() => {
     return rosterWithComp.filter((e) => !e.hasSalary);
   }, [rosterWithComp]);
+
+  // Safe tab routing with automatic tab name normalization and optional modal trigger
+  const handleNavigateTab = (tab: string, andOpen?: "compensation" | "rule") => {
+    let target = tab;
+    if (tab === "Compensation") target = "Salaries";
+    if (tab === "Rules") target = "Deductions & Rules";
+    setActiveTab(target);
+    if (target === "Run Payroll") setWizardStep(0);
+    if (andOpen === "compensation") {
+      const missing = employeesMissingSalary[0];
+      setSelectedCompEmployeeId(missing ? missing.id : employees[0]?.id || "");
+      setIsCompModalOpen(true);
+    } else if (andOpen === "rule") {
+      setIsTaxRuleModalOpen(true);
+    }
+  };
 
   // Aggregate stats from the most recent run (or live roster if no run yet)
   const latestApprovedRun = useMemo(() => {
@@ -680,7 +726,7 @@ export default function PayrollPage() {
         {/* Walkthrough Widget (Workaround guide) */}
         <PayrollWalkthroughWidget
           onOpenHelp={() => setIsHelpModalOpen(true)}
-          onNavigateTab={setActiveTab}
+          onNavigateTab={handleNavigateTab}
           hasConfig={!!activeConfig}
           employeesWithComp={rosterWithComp.filter((e) => e.hasSalary).length}
           totalEmployees={employees.length}
@@ -691,7 +737,7 @@ export default function PayrollPage() {
         {employeesMissingSalary.length > 0 && (
           <div
             style={{
-              padding: "12px 18px",
+              padding: "14px 18px",
               background: "#FFFBEB",
               border: "1px solid #FDE68A",
               borderRadius: 12,
@@ -702,9 +748,23 @@ export default function PayrollPage() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <AlertTriangle size={20} style={{ color: "#D97706", flexShrink: 0 }} />
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  background: "#FEF3C7",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  color: "#D97706",
+                }}
+              >
+                <AlertTriangle size={20} />
+              </div>
               <div>
-                <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
+                <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>
                   Compensation setup needed:{" "}
                 </strong>
                 <span style={{ fontSize: 12.5, color: "var(--text-3)" }}>
@@ -714,8 +774,8 @@ export default function PayrollPage() {
             </div>
             <button
               type="button"
-              className="btn-neutral btn-sm"
-              onClick={() => setActiveTab("Salaries")}
+              className="btn-primary btn-sm"
+              onClick={() => handleNavigateTab("Salaries", "compensation")}
               style={{ flexShrink: 0 }}
             >
               Assign Salaries
@@ -1125,130 +1185,290 @@ export default function PayrollPage() {
           </Card>
         )}
 
-        {/* STEP 2: Review Calculated Run Items */}
-        {wizardStep === 2 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Card>
-              <CardHeader
-                title="Step 3: Review Calculated Payroll & Approve"
-                action={
-                  activeRun && (
+        {/* STEP 2: Review Calculated Run Items with Live Dynamic Hourly & Higher Rates */}
+        {wizardStep === 2 && (() => {
+          // Compute live items for each employee in the active run
+          const evaluatedItems = runItems.map((item) => {
+            const comp = compensationList.find((c) => c.employeeId === item.employeeId);
+            const parsed = parseCompensationDetails(comp);
+            const adj = employeeAdjustments[item.employeeId] || {
+              productiveHours: parsed.standardHours || 173.33,
+              overtimeHours: 0,
+              holidayHours: 0,
+              bonusesMinor: 0,
+              penaltiesMinor: 0,
+              insuranceMinor: 0,
+            };
+
+            const calc = calculateChargeableGross({
+              payRateMinor: parsed.hourlyRateMinor,
+              isHourly: parsed.model === "hourly",
+              monthlyBaseMinor: item.basePay,
+              productiveHours: adj.productiveHours,
+              overtimeHours: adj.overtimeHours,
+              holidayHours: adj.holidayHours,
+              bonusesMinor: adj.bonusesMinor,
+              insuranceMinor: adj.insuranceMinor,
+              penaltiesMinor: adj.penaltiesMinor,
+            });
+
+            const paye = currentCountry === "UG" ? calculateUgandaPAYE(calc.chargeableGrossMinor) : Math.round(item.deductions * 0.8);
+            const nssf = currentCountry === "UG" ? calculateNSSF(calc.chargeableGrossMinor) : Math.round(item.deductions * 0.2);
+            const totalDeductions = paye + nssf;
+            const netPay = Math.max(0, calc.chargeableGrossMinor - totalDeductions);
+
+            return {
+              item,
+              parsed,
+              adj,
+              calc,
+              paye,
+              nssf,
+              totalDeductions,
+              netPay,
+            };
+          });
+
+          const totalGrossAll = evaluatedItems.reduce((s, e) => s + e.calc.chargeableGrossMinor, 0);
+          const totalDeductionsAll = evaluatedItems.reduce((s, e) => s + e.totalDeductions, 0);
+          const totalNetAll = evaluatedItems.reduce((s, e) => s + e.netPay, 0);
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <Card>
+                <CardHeader
+                  title="Step 3: Review Calculated Payroll & Approve"
+                  action={
+                    activeRun && (
+                      <button
+                        type="button"
+                        className="btn-neutral btn-sm"
+                        style={{ color: "#DC2626" }}
+                        onClick={() => handleDiscardRun(activeRun.id)}
+                      >
+                        <Trash2 size={12} className="mr-4" /> Discard &amp; Recompute
+                      </button>
+                    )
+                  }
+                />
+                <CardBody style={{ padding: 0 }}>
+                  {/* Calculation Formula Banner (Matching Reference Specification) */}
+                  <div
+                    style={{
+                      padding: "14px 20px",
+                      background: "#FAF9F7",
+                      borderBottom: "1px solid var(--card-border, #E8ECE8)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <FileText size={14} style={{ color: "var(--primary)" }} />
+                      <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
+                        Calculation Formula: Chargeable Gross &amp; Statutory Deductions
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: 12, lineHeight: 1.6, color: "var(--text-2)" }}>
+                      <div>
+                        <strong>HOURLY compensation:</strong> Total monthly compensation = Pay rate × Productive hours
+                      </div>
+                      <div>
+                        <strong>Chargeable Income Gross Total</strong> = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
+                      </div>
+                      <div style={{ color: "var(--text-4)", fontSize: 11.5 }}>
+                        • Total Higher rates = (Overtime hours × Pay rate × 1.5) + (Public Holiday &amp; Sunday hours × Pay rate × 2.0).
+                        <br />
+                        • Statutory Deductions = PAYE (Progressive Tax on Chargeable Gross) + NSSF (5% Employee Pension). Net Pay = Gross Total - Deductions.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Aggregate Summary Ribbon */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, 1fr)",
+                      gap: 12,
+                      padding: "16px 20px",
+                      background: "#FFFFFF",
+                      borderBottom: "1px solid var(--card-border, #E8ECE8)",
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Total Chargeable Gross</span>
+                      <strong style={{ fontSize: 16, color: "var(--text-1)" }}>
+                        {formatMoney(totalGrossAll, currentCurrency)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Total Statutory Deductions</span>
+                      <strong style={{ fontSize: 16, color: "#DC2626" }}>
+                        -{formatMoney(totalDeductionsAll, currentCurrency)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Net Disbursement</span>
+                      <strong style={{ fontSize: 16, color: "#16A34A" }}>
+                        {formatMoney(totalNetAll, currentCurrency)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Employees in Run</span>
+                      <strong style={{ fontSize: 16, color: "var(--text-1)" }}>{runItems.length} Staff</strong>
+                    </div>
+                  </div>
+
+                  {/* Run Items Table */}
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12.5 }}>
+                      <thead>
+                        <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
+                          <th style={{ padding: "12px 16px" }}>Employee</th>
+                          <th style={{ padding: "12px 16px" }}>Pay Model &amp; Rate</th>
+                          <th style={{ padding: "12px 16px" }}>Productive Hours</th>
+                          <th style={{ padding: "12px 16px" }}>Higher Rates (OT/Hol)</th>
+                          <th style={{ padding: "12px 16px" }}>Bonuses / Penalties</th>
+                          <th style={{ padding: "12px 16px" }}>Chargeable Gross</th>
+                          <th style={{ padding: "12px 16px" }}>Deductions</th>
+                          <th style={{ padding: "12px 16px" }}>Net Pay</th>
+                          <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {evaluatedItems.map(({ item, parsed, adj, calc, totalDeductions, netPay }) => (
+                          <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <Avatar name={item.employeeName} size="sm" src={item.avatarUrl} />
+                                <div>
+                                  <strong style={{ color: "var(--text-1)" }}>{item.employeeName}</strong>
+                                  <div style={{ fontSize: 11, color: "var(--text-4)" }}>{item.department || "Staff"}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <Badge variant="neutral">
+                                {parsed.model === "hourly" ? "HOURLY" : "SALARIED"}
+                              </Badge>
+                              <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                                {parsed.model === "hourly"
+                                  ? `${formatMoney(parsed.hourlyRateMinor, currentCurrency)}/hr`
+                                  : formatMoney(item.basePay, currentCurrency)}
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "var(--text-2)", fontWeight: 600 }}>
+                              {adj.productiveHours} hrs
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              {calc.totalHigherRatesMinor > 0 ? (
+                                <div>
+                                  <span style={{ color: "var(--primary)", fontWeight: 700 }}>
+                                    +{formatMoney(calc.totalHigherRatesMinor, currentCurrency)}
+                                  </span>
+                                  <div style={{ fontSize: 10.5, color: "var(--text-4)" }}>
+                                    {adj.overtimeHours > 0 && `${adj.overtimeHours}h OT (1.5×)`}
+                                    {adj.overtimeHours > 0 && adj.holidayHours > 0 && " · "}
+                                    {adj.holidayHours > 0 && `${adj.holidayHours}h Hol (2.0×)`}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ color: "var(--text-4)" }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 16px", fontSize: 11.5 }}>
+                              {calc.totalBonusesMinor > 0 && (
+                                <span style={{ color: "var(--primary)", fontWeight: 600, display: "block" }}>
+                                  +{formatMoney(calc.totalBonusesMinor, currentCurrency)}
+                                </span>
+                              )}
+                              {calc.totalPenaltiesMinor > 0 && (
+                                <span style={{ color: "#DC2626", fontWeight: 600, display: "block" }}>
+                                  -{formatMoney(calc.totalPenaltiesMinor, currentCurrency)}
+                                </span>
+                              )}
+                              {calc.totalBonusesMinor === 0 && calc.totalPenaltiesMinor === 0 && (
+                                <span style={{ color: "var(--text-4)" }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 16px", fontWeight: 700, color: "var(--text-1)" }}>
+                              {formatMoney(calc.chargeableGrossMinor, currentCurrency)}
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "#DC2626", fontWeight: 600 }}>
+                              -{formatMoney(totalDeductions, currentCurrency)}
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "#16A34A", fontWeight: 700 }}>
+                              {formatMoney(netPay, currentCurrency)}
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                              <div style={{ display: "inline-flex", gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="btn-neutral btn-sm"
+                                  onClick={() => {
+                                    setEditingAdjItem(item);
+                                    setFormProductiveHours(String(adj.productiveHours));
+                                    setFormOvertimeHours(String(adj.overtimeHours));
+                                    setFormHolidayHours(String(adj.holidayHours));
+                                    setFormBonuses(String(toMajor(adj.bonusesMinor)));
+                                    setFormPenalties(String(toMajor(adj.penaltiesMinor)));
+                                    setFormInsurance(String(toMajor(adj.insuranceMinor)));
+                                  }}
+                                  title="Adjust hours, overtime, holidays, bonuses"
+                                >
+                                  Adjust Hours
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-neutral btn-sm"
+                                  onClick={() =>
+                                    setStatementPayslip({
+                                      ...item,
+                                      currency: currentCurrency,
+                                      productiveHours: adj.productiveHours,
+                                      overtimeHours: adj.overtimeHours,
+                                      holidayHours: adj.holidayHours,
+                                      higherRatesMinor: calc.totalHigherRatesMinor,
+                                      bonusesMinor: calc.totalBonusesMinor,
+                                      penaltiesMinor: calc.totalPenaltiesMinor,
+                                      insuranceMinor: calc.totalInsuranceMinor,
+                                      payModel: parsed.model,
+                                      hourlyRateMinor: parsed.hourlyRateMinor,
+                                      basePay: calc.baseMonthlyCompensationMinor,
+                                      earnings: calc.totalHigherRatesMinor + calc.totalBonusesMinor + calc.totalInsuranceMinor,
+                                      deductions: totalDeductions,
+                                      netPay,
+                                    })
+                                  }
+                                >
+                                  <Eye size={12} className="mr-4" /> Statement
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Footer Approve Button */}
+                  <div style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <button type="button" className="btn-neutral" onClick={() => setWizardStep(1)}>
+                      Back to Calculation
+                    </button>
                     <button
                       type="button"
-                      className="btn-neutral btn-sm"
-                      style={{ color: "#DC2626" }}
-                      onClick={() => handleDiscardRun(activeRun.id)}
+                      className="btn-primary"
+                      disabled={isProcessingRun}
+                      onClick={handleLockRun}
+                      style={{ padding: "10px 22px", fontSize: 13.5 }}
                     >
-                      <Trash2 size={12} className="mr-4" /> Discard &amp; Recompute
+                      {isProcessingRun ? <Loader2 size={15} className="animate-spin mr-6" /> : <ShieldCheck size={16} className="mr-6" />}
+                      Approve &amp; Lock Payroll Run
                     </button>
-                  )
-                }
-              />
-              <CardBody style={{ padding: 0 }}>
-                {/* Aggregate Summary Ribbon */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, 1fr)",
-                    gap: 12,
-                    padding: "16px 20px",
-                    background: "#FAF9F7",
-                    borderBottom: "1px solid var(--card-border)",
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Total Gross</span>
-                    <strong style={{ fontSize: 15, color: "var(--text-1)" }}>
-                      {formatMoney(runItems.reduce((s, i) => s + i.basePay + i.earnings, 0), currentCurrency)}
-                    </strong>
                   </div>
-                  <div>
-                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Total Deductions</span>
-                    <strong style={{ fontSize: 15, color: "#DC2626" }}>
-                      -{formatMoney(runItems.reduce((s, i) => s + i.deductions, 0), currentCurrency)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Net Take-Home Pay</span>
-                    <strong style={{ fontSize: 16, color: "#16A34A" }}>
-                      {formatMoney(runItems.reduce((s, i) => s + i.netPay, 0), currentCurrency)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Employees Count</span>
-                    <strong style={{ fontSize: 15, color: "var(--text-1)" }}>{runItems.length} Staff</strong>
-                  </div>
-                </div>
-
-                {/* Run Items Table */}
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12.5 }}>
-                    <thead>
-                      <tr style={{ background: "#FFFFFF", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
-                        <th style={{ padding: "12px 18px" }}>Employee</th>
-                        <th style={{ padding: "12px 18px" }}>Department</th>
-                        <th style={{ padding: "12px 18px" }}>Base Salary</th>
-                        <th style={{ padding: "12px 18px" }}>Deductions</th>
-                        <th style={{ padding: "12px 18px" }}>Net Pay</th>
-                        <th style={{ padding: "12px 18px", textAlign: "right" }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {runItems.map((item) => (
-                        <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                          <td style={{ padding: "12px 18px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <Avatar name={item.employeeName} size="sm" src={item.avatarUrl} />
-                              <strong style={{ color: "var(--text-1)" }}>{item.employeeName}</strong>
-                            </div>
-                          </td>
-                          <td style={{ padding: "12px 18px", color: "var(--text-3)" }}>
-                            {item.department || "General"}
-                          </td>
-                          <td style={{ padding: "12px 18px", fontWeight: 600 }}>
-                            {formatMoney(item.basePay, currentCurrency)}
-                          </td>
-                          <td style={{ padding: "12px 18px", color: "#DC2626", fontWeight: 600 }}>
-                            -{formatMoney(item.deductions, currentCurrency)}
-                          </td>
-                          <td style={{ padding: "12px 18px", color: "#16A34A", fontWeight: 700 }}>
-                            {formatMoney(item.netPay, currentCurrency)}
-                          </td>
-                          <td style={{ padding: "12px 18px", textAlign: "right" }}>
-                            <button
-                              type="button"
-                              className="btn-neutral btn-sm"
-                              onClick={() => setStatementPayslip({ ...item, currency: currentCurrency })}
-                            >
-                              <Eye size={12} className="mr-4" /> Preview
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Footer Approve Button */}
-                <div style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <button type="button" className="btn-neutral" onClick={() => setWizardStep(1)}>
-                    Back to Calculation
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={isProcessingRun}
-                    onClick={handleLockRun}
-                    style={{ padding: "10px 22px", fontSize: 13.5 }}
-                  >
-                    {isProcessingRun ? <Loader2 size={15} className="animate-spin mr-6" /> : <ShieldCheck size={16} className="mr-6" />}
-                    Approve &amp; Lock Payroll Run
-                  </button>
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-        )}
+                </CardBody>
+              </Card>
+            </div>
+          );
+        })()}
 
         {/* STEP 3: Completed */}
         {wizardStep === 3 && (
@@ -1338,7 +1558,7 @@ export default function PayrollPage() {
               Employee Salaries &amp; Compensation
             </h3>
             <p style={{ fontSize: 12.5, color: "var(--text-3)", margin: "3px 0 0 0" }}>
-              Every active staff member must have an effective monthly salary to be included in payroll cycles.
+              Configure hourly rates, standard productive hours, or fixed monthly salaries for active staff.
             </p>
           </div>
 
@@ -1350,8 +1570,53 @@ export default function PayrollPage() {
               setIsCompModalOpen(true);
             }}
           >
-            <Plus size={14} className="mr-6" /> Set Employee Salary
+            <Plus size={14} className="mr-6" /> Set Employee Compensation
           </button>
+        </div>
+
+        {/* Calculation Formula Card (Matching Reference Specification) */}
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid var(--card-border, #E8ECE8)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                background: "var(--primary-tint, #EFF6FF)",
+                color: "var(--primary, #2563EB)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <FileText size={14} />
+            </div>
+            <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
+              Calculation Formula
+            </h4>
+          </div>
+
+          <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-2)" }}>
+            <div style={{ fontWeight: 600, color: "var(--text-1)" }}>
+              HOURLY compensation: Total monthly compensation = Pay rate × Productive hours
+            </div>
+            <div>
+              Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
+            </div>
+            <div style={{ color: "var(--text-4)", fontSize: 11.5 }}>
+              • Total Higher rates = (Overtime hours × Pay rate × 1.5) + (Public Holiday &amp; Sunday hours × Pay rate × 2.0).
+              <br />
+              • Statutory Deductions = PAYE (Uganda Progressive Tax) + NSSF (5% Employee Pension). Net Pay = Gross Total - Deductions.
+            </div>
+          </div>
         </div>
 
         {/* Filter bar */}
@@ -1392,7 +1657,9 @@ export default function PayrollPage() {
                   <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
                     <th style={{ padding: "12px 18px" }}>Employee</th>
                     <th style={{ padding: "12px 18px" }}>Department &amp; Job Title</th>
-                    <th style={{ padding: "12px 18px" }}>Monthly Salary</th>
+                    <th style={{ padding: "12px 18px" }}>Pay Model &amp; Rate</th>
+                    <th style={{ padding: "12px 18px" }}>Standard Hours</th>
+                    <th style={{ padding: "12px 18px" }}>Monthly Base Compensation</th>
                     <th style={{ padding: "12px 18px" }}>Effective Date</th>
                     <th style={{ padding: "12px 18px" }}>Status</th>
                     <th style={{ padding: "12px 18px", textAlign: "right" }}>Actions</th>
@@ -1401,63 +1668,87 @@ export default function PayrollPage() {
                 <tbody>
                   {filteredRoster.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
+                      <td colSpan={8} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
                         No employees match the selected criteria.
                       </td>
                     </tr>
                   ) : (
-                    filteredRoster.map((emp) => (
-                      <tr key={emp.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                        <td style={{ padding: "12px 18px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <Avatar name={`${emp.firstName} ${emp.lastName}`} size="sm" src={emp.avatar} />
-                            <div>
-                              <strong style={{ color: "var(--text-1)" }}>
-                                {emp.firstName} {emp.lastName}
-                              </strong>
-                              {emp.workEmail && (
-                                <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>{emp.workEmail}</div>
-                              )}
+                    filteredRoster.map((emp) => {
+                      const comp = compensationList.find((c) => c.employeeId === emp.id);
+                      const parsed = parseCompensationDetails(comp);
+
+                      return (
+                        <tr key={emp.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                          <td style={{ padding: "12px 18px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Avatar name={`${emp.firstName} ${emp.lastName}`} size="sm" src={emp.avatar} />
+                              <div>
+                                <strong style={{ color: "var(--text-1)" }}>
+                                  {emp.firstName} {emp.lastName}
+                                </strong>
+                                {emp.workEmail && (
+                                  <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>{emp.workEmail}</div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "12px 18px", color: "var(--text-3)" }}>
-                          <div>{emp.jobTitle || "Staff"}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-4)" }}>{emp.department || "General"}</div>
-                        </td>
-                        <td style={{ padding: "12px 18px" }}>
-                          {emp.hasSalary ? (
-                            <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>
-                              {formatMoney(emp.baseAmountMinor, emp.currency)}
-                            </strong>
-                          ) : (
-                            <span style={{ fontSize: 12, color: "#D97706", fontWeight: 600 }}>
-                              Not set
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: "12px 18px", color: "var(--text-4)", fontSize: 12 }}>
-                          {emp.effectiveDate ? shortDate(emp.effectiveDate) : "—"}
-                        </td>
-                        <td style={{ padding: "12px 18px" }}>
-                          <Badge variant={emp.hasSalary ? "success" : "warning"}>
-                            {emp.hasSalary ? "CONFIGURED" : "MISSING"}
-                          </Badge>
-                        </td>
-                        <td style={{ padding: "12px 18px", textAlign: "right" }}>
-                          <button
-                            type="button"
-                            className="btn-neutral btn-sm"
-                            onClick={() => {
-                              setSelectedCompEmployeeId(emp.id);
-                              setIsCompModalOpen(true);
-                            }}
-                          >
-                            <Edit3 size={12} className="mr-4" /> {emp.hasSalary ? "Update" : "Set Salary"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-3)" }}>
+                            <div>{emp.jobTitle || "Staff"}</div>
+                            <div style={{ fontSize: 11, color: "var(--text-4)" }}>{emp.department || "General"}</div>
+                          </td>
+                          <td style={{ padding: "12px 18px" }}>
+                            {emp.hasSalary ? (
+                              <div>
+                                <Badge variant="neutral">
+                                  {parsed.model === "hourly" ? "HOURLY" : "SALARIED"}
+                                </Badge>
+                                <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 2 }}>
+                                  {parsed.model === "hourly"
+                                    ? `${formatMoney(parsed.hourlyRateMinor, emp.currency)} / hr`
+                                    : "Fixed Monthly"}
+                                </div>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "var(--text-4)" }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-3)", fontSize: 12 }}>
+                            {emp.hasSalary ? `${parsed.standardHours} hrs/mo` : "—"}
+                          </td>
+                          <td style={{ padding: "12px 18px" }}>
+                            {emp.hasSalary ? (
+                              <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>
+                                {formatMoney(emp.baseAmountMinor, emp.currency)}
+                              </strong>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "#D97706", fontWeight: 600 }}>
+                                Not set
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-4)", fontSize: 12 }}>
+                            {emp.effectiveDate ? shortDate(emp.effectiveDate) : "—"}
+                          </td>
+                          <td style={{ padding: "12px 18px" }}>
+                            <Badge variant={emp.hasSalary ? "success" : "warning"}>
+                              {emp.hasSalary ? "CONFIGURED" : "MISSING"}
+                            </Badge>
+                          </td>
+                          <td style={{ padding: "12px 18px", textAlign: "right" }}>
+                            <button
+                              type="button"
+                              className="btn-neutral btn-sm"
+                              onClick={() => {
+                                setSelectedCompEmployeeId(emp.id);
+                                setIsCompModalOpen(true);
+                              }}
+                            >
+                              <Edit3 size={12} className="mr-4" /> {emp.hasSalary ? "Update" : "Set Salary"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1512,32 +1803,92 @@ export default function PayrollPage() {
                 <tbody>
                   {taxRules.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
-                        No deduction rules configured. Click <strong>Add Deduction Rule</strong> or choose a 1-click template to add statutory rules.
+                      <td colSpan={6} style={{ padding: "40px 24px", textAlign: "center" }}>
+                        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+                          <div
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 10,
+                              background: "var(--primary-tint, #EFF6FF)",
+                              color: "var(--primary, #2563EB)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              margin: "0 auto 12px auto",
+                            }}
+                          >
+                            <Receipt size={20} />
+                          </div>
+                          <h4 style={{ fontSize: 14.5, fontWeight: 700, margin: "0 0 4px 0", color: "var(--text-1)" }}>
+                            No Statutory or Deduction Rules Yet
+                          </h4>
+                          <p style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 16px 0", lineHeight: 1.45 }}>
+                            Payroll requires statutory rules (like progressive PAYE or NSSF pension) to calculate employee net pay.
+                          </p>
+                          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="btn-primary btn-sm"
+                              onClick={() => setIsTaxRuleModalOpen(true)}
+                            >
+                              <TrendingUp size={13} className="mr-4" /> Add Uganda PAYE Brackets
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-neutral btn-sm"
+                              onClick={() => setIsTaxRuleModalOpen(true)}
+                            >
+                              <ShieldCheck size={13} className="mr-4" /> Add NSSF (5% Employee)
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-neutral btn-sm"
+                              onClick={() => setIsTaxRuleModalOpen(true)}
+                            >
+                              <Plus size={13} className="mr-4" /> Custom Rule
+                            </button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    taxRules.map((rule) => (
-                      <tr key={rule.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                        <td style={{ padding: "12px 18px" }}>
-                          <strong style={{ color: "var(--text-1)" }}>{rule.ruleName}</strong>
-                          <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>
-                            Country: {rule.country} · {rule.currency}
-                          </div>
-                        </td>
-                        <td style={{ padding: "12px 18px" }}>
-                          <Badge variant="neutral">
-                            {rule.ruleType === "progressive_tax" ? "PROGRESSIVE TAX" : "FLAT DEDUCTION"}
-                          </Badge>
-                        </td>
-                        <td style={{ padding: "12px 18px", color: "var(--text-2)", fontSize: 12.5 }}>
-                          {describeRule(rule, rule.currency || currentCurrency)}
-                        </td>
-                        <td style={{ padding: "12px 18px", color: "var(--text-3)", fontSize: 12 }}>
-                          {rule.appliesTo === "all_employees"
-                            ? "All Employees"
-                            : `${rule.appliesTo.toUpperCase()}`}
-                        </td>
+                    taxRules.map((rule) => {
+                      const nameLower = rule.ruleName.toLowerCase();
+                      const isProgressive = rule.ruleType === "progressive_tax";
+                      const isPension = nameLower.includes("nssf") || nameLower.includes("pension") || nameLower.includes("social");
+                      const isHealth = nameLower.includes("health") || nameLower.includes("medical") || nameLower.includes("insurance");
+                      const isFixed = rule.amountMinor > 0;
+
+                      return (
+                        <tr key={rule.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                          <td style={{ padding: "12px 18px" }}>
+                            <strong style={{ color: "var(--text-1)" }}>{rule.ruleName}</strong>
+                            <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>
+                              Country: {rule.country} · {rule.currency}
+                            </div>
+                          </td>
+                          <td style={{ padding: "12px 18px" }}>
+                            <Badge variant="neutral">
+                              {isProgressive
+                                ? "PROGRESSIVE TAX (PAYE)"
+                                : isPension
+                                ? "PENSION / STATUTORY"
+                                : isHealth
+                                ? "HEALTH SCHEME"
+                                : isFixed
+                                ? "FIXED MONTHLY"
+                                : "PERCENTAGE DEDUCTION"}
+                            </Badge>
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-2)", fontSize: 12.5 }}>
+                            {describeRule(rule, rule.currency || currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-3)", fontSize: 12 }}>
+                            {rule.appliesTo === "all_employees"
+                              ? "All Employees"
+                              : `${rule.appliesTo.toUpperCase()}`}
+                          </td>
                         <td style={{ padding: "12px 18px" }}>
                           <button
                             type="button"
@@ -1572,8 +1923,9 @@ export default function PayrollPage() {
                           </button>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    );
+                  })
+                )}
                 </tbody>
               </table>
             </div>
@@ -1883,8 +2235,8 @@ export default function PayrollPage() {
           </div>
         }
         tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        activeTab={activeTab === "Compensation" ? "Salaries" : activeTab === "Rules" ? "Deductions & Rules" : activeTab}
+        onTabChange={(tab) => handleNavigateTab(tab)}
       />
 
       <main style={{ padding: "0 24px 32px" }}>
@@ -1895,10 +2247,12 @@ export default function PayrollPage() {
           </div>
         ) : (
           <>
-            {activeTab === "Overview" && renderOverview()}
+            {(activeTab === "Overview" ||
+              (!TABS.includes(activeTab) && activeTab !== "Compensation" && activeTab !== "Rules")) &&
+              renderOverview()}
             {activeTab === "Run Payroll" && renderRunPayrollWizard()}
-            {activeTab === "Salaries" && renderSalaries()}
-            {activeTab === "Deductions & Rules" && renderRules()}
+            {(activeTab === "Salaries" || activeTab === "Compensation") && renderSalaries()}
+            {(activeTab === "Deductions & Rules" || activeTab === "Rules") && renderRules()}
             {activeTab === "Paystubs" && renderPaystubs()}
             {activeTab === "Settings" && renderSettings()}
           </>
@@ -1909,10 +2263,13 @@ export default function PayrollPage() {
       <PayrollHelpModal
         isOpen={isHelpModalOpen}
         onClose={() => setIsHelpModalOpen(false)}
-        onNavigateTab={(tab) => {
-          setActiveTab(tab);
-          if (tab === "Run Payroll") setWizardStep(0);
+        onNavigateTab={(tab) => handleNavigateTab(tab)}
+        onOpenAssignSalary={() => {
+          const missing = employeesMissingSalary[0];
+          setSelectedCompEmployeeId(missing ? missing.id : employees[0]?.id || "");
+          setIsCompModalOpen(true);
         }}
+        onOpenAddDeduction={() => setIsTaxRuleModalOpen(true)}
         hasConfig={!!activeConfig}
         configuredCountry={currentCountry}
         configuredCurrency={currentCurrency}
@@ -1951,6 +2308,245 @@ export default function PayrollPage() {
         payslip={statementPayslip}
         currency={currentCurrency}
       />
+
+      {/* ADJUST EMPLOYEE HOURS & RATES MODAL */}
+      <Modal
+        isOpen={!!editingAdjItem}
+        onClose={() => setEditingAdjItem(null)}
+        title="Adjust Hours & Higher Rates"
+        subtitle={
+          editingAdjItem
+            ? `Configure productive hours, overtime (1.5×), holiday rates (2.0×), and bonuses for ${editingAdjItem.employeeName}`
+            : ""
+        }
+        width={540}
+      >
+        {editingAdjItem &&
+          (() => {
+            const comp = compensationList.find((c) => c.employeeId === editingAdjItem.employeeId);
+            const parsed = parseCompensationDetails(comp);
+            const pHours = parseFloat(formProductiveHours) || 0;
+            const otHours = parseFloat(formOvertimeHours) || 0;
+            const holHours = parseFloat(formHolidayHours) || 0;
+            const bonMinor = toMinor(parseFloat(formBonuses) || 0);
+            const penMinor = toMinor(parseFloat(formPenalties) || 0);
+            const insMinor = toMinor(parseFloat(formInsurance) || 0);
+
+            const liveCalc = calculateChargeableGross({
+              payRateMinor: parsed.hourlyRateMinor,
+              isHourly: parsed.model === "hourly",
+              monthlyBaseMinor: editingAdjItem.basePay,
+              productiveHours: pHours,
+              overtimeHours: otHours,
+              holidayHours: holHours,
+              bonusesMinor: bonMinor,
+              insuranceMinor: insMinor,
+              penaltiesMinor: penMinor,
+            });
+
+            const livePaye =
+              currentCountry === "UG"
+                ? calculateUgandaPAYE(liveCalc.chargeableGrossMinor)
+                : Math.round(editingAdjItem.deductions * 0.8);
+            const liveNssf =
+              currentCountry === "UG"
+                ? calculateNSSF(liveCalc.chargeableGrossMinor)
+                : Math.round(editingAdjItem.deductions * 0.2);
+            const liveTotalDeductions = livePaye + liveNssf;
+            const liveNet = Math.max(0, liveCalc.chargeableGrossMinor - liveTotalDeductions);
+
+            const handleSaveAdj = (e: React.FormEvent) => {
+              e.preventDefault();
+              setEmployeeAdjustments((prev) => ({
+                ...prev,
+                [editingAdjItem.employeeId]: {
+                  productiveHours: pHours,
+                  overtimeHours: otHours,
+                  holidayHours: holHours,
+                  bonusesMinor: bonMinor,
+                  penaltiesMinor: penMinor,
+                  insuranceMinor: insMinor,
+                },
+              }));
+              setEditingAdjItem(null);
+              toast.success("Adjustment saved", `Updated hours and earnings for ${editingAdjItem.employeeName}.`);
+            };
+
+            return (
+              <form onSubmit={handleSaveAdj} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px 14px",
+                    background: "#FAF9F7",
+                    borderRadius: 8,
+                    border: "1px solid var(--card-border, #E8ECE8)",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: 11, color: "var(--text-4)", display: "block" }}>Structure</span>
+                    <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
+                      {parsed.model === "hourly"
+                        ? `Hourly: ${formatMoney(parsed.hourlyRateMinor, currentCurrency)}/hr`
+                        : "Monthly Salaried"}
+                    </strong>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-4)", display: "block" }}>Base Monthly Pay</span>
+                    <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
+                      {formatMoney(liveCalc.baseMonthlyCompensationMinor, currentCurrency)}
+                    </strong>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
+                      Productive Hours Worked
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input"
+                      value={formProductiveHours}
+                      onChange={(e) => setFormProductiveHours(e.target.value)}
+                      required
+                    />
+                    <small style={{ fontSize: 11, color: "var(--text-4)" }}>Standard: 173.33 hrs</small>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
+                      Overtime Hours (1.5× rate)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input"
+                      value={formOvertimeHours}
+                      onChange={(e) => setFormOvertimeHours(e.target.value)}
+                    />
+                    <small style={{ fontSize: 11, color: "var(--text-4)" }}>
+                      +{formatMoney(liveCalc.overtimeMinor, currentCurrency)}
+                    </small>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
+                      Public Holiday &amp; Sunday Hours (2.0×)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input"
+                      value={formHolidayHours}
+                      onChange={(e) => setFormHolidayHours(e.target.value)}
+                    />
+                    <small style={{ fontSize: 11, color: "var(--text-4)" }}>
+                      +{formatMoney(liveCalc.holidayMinor, currentCurrency)}
+                    </small>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
+                      One-Time Bonuses ({currentCurrency})
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input"
+                      value={formBonuses}
+                      onChange={(e) => setFormBonuses(e.target.value)}
+                    />
+                    <small style={{ fontSize: 11, color: "var(--text-4)" }}>Performance / attendance</small>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
+                      Insurance &amp; Allowances ({currentCurrency})
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input"
+                      value={formInsurance}
+                      onChange={(e) => setFormInsurance(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
+                      Penalties / Deductions ({currentCurrency})
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input"
+                      value={formPenalties}
+                      onChange={(e) => setFormPenalties(e.target.value)}
+                    />
+                    <small style={{ fontSize: 11, color: "var(--text-4)" }}>Tardiness / absence</small>
+                  </div>
+                </div>
+
+                {/* Live Chargeable Summary */}
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    background: "var(--primary-tint, #EFF6FF)",
+                    borderRadius: 8,
+                    border: "1px solid #BFDBFE",
+                    fontSize: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span>Chargeable Gross Total:</span>
+                    <strong>{formatMoney(liveCalc.chargeableGrossMinor, currentCurrency)}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#DC2626", marginBottom: 4 }}>
+                    <span>Statutory Deductions (PAYE + NSSF):</span>
+                    <strong>-{formatMoney(liveTotalDeductions, currentCurrency)}</strong>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: 13,
+                      borderTop: "1px solid #BFDBFE",
+                      paddingTop: 4,
+                      fontWeight: 700,
+                      color: "#16A34A",
+                    }}
+                  >
+                    <span>Calculated Net Pay:</span>
+                    <span>{formatMoney(liveNet, currentCurrency)}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                  <button type="button" className="btn-neutral" onClick={() => setEditingAdjItem(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Save Adjustments
+                  </button>
+                </div>
+              </form>
+            );
+          })()}
+      </Modal>
     </>
   );
 }

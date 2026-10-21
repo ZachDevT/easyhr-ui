@@ -320,3 +320,172 @@ export const COUNTRY_TEMPLATES: Record<string, RuleTemplate[]> = {
     },
   ],
 };
+
+/* -------------------------------------------------------------- Uganda / Dynamic Calculation Engine */
+
+export interface ParsedCompensation {
+  model: 'hourly' | 'monthly_salary';
+  hourlyRateMinor: number;
+  monthlyBaseMinor: number;
+  standardHours: number;
+  displaySummary: string;
+}
+
+/**
+ * Extracts hourly vs salaried metadata from a compensation record.
+ * Handles patterns like "HOURLY: 18500 UGX/hr (173.33 hrs)" or defaults to salaried.
+ */
+export function parseCompensationDetails(comp?: CompensationRecord | null): ParsedCompensation {
+  if (!comp || comp.baseAmountMinor <= 0) {
+    return {
+      model: 'monthly_salary',
+      hourlyRateMinor: 0,
+      monthlyBaseMinor: 0,
+      standardHours: 173.33,
+      displaySummary: 'Not configured',
+    };
+  }
+
+  const reason = (comp.reason || '').trim();
+  const isHourly = comp.payType === 'hourly' || reason.toLowerCase().startsWith('hourly');
+
+  if (isHourly) {
+    // Try to extract hourly rate from reason e.g. "HOURLY: 18500 UGX/hr (173.33 hrs)"
+    const match = reason.match(/HOURLY:\s*(\d+(?:\.\d+)?)/i);
+    let hourlyRateMinor = 0;
+    if (match) {
+      hourlyRateMinor = toMinor(parseFloat(match[1]));
+    } else {
+      hourlyRateMinor = Math.round(comp.baseAmountMinor / 173.33);
+    }
+
+    return {
+      model: 'hourly',
+      hourlyRateMinor,
+      monthlyBaseMinor: comp.baseAmountMinor,
+      standardHours: 173.33,
+      displaySummary: `${formatMoney(hourlyRateMinor, comp.currency)} / hr (Hourly)`,
+    };
+  }
+
+  return {
+    model: 'monthly_salary',
+    hourlyRateMinor: Math.round(comp.baseAmountMinor / 173.33),
+    monthlyBaseMinor: comp.baseAmountMinor,
+    standardHours: 173.33,
+    displaySummary: `${formatMoney(comp.baseAmountMinor, comp.currency)} / mo (Salaried)`,
+  };
+}
+
+export interface GrossCalculationParams {
+  payRateMinor: number; // Hourly rate (or monthly equivalent / 173.33)
+  isHourly: boolean;
+  monthlyBaseMinor: number;
+  productiveHours: number; // e.g. 173.33, 160
+  overtimeHours?: number; // 1.5x regular pay
+  holidayHours?: number; // 2.0x regular pay (Public holidays & Sundays)
+  bonusesMinor?: number; // One-time bonuses
+  insuranceMinor?: number; // Insurance / Allowances
+  penaltiesMinor?: number; // Tardiness, absence penalties
+}
+
+export interface GrossCalculationResult {
+  baseMonthlyCompensationMinor: number;
+  totalHigherRatesMinor: number;
+  overtimeMinor: number;
+  holidayMinor: number;
+  totalBonusesMinor: number;
+  totalInsuranceMinor: number;
+  totalPenaltiesMinor: number;
+  chargeableGrossMinor: number;
+}
+
+/**
+ * Basic Uganda & Enterprise Chargeable Income formula:
+ * HOURLY compensation: Total monthly compensation = Pay rate * Productive hours
+ * Higher rates = Overtime (1.5x) + Public Holidays / Sundays (2.0x)
+ * Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
+ */
+export function calculateChargeableGross(params: GrossCalculationParams): GrossCalculationResult {
+  const {
+    payRateMinor,
+    isHourly,
+    monthlyBaseMinor,
+    productiveHours,
+    overtimeHours = 0,
+    holidayHours = 0,
+    bonusesMinor = 0,
+    insuranceMinor = 0,
+    penaltiesMinor = 0,
+  } = params;
+
+  let baseMonthlyCompensationMinor = 0;
+  if (isHourly && payRateMinor > 0) {
+    baseMonthlyCompensationMinor = Math.round(payRateMinor * Math.max(0, productiveHours));
+  } else {
+    baseMonthlyCompensationMinor = monthlyBaseMinor;
+  }
+
+  const effectiveHourlyRateMinor = isHourly
+    ? payRateMinor
+    : Math.round(monthlyBaseMinor / 173.33);
+
+  // Overtime = 1.5x regular pay rate
+  const overtimeMinor = Math.round(Math.max(0, overtimeHours) * effectiveHourlyRateMinor * 1.5);
+  // Public Holidays & Sundays = 2.0x regular pay rate
+  const holidayMinor = Math.round(Math.max(0, holidayHours) * effectiveHourlyRateMinor * 2.0);
+  const totalHigherRatesMinor = overtimeMinor + holidayMinor;
+
+  const totalBonusesMinor = Math.max(0, bonusesMinor);
+  const totalInsuranceMinor = Math.max(0, insuranceMinor);
+  const totalPenaltiesMinor = Math.max(0, penaltiesMinor);
+
+  // Chargeable Gross Total formula
+  const chargeableGrossMinor = Math.max(
+    0,
+    baseMonthlyCompensationMinor +
+      totalBonusesMinor +
+      totalHigherRatesMinor +
+      totalInsuranceMinor -
+      totalPenaltiesMinor
+  );
+
+  return {
+    baseMonthlyCompensationMinor,
+    totalHigherRatesMinor,
+    overtimeMinor,
+    holidayMinor,
+    totalBonusesMinor,
+    totalInsuranceMinor,
+    totalPenaltiesMinor,
+    chargeableGrossMinor,
+  };
+}
+
+/**
+ * Standard Uganda PAYE Progressive Tax calculation (URA Brackets)
+ * Slices:
+ * Up to 235,000 UGX: 0%
+ * 235,000 - 335,000 UGX: 10%
+ * 335,000 - 410,000 UGX: 20%
+ * 410,000 - 10,000,000 UGX: 30%
+ * Above 10,000,000 UGX: 40%
+ */
+export function calculateUgandaPAYE(chargeableGrossMinor: number): number {
+  const bands: TaxBand[] = [
+    { upTo: toMinor(235_000), ratePercent: 0 },
+    { upTo: toMinor(335_000), ratePercent: 10 },
+    { upTo: toMinor(410_000), ratePercent: 20 },
+    { upTo: toMinor(10_000_000), ratePercent: 30 },
+    { upTo: 0, ratePercent: 40 },
+  ];
+  return progressiveTax(chargeableGrossMinor, bands);
+}
+
+/**
+ * Uganda Statutory NSSF (5% Employee Pension)
+ */
+export function calculateNSSF(chargeableGrossMinor: number): number {
+  return Math.round(chargeableGrossMinor * 0.05);
+}
+

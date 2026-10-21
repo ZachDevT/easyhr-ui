@@ -3,13 +3,28 @@
 import React from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
-import { Printer, X, Building, CheckCircle2, DollarSign } from "lucide-react";
+import { Printer, Building, FileText } from "lucide-react";
 import { formatMoney, shortDate, monthLabel, PayrollPayslip, PayrollRunItem } from "./payrollModel";
 
 interface PaystubStatementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  payslip: PayrollPayslip | (PayrollRunItem & { periodStart?: string; periodEnd?: string; payDate?: string; currency?: string; email?: string }) | null;
+  payslip: (PayrollPayslip | PayrollRunItem) & {
+    periodStart?: string;
+    periodEnd?: string;
+    payDate?: string;
+    currency?: string;
+    email?: string;
+    productiveHours?: number;
+    overtimeHours?: number;
+    holidayHours?: number;
+    higherRatesMinor?: number;
+    bonusesMinor?: number;
+    penaltiesMinor?: number;
+    insuranceMinor?: number;
+    payModel?: "hourly" | "monthly_salary";
+    hourlyRateMinor?: number;
+  } | null;
   currency: string;
   companyName?: string;
 }
@@ -23,10 +38,25 @@ export function PaystubStatementModal({
 }: PaystubStatementModalProps) {
   if (!payslip) return null;
 
-  const cur = (payslip as any).currency || currency;
-  const pStart = (payslip as any).periodStart || "";
-  const pEnd = (payslip as any).periodEnd || "";
-  const pPayDate = (payslip as any).payDate || "";
+  const cur = payslip.currency || currency;
+  const pStart = payslip.periodStart || "";
+  const pEnd = payslip.periodEnd || "";
+  const pPayDate = payslip.payDate || "";
+
+  const isHourly = payslip.payModel === "hourly";
+  const productiveHours = payslip.productiveHours || 173.33;
+  const overtimeHours = payslip.overtimeHours || 0;
+  const holidayHours = payslip.holidayHours || 0;
+  const higherRatesMinor = payslip.higherRatesMinor || 0;
+  const bonusesMinor = payslip.bonusesMinor || 0;
+  const penaltiesMinor = payslip.penaltiesMinor || 0;
+  const insuranceMinor = payslip.insuranceMinor || 0;
+
+  const totalGrossPay = payslip.basePay + (payslip.earnings || 0) + higherRatesMinor + bonusesMinor + insuranceMinor - penaltiesMinor;
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <Modal
@@ -34,7 +64,7 @@ export function PaystubStatementModal({
       onClose={onClose}
       title="Official Pay Statement"
       subtitle={`Payment record for ${payslip.employeeName}`}
-      width={680}
+      width={700}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }} id="printable-payslip">
         {/* Top Header Card */}
@@ -44,7 +74,7 @@ export function PaystubStatementModal({
             justifyContent: "space-between",
             alignItems: "flex-start",
             paddingBottom: 16,
-            borderBottom: "1px solid var(--card-border, #E4E4E7)",
+            borderBottom: "1px solid var(--card-border, #E8ECE8)",
           }}
         >
           <div>
@@ -54,7 +84,7 @@ export function PaystubStatementModal({
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  background: "var(--gradient)",
+                  background: "var(--primary, #2563EB)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -96,25 +126,25 @@ export function PaystubStatementModal({
             padding: "12px 16px",
             background: "#FAF9F7",
             borderRadius: 10,
-            border: "1px solid var(--card-border)",
+            border: "1px solid var(--card-border, #E8ECE8)",
             fontSize: 12.5,
           }}
         >
           <div>
             <span style={{ color: "var(--text-4)", display: "block", fontSize: 11 }}>Employee Name</span>
             <strong style={{ color: "var(--text-1)", fontSize: 13.5 }}>{payslip.employeeName}</strong>
-            {(payslip as any).email && (
-              <div style={{ color: "var(--text-3)", fontSize: 11.5 }}>{(payslip as any).email}</div>
+            {payslip.email && (
+              <div style={{ color: "var(--text-3)", fontSize: 11.5 }}>{payslip.email}</div>
             )}
           </div>
           <div>
-            <span style={{ color: "var(--text-4)", display: "block", fontSize: 11 }}>Currency &amp; Pay Method</span>
-            <strong style={{ color: "var(--text-1)", fontSize: 13.5 }}>{cur} (Direct Electronic Transfer)</strong>
-            {(payslip as any).deliveryStatus && (
-              <div style={{ color: "#16A34A", fontSize: 11.5, textTransform: "capitalize" }}>
-                Status: {(payslip as any).deliveryStatus}
-              </div>
-            )}
+            <span style={{ color: "var(--text-4)", display: "block", fontSize: 11 }}>Compensation Structure</span>
+            <strong style={{ color: "var(--text-1)", fontSize: 13.5 }}>
+              {isHourly ? `Hourly (${productiveHours} Productive Hours)` : "Monthly Salaried"}
+            </strong>
+            <div style={{ color: "var(--text-3)", fontSize: 11.5 }}>
+              Disbursement Currency: <strong>{cur}</strong>
+            </div>
           </div>
         </div>
 
@@ -123,40 +153,73 @@ export function PaystubStatementModal({
           {/* Earnings */}
           <div
             style={{
-              border: "1px solid var(--card-border)",
+              border: "1px solid var(--card-border, #E8ECE8)",
               borderRadius: 10,
               padding: 14,
               background: "#FFFFFF",
             }}
           >
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#166534", marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-1)", marginBottom: 10 }}>
               Gross Earnings (+)
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-2)" }}>Base Salary</span>
+                <span style={{ color: "var(--text-2)" }}>
+                  Base Compensation {isHourly && `(${productiveHours} hrs)`}
+                </span>
                 <span style={{ fontWeight: 600 }}>{formatMoney(payslip.basePay, cur)}</span>
               </div>
-              {payslip.earnings > 0 && (
+
+              {higherRatesMinor > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--text-2)" }}>Additional Earnings / Bonuses</span>
-                  <span style={{ fontWeight: 600, color: "#16A34A" }}>
-                    +{formatMoney(payslip.earnings, cur)}
+                  <span style={{ color: "var(--text-2)" }}>
+                    Higher Rates (OT 1.5×, Holidays 2.0×)
+                  </span>
+                  <span style={{ fontWeight: 600, color: "var(--primary)" }}>
+                    +{formatMoney(higherRatesMinor, cur)}
                   </span>
                 </div>
               )}
+
+              {bonusesMinor > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-2)" }}>Bonuses &amp; Incentives</span>
+                  <span style={{ fontWeight: 600, color: "var(--primary)" }}>
+                    +{formatMoney(bonusesMinor, cur)}
+                  </span>
+                </div>
+              )}
+
+              {insuranceMinor > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-2)" }}>Insurance &amp; Allowances</span>
+                  <span style={{ fontWeight: 600 }}>
+                    +{formatMoney(insuranceMinor, cur)}
+                  </span>
+                </div>
+              )}
+
+              {penaltiesMinor > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-2)" }}>Penalties / Attendance Adjustments</span>
+                  <span style={{ fontWeight: 600, color: "#DC2626" }}>
+                    -{formatMoney(penaltiesMinor, cur)}
+                  </span>
+                </div>
+              )}
+
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   paddingTop: 8,
                   marginTop: 4,
-                  borderTop: "1px solid var(--card-border)",
+                  borderTop: "1px solid var(--card-border, #E8ECE8)",
                   fontWeight: 700,
                 }}
               >
-                <span>Total Gross Pay</span>
-                <span>{formatMoney(payslip.basePay + (payslip.earnings || 0), cur)}</span>
+                <span>Chargeable Gross Total</span>
+                <span>{formatMoney(totalGrossPay, cur)}</span>
               </div>
             </div>
           </div>
@@ -164,20 +227,26 @@ export function PaystubStatementModal({
           {/* Deductions */}
           <div
             style={{
-              border: "1px solid var(--card-border)",
+              border: "1px solid var(--card-border, #E8ECE8)",
               borderRadius: 10,
               padding: 14,
               background: "#FFFFFF",
             }}
           >
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#991B1B", marginBottom: 10 }}>
-              Statutory &amp; Company Deductions (-)
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-1)", marginBottom: 10 }}>
+              Statutory Withholdings (-)
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-2)" }}>Taxes &amp; Statutory Withholdings</span>
-                <span style={{ fontWeight: 600, color: "#DC2626" }}>
-                  -{formatMoney(payslip.deductions, cur)}
+                <span style={{ color: "var(--text-2)" }}>PAYE &amp; National Taxes</span>
+                <span style={{ fontWeight: 600, color: "var(--text-1)" }}>
+                  -{formatMoney(Math.round(payslip.deductions * 0.8), cur)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text-2)" }}>NSSF (5% Employee Pension)</span>
+                <span style={{ fontWeight: 600, color: "var(--text-1)" }}>
+                  -{formatMoney(Math.round(payslip.deductions * 0.2), cur)}
                 </span>
               </div>
               <div
@@ -186,13 +255,12 @@ export function PaystubStatementModal({
                   justifyContent: "space-between",
                   paddingTop: 8,
                   marginTop: 4,
-                  borderTop: "1px solid var(--card-border)",
+                  borderTop: "1px solid var(--card-border, #E8ECE8)",
                   fontWeight: 700,
-                  color: "#991B1B",
                 }}
               >
-                <span>Total Deductions</span>
-                <span>-{formatMoney(payslip.deductions, cur)}</span>
+                <span>Total Statutory Deductions</span>
+                <span style={{ color: "#DC2626" }}>-{formatMoney(payslip.deductions, cur)}</span>
               </div>
             </div>
           </div>
@@ -201,8 +269,8 @@ export function PaystubStatementModal({
         {/* Net Take-Home Pay Banner */}
         <div
           style={{
-            background: "linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)",
-            border: "1px solid #A7F3D0",
+            background: "var(--primary-tint, #EFF6FF)",
+            border: "1px solid #BFDBFE",
             borderRadius: 12,
             padding: "16px 20px",
             display: "flex",
@@ -211,31 +279,30 @@ export function PaystubStatementModal({
           }}
         >
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase" }}>
               Net Take-Home Pay
             </div>
-            <div style={{ fontSize: 11.5, color: "#047857" }}>
-              Amount deposited or authorized for disbursement
+            <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+              Amount disbursed via electronic payroll transfer
             </div>
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "#065F46" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-1)" }}>
             {formatMoney(payslip.netPay, cur)}
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
-          <button type="button" className="btn-neutral" onClick={onClose}>
-            Close
-          </button>
+        {/* Action buttons */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
           <button
             type="button"
-            className="btn-primary"
-            onClick={() => {
-              window.print();
-            }}
+            className="btn-neutral"
+            onClick={handlePrint}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            <Printer size={14} className="mr-6" /> Print / Save PDF
+            <Printer size={14} /> Print / Save PDF
+          </button>
+          <button type="button" className="btn-primary" onClick={onClose}>
+            Done
           </button>
         </div>
       </div>

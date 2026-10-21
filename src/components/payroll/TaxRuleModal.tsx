@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Plus, Trash2, Sparkles, Loader2, Info } from "lucide-react";
+import { Plus, Trash2, Sparkles, Loader2, Info, TrendingUp, ShieldCheck, HeartPulse, Percent, DollarSign, Layers } from "lucide-react";
 import { TaxBand, toMinor, toMajor, formatMoney, Department, Position } from "./payrollModel";
 
 interface TaxRuleModalProps {
@@ -191,7 +191,7 @@ export function TaxRuleModal({
           </div>
         )}
 
-        {/* Quick Presets */}
+        {/* Quick Presets adhering to EasyHR colors */}
         <div>
           <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-3)", display: "block", marginBottom: 6 }}>
             Quick Templates (1-Click)
@@ -201,26 +201,27 @@ export function TaxRuleModal({
               type="button"
               className="btn-neutral btn-sm"
               onClick={loadUgandaPayePreset}
-              style={{ fontSize: 11.5 }}
+              style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 5 }}
             >
-              <Sparkles size={12} className="mr-4" style={{ color: "var(--primary)" }} />
+              <TrendingUp size={12} style={{ color: "var(--primary)" }} />
               Uganda PAYE (URA Brackets)
             </button>
             <button
               type="button"
               className="btn-neutral btn-sm"
               onClick={loadNssfPreset}
-              style={{ fontSize: 11.5 }}
+              style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 5 }}
             >
-              <Sparkles size={12} className="mr-4" style={{ color: "var(--primary)" }} />
+              <ShieldCheck size={12} style={{ color: "var(--primary)" }} />
               NSSF (5% Employee)
             </button>
             <button
               type="button"
               className="btn-neutral btn-sm"
               onClick={loadHealthSchemePreset}
-              style={{ fontSize: 11.5 }}
+              style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 5 }}
             >
+              <HeartPulse size={12} style={{ color: "var(--primary)" }} />
               Staff Health Fixed
             </button>
           </div>
@@ -241,7 +242,7 @@ export function TaxRuleModal({
           />
         </div>
 
-        {/* Deduction Method */}
+        {/* Deduction Method with EasyHR primary theme */}
         <div>
           <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
             Calculation Method
@@ -260,9 +261,13 @@ export function TaxRuleModal({
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
               }}
             >
-              Percentage of Salary
+              <Percent size={13} /> Percentage
             </button>
             <button
               type="button"
@@ -277,9 +282,13 @@ export function TaxRuleModal({
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
               }}
             >
-              Fixed Monthly Amount
+              <DollarSign size={13} /> Fixed Monthly
             </button>
             <button
               type="button"
@@ -294,9 +303,13 @@ export function TaxRuleModal({
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
               }}
             >
-              Progressive Tax Brackets
+              <Layers size={13} /> Progressive Brackets
             </button>
           </div>
         </div>

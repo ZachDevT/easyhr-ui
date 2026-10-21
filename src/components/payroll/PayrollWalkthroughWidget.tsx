@@ -6,12 +6,14 @@ import {
   CheckCircle2,
   Sliders,
   DollarSign,
+  Receipt,
   FileText,
   Send,
   X,
   HelpCircle,
   ChevronRight,
   Info,
+  Building,
 } from "lucide-react";
 
 interface PayrollWalkthroughWidgetProps {
@@ -126,13 +128,13 @@ export function PayrollWalkthroughWidget({
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #FAF5FF 0%, #F5F7FF 100%)",
-        border: "1px solid #E9D5FF",
-        borderRadius: 14,
+        background: "#FFFFFF",
+        border: "1px solid var(--card-border, #E8ECE8)",
+        borderRadius: 16,
         padding: "16px 20px",
         marginBottom: 20,
         position: "relative",
-        boxShadow: "0 2px 10px rgba(162, 56, 255, 0.04)",
+        boxShadow: "0 4px 18px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)",
       }}
     >
       {/* Header row */}
@@ -148,10 +150,10 @@ export function PayrollWalkthroughWidget({
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div
             style={{
-              width: 30,
-              height: 30,
+              width: 32,
+              height: 32,
               borderRadius: 8,
-              background: "var(--gradient)",
+              background: "var(--primary, #2563EB)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -232,110 +234,160 @@ export function PayrollWalkthroughWidget({
         </div>
       </div>
 
-      {/* 4 Steps visual row */}
+      {/* 4 Steps visual row adhering to EasyHR colors */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 10,
+          gap: 12,
           marginTop: 10,
         }}
       >
-        {/* Step 1 */}
+        {/* Step 1: Settings */}
         <div
           onClick={() => onNavigateTab("Settings")}
           style={{
             background: "#FFFFFF",
-            borderRadius: 10,
-            padding: "10px 12px",
-            border: hasConfig ? "1px solid #BBF7D0" : "1px solid #E9D5FF",
+            borderRadius: 12,
+            padding: "12px 14px",
+            border: "1px solid var(--card-border, #E8ECE8)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)" }}>1. Country & Currency</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--primary, #2563EB)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Sliders size={13} /> 1. Settings &amp; Hours
+            </span>
             {hasConfig ? (
-              <CheckCircle2 size={13} style={{ color: "#16A34A" }} />
+              <CheckCircle2 size={14} style={{ color: "#16A34A" }} />
             ) : (
-              <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>Needs setup</span>
+              <span style={{ fontSize: 10.5, color: "var(--text-3)", fontWeight: 600, background: "#F4F4F5", padding: "1px 6px", borderRadius: 4 }}>
+                Setup
+              </span>
             )}
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.35 }}>
-            Pick your country, currency, and standard work hours in Settings.
+          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.4 }}>
+            Currency, country tax standards, and monthly hours benchmark.
           </p>
         </div>
 
-        {/* Step 2 */}
+        {/* Step 2: Base Salaries */}
         <div
-          onClick={() => onNavigateTab("Compensation")}
+          onClick={() => onNavigateTab("Salaries")}
           style={{
             background: "#FFFFFF",
-            borderRadius: 10,
-            padding: "10px 12px",
-            border: employeesWithComp > 0 ? "1px solid #BBF7D0" : "1px solid #E9D5FF",
+            borderRadius: 12,
+            padding: "12px 14px",
+            border: "1px solid var(--card-border, #E8ECE8)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)" }}>2. Base Salaries</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--primary, #2563EB)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <DollarSign size={13} /> 2. Pay Rates &amp; Salaries
+            </span>
             {employeesWithComp > 0 ? (
               <span style={{ fontSize: 10.5, color: "#16A34A", fontWeight: 700 }}>
                 {employeesWithComp}/{totalEmployees || "—"} set
               </span>
             ) : (
-              <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>Required</span>
+              <span style={{ fontSize: 10.5, color: "var(--text-3)", fontWeight: 600, background: "#F4F4F5", padding: "1px 6px", borderRadius: 4 }}>
+                Required
+              </span>
             )}
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.35 }}>
-            Every active employee needs an effective monthly salary record.
+          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.4 }}>
+            Hourly rates (Pay rate × hours) or monthly salaried compensation.
           </p>
         </div>
 
-        {/* Step 3 */}
+        {/* Step 3: Deductions & Taxes */}
         <div
-          onClick={() => onNavigateTab("Rules")}
+          onClick={() => onNavigateTab("Deductions & Rules")}
           style={{
             background: "#FFFFFF",
-            borderRadius: 10,
-            padding: "10px 12px",
-            border: hasRules ? "1px solid #BBF7D0" : "1px solid #E9D5FF",
+            borderRadius: 12,
+            padding: "12px 14px",
+            border: "1px solid var(--card-border, #E8ECE8)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)" }}>3. Deductions & Taxes</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--primary, #2563EB)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Receipt size={13} /> 3. Deductions &amp; Taxes
+            </span>
             {hasRules ? (
-              <CheckCircle2 size={13} style={{ color: "#16A34A" }} />
+              <CheckCircle2 size={14} style={{ color: "#16A34A" }} />
             ) : (
-              <span style={{ fontSize: 10, color: "#D97706", fontWeight: 600 }}>Add rules</span>
+              <span style={{ fontSize: 10.5, color: "var(--text-3)", fontWeight: 600, background: "#F4F4F5", padding: "1px 6px", borderRadius: 4 }}>
+                Add rules
+              </span>
             )}
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.35 }}>
-            Progressive income tax brackets (PAYE) and social funds (NSSF).
+          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.4 }}>
+            Progressive income tax (PAYE), pension (NSSF), and company deductions.
           </p>
         </div>
 
-        {/* Step 4 */}
+        {/* Step 4: Run & Disburse */}
         <div
           onClick={() => onNavigateTab("Run Payroll")}
           style={{
             background: "#FFFFFF",
-            borderRadius: 10,
-            padding: "10px 12px",
-            border: "1px solid #E9D5FF",
+            borderRadius: 12,
+            padding: "12px 14px",
+            border: "1px solid var(--card-border, #E8ECE8)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)" }}>4. Run & Disburse</span>
-            <ChevronRight size={13} style={{ color: "var(--text-4)" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--primary, #2563EB)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Send size={13} /> 4. Run &amp; Disburse
+            </span>
+            <ChevronRight size={14} style={{ color: "var(--text-4)" }} />
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.35 }}>
-            Calculate net pay, approve the run, and email official paystubs.
+          <p style={{ fontSize: 11.5, color: "var(--text-3)", margin: 0, lineHeight: 1.4 }}>
+            Review overtime, holiday rates, bonuses, and lock payroll statements.
           </p>
         </div>
       </div>
@@ -346,15 +398,15 @@ export function PayrollWalkthroughWidget({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginTop: 10,
-          paddingTop: 8,
-          borderTop: "1px solid rgba(233, 213, 255, 0.6)",
+          marginTop: 12,
+          paddingTop: 10,
+          borderTop: "1px solid var(--card-border, #E8ECE8)",
           fontSize: 11.5,
           color: "var(--text-4, #6E7571)",
         }}
       >
         <span>
-          💡 Tip: You can review and discard draft runs anytime before final approval without affecting your books.
+          💡 <strong>Tip:</strong> You can review and discard draft runs anytime before final approval without affecting your books.
         </span>
         <button
           type="button"
@@ -368,7 +420,7 @@ export function PayrollWalkthroughWidget({
             fontSize: 11,
           }}
         >
-          Got it, don't show this banner again
+          Dismiss guide
         </button>
       </div>
     </div>
