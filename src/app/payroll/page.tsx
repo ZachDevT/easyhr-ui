@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   DollarSign,
   Clock,
@@ -8,10 +8,8 @@ import {
   Mail,
   CheckCircle2,
   ChevronRight,
-  Download,
-  Filter,
   Search,
-  Settings,
+  Settings as SettingsIcon,
   Building,
   AlertCircle,
   AlertTriangle,
@@ -19,8 +17,6 @@ import {
   Save,
   Info,
   CalendarDays,
-  TrendingDown,
-  TrendingUp,
   Loader2,
   Plus,
   Trash2,
@@ -31,1594 +27,1930 @@ import {
   Check,
   X,
   Sparkles,
-  ToggleLeft,
-  ToggleRight,
+  HelpCircle,
+  Send,
   RefreshCw,
-} from 'lucide-react';
-import { useAuth } from '@clerk/nextjs';
-import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Avatar } from '@/components/ui/Avatar';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { StatRibbon } from '@/components/ui/StatRibbon';
-import { Modal } from '@/components/ui/Modal';
-import { toast } from '@/components/ui/Toast';
-import { usePayroll } from '@/context/PayrollContext';
+  UserCheck,
+  ArrowRight,
+  TrendingUp,
+} from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
+import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { StatRibbon } from "@/components/ui/StatRibbon";
+import { toast } from "@/components/ui/Toast";
+import { usePayroll } from "@/context/PayrollContext";
+
 import {
-  PayrollRule,
-  RuleCategory,
-  RuleScope,
-  CalculationMethod,
+  PayrollConfig,
+  CompensationRecord,
+  TaxRule,
+  PayrollPeriod,
+  PayrollRunSummary,
+  PayrollRunItem,
+  PayrollPayslip,
+  PayrollEmployee,
+  Department,
+  Position,
   formatMoney,
-  PayrollCalculationResult,
-  calculateEmployeePayroll,
-  AttendancePayrollSummary,
-  EmployeePayrollProfile,
-} from '@/utils/payrollEngine';
+  toMinor,
+  toMajor,
+  shortDate,
+  monthLabel,
+  COUNTRY_OPTIONS,
+  COUNTRY_CURRENCIES,
+  countryName,
+  describeRule,
+  PAYROLL_STATUSES,
+} from "@/components/payroll/payrollModel";
 
-const TABS = ['Overview', 'Rules Engine', 'Run Payroll', 'Paystubs', 'Settings'];
-const WIZARD_STEPS = ['Hours & Attendance', 'Earnings & Adjustments', 'Taxes & Deductions', 'Review & Finalize'];
+import { PayrollWalkthroughWidget } from "@/components/payroll/PayrollWalkthroughWidget";
+import { PayrollHelpModal } from "@/components/payroll/PayrollHelpModal";
+import { CompensationModal } from "@/components/payroll/CompensationModal";
+import { TaxRuleModal } from "@/components/payroll/TaxRuleModal";
+import { PaystubStatementModal } from "@/components/payroll/PaystubStatementModal";
 
-const COUNTRY_CURRENCIES: Record<string, string> = {
-  UG: 'UGX', KE: 'KES', RW: 'RWF', TZ: 'TZS', US: 'USD', GB: 'GBP', CA: 'CAD',
-  NG: 'NGN', ZA: 'ZAR', GH: 'GHS', IN: 'INR', AU: 'AUD', NZ: 'NZD', EU: 'EUR',
-  DE: 'EUR', FR: 'EUR', IE: 'EUR', NL: 'EUR', ES: 'EUR', IT: 'EUR', AE: 'AED',
-};
-
-const COUNTRY_OPTIONS = Object.keys(COUNTRY_CURRENCIES).map((code) => ({
-  code,
-  name: new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code,
-  currency: COUNTRY_CURRENCIES[code],
-})).sort((a, b) => a.name.localeCompare(b.name));
-
-// Standard simulated workforce roster for comprehensive payroll testing
-const DEFAULT_ROSTER: EmployeePayrollProfile[] = [
-  {
-    employeeId: 'emp-bushu',
-    employeeName: 'Bushu Hamuli Zacharie',
-    employeeNumber: '# 10974',
-    email: 'bushu.zacharie@helpware.com',
-    department: 'Regional Staff - Africa',
-    jobTitle: 'Customer Support Representative',
-    countryCode: 'UG',
-    currency: 'UGX',
-    compensationModel: 'hourly',
-    hourlyRate: 18500,
-    baseSalary: 3200000,
-    dailyRate: 145000,
-    expectedHoursPerWeek: 40,
-    standardMonthlyHours: 173.33,
-    isExemptFromOvertime: false,
-  },
-  {
-    employeeId: 'emp-brenda',
-    employeeName: 'Brenda Nansubuga',
-    employeeNumber: '# 10975',
-    email: 'brenda.nansubuga@helpware.com',
-    department: 'People Operations',
-    jobTitle: 'HR Operations Lead',
-    countryCode: 'UG',
-    currency: 'UGX',
-    compensationModel: 'monthly_salary',
-    hourlyRate: 26000,
-    baseSalary: 4500000,
-    dailyRate: 205000,
-    expectedHoursPerWeek: 40,
-    standardMonthlyHours: 173.33,
-    isExemptFromOvertime: true,
-  },
-  {
-    employeeId: 'emp-david',
-    employeeName: 'David Okello',
-    employeeNumber: '# 10976',
-    email: 'david.okello@helpware.com',
-    department: 'Engineering & QA',
-    jobTitle: 'Senior Systems Architect',
-    countryCode: 'UG',
-    currency: 'UGX',
-    compensationModel: 'monthly_salary',
-    hourlyRate: 40000,
-    baseSalary: 7200000,
-    dailyRate: 325000,
-    expectedHoursPerWeek: 40,
-    standardMonthlyHours: 173.33,
-    isExemptFromOvertime: true,
-  },
-  {
-    employeeId: 'emp-sarah',
-    employeeName: 'Sarah Tumusiime',
-    employeeNumber: '# 10977',
-    email: 'sarah.tumusiime@helpware.com',
-    department: 'Customer Experience',
-    jobTitle: 'Support Specialist - Night Shift',
-    countryCode: 'UG',
-    currency: 'UGX',
-    compensationModel: 'overtime_based',
-    hourlyRate: 16500,
-    baseSalary: 2850000,
-    dailyRate: 130000,
-    expectedHoursPerWeek: 40,
-    standardMonthlyHours: 173.33,
-    isExemptFromOvertime: false,
-  },
-  {
-    employeeId: 'emp-michael',
-    employeeName: 'Michael Kato',
-    employeeNumber: '# 10978',
-    email: 'michael.kato@helpware.com',
-    department: 'Sales & Partnerships',
-    jobTitle: 'Account Executive',
-    countryCode: 'UG',
-    currency: 'UGX',
-    compensationModel: 'commission_based',
-    hourlyRate: 20000,
-    baseSalary: 3500000,
-    dailyRate: 160000,
-    expectedHoursPerWeek: 40,
-    standardMonthlyHours: 173.33,
-    isExemptFromOvertime: false,
-  },
-];
+const TABS = ["Overview", "Run Payroll", "Salaries", "Deductions & Rules", "Paystubs", "Settings"];
 
 export default function PayrollPage() {
   const { getToken } = useAuth();
-  const {
-    rules,
-    settings,
-    payrollRuns,
-    bonusesPenalties,
-    addRule,
-    deleteRule,
-    toggleRuleActive,
-    resetRulesToDefault,
-    toggleEmployeePayslipsVisibility,
-    updateSettings,
-    runPayrollForPeriod,
-    approvePayrollRun,
-    getEmployeeCompensationDetails,
-  } = usePayroll();
+  const { settings, updateSettings, toggleEmployeePayslipsVisibility } = usePayroll();
 
-  const [activeTab, setActiveTab] = useState('Overview');
-  const [wizardStep, setWizardStep] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [payrollRunSuccess, setPayrollRunSuccess] = useState(false);
-  const [selectedPaystub, setSelectedPaystub] = useState<PayrollCalculationResult | null>(null);
+  // Tab & UI state
+  const [activeTab, setActiveTab] = useState("Overview");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
-  // Filter for rules engine
-  const [ruleCategoryFilter, setRuleCategoryFilter] = useState<string>('all');
-  const [ruleSearch, setRuleSearch] = useState<string>('');
+  // Live Backend Data States
+  const [configurations, setConfigurations] = useState<PayrollConfig[]>([]);
+  const [taxRules, setTaxRules] = useState<TaxRule[]>([]);
+  const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
+  const [runs, setRuns] = useState<PayrollRunSummary[]>([]);
+  const [compensationList, setCompensationList] = useState<CompensationRecord[]>([]);
+  const [employees, setEmployees] = useState<PayrollEmployee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
 
-  // Create rule modal state
-  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
-  const [ruleForm, setRuleForm] = useState({
-    name: '',
-    description: '',
-    category: 'overtime' as RuleCategory,
-    scope: 'company' as RuleScope,
-    countryCode: 'UG',
-    calculationMethod: 'multiplier_x_base_rate' as CalculationMethod,
-    rateOrAmount: 1.5,
-    multiplier: 1.5,
-    isTaxable: true,
-    isPensionable: true,
-    requiresApproval: true,
-    priority: 20,
+  // Modals state
+  const [isCompModalOpen, setIsCompModalOpen] = useState(false);
+  const [selectedCompEmployeeId, setSelectedCompEmployeeId] = useState<string>("");
+  const [isTaxRuleModalOpen, setIsTaxRuleModalOpen] = useState(false);
+  const [statementPayslip, setStatementPayslip] = useState<PayrollPayslip | PayrollRunItem | null>(null);
+
+  // Wizard state (Run Payroll)
+  const [wizardStep, setWizardStep] = useState<number>(0);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
+  const [activeRun, setActiveRun] = useState<PayrollRunSummary | null>(null);
+  const [runItems, setRunItems] = useState<PayrollRunItem[]>([]);
+  const [isProcessingRun, setIsProcessingRun] = useState(false);
+  const [newPeriodMonth, setNewPeriodMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
 
-  // Paystubs search and period filter
-  const [paystubSearch, setPaystubSearch] = useState('');
-  const [paystubMonthFilter, setPaystubMonthFilter] = useState('10');
+  // Paystubs tab search & filter
+  const [paystubSearch, setPaystubSearch] = useState("");
+  const [selectedRunIdForPayslips, setSelectedRunIdForPayslips] = useState<string>("");
+  const [runPayslips, setRunPayslips] = useState<PayrollPayslip[]>([]);
+  const [isLoadingPayslips, setIsLoadingPayslips] = useState(false);
+  const [isSendingEmails, setIsSendingEmails] = useState(false);
 
-  // Country settings form
-  const [countrySearch, setCountrySearch] = useState('');
-  const [configCountry, setConfigCountry] = useState(settings.defaultCountry || 'UG');
-  const [configCurrency, setConfigCurrency] = useState(settings.defaultCurrency || 'UGX');
+  // Salaries tab filter
+  const [salarySearch, setSalarySearch] = useState("");
+  const [salaryDeptFilter, setSalaryDeptFilter] = useState("all");
+
+  // Company Settings Form
+  const [configCountry, setConfigCountry] = useState(settings.defaultCountry || "UG");
+  const [configCurrency, setConfigCurrency] = useState(settings.defaultCurrency || "UGX");
   const [configHours, setConfigHours] = useState(String(settings.standardMonthlyHours || 173.33));
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  // Live calculated payroll dataset for the active wizard cycle (October 2026)
-  const [wizardAttendance, setWizardAttendance] = useState<Record<string, AttendancePayrollSummary>>({
-    'emp-bushu': {
-      employeeId: 'emp-bushu',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      recordedHours: 180.0,
-      productiveHours: 168.5,
-      billableHours: 158.5,
-      payableRegularHours: 168.5,
-      approvedOvertimeHours: 8.5,
-      unapprovedOvertimeHours: 0,
-      holidaySpecialHours: 8.0,
-      nightShiftHours: 0,
-      daysWorked: 21,
-      expectedDays: 22,
-      absentDays: 1,
-      missingPunchCount: 0,
-    },
-    'emp-brenda': {
-      employeeId: 'emp-brenda',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      recordedHours: 173.33,
-      productiveHours: 173.33,
-      billableHours: 173.33,
-      payableRegularHours: 173.33,
-      approvedOvertimeHours: 0,
-      unapprovedOvertimeHours: 0,
-      holidaySpecialHours: 0,
-      nightShiftHours: 0,
-      daysWorked: 22,
-      expectedDays: 22,
-      absentDays: 0,
-      missingPunchCount: 0,
-    },
-    'emp-david': {
-      employeeId: 'emp-david',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      recordedHours: 185.0,
-      productiveHours: 173.33,
-      billableHours: 170.0,
-      payableRegularHours: 173.33,
-      approvedOvertimeHours: 0,
-      unapprovedOvertimeHours: 0,
-      holidaySpecialHours: 0,
-      nightShiftHours: 0,
-      daysWorked: 22,
-      expectedDays: 22,
-      absentDays: 0,
-      missingPunchCount: 0,
-    },
-    'emp-sarah': {
-      employeeId: 'emp-sarah',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      recordedHours: 176.0,
-      productiveHours: 164.0,
-      billableHours: 164.0,
-      payableRegularHours: 164.0,
-      approvedOvertimeHours: 14.0,
-      unapprovedOvertimeHours: 0,
-      holidaySpecialHours: 0,
-      nightShiftHours: 80.0,
-      daysWorked: 20,
-      expectedDays: 22,
-      absentDays: 2,
-      missingPunchCount: 1, // Flagged missing punch for audit demonstration
-    },
-    'emp-michael': {
-      employeeId: 'emp-michael',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      recordedHours: 170.0,
-      productiveHours: 165.0,
-      billableHours: 155.0,
-      payableRegularHours: 165.0,
-      approvedOvertimeHours: 0,
-      unapprovedOvertimeHours: 0,
-      holidaySpecialHours: 0,
-      nightShiftHours: 0,
-      daysWorked: 21,
-      expectedDays: 22,
-      absentDays: 1,
-      missingPunchCount: 0,
-    },
-  });
+  // --------------------------------------------------------------------------
+  // Fetch All Live Payroll Data from Backend
+  // --------------------------------------------------------------------------
+  const fetchPayrollData = useCallback(async (quiet = false) => {
+    if (!quiet) setIsLoading(true);
+    else setIsRefreshing(true);
 
-  // Calculate current run items from active rules & attendance
-  const currentRunItems = useMemo(() => {
-    return DEFAULT_ROSTER.map((emp) => {
-      const att = wizardAttendance[emp.employeeId] || {
-        employeeId: emp.employeeId,
-        periodStart: '2026-10-01',
-        periodEnd: '2026-10-31',
-        recordedHours: 173.33,
-        productiveHours: 173.33,
-        billableHours: 173.33,
-        payableRegularHours: 173.33,
-        approvedOvertimeHours: 0,
-        unapprovedOvertimeHours: 0,
-        holidaySpecialHours: 0,
-        nightShiftHours: 0,
-        daysWorked: 22,
-        expectedDays: 22,
-        absentDays: 0,
-        missingPunchCount: 0,
-      };
+    try {
+      const token = await getToken();
+      const headers = getAuthHeaders(token);
 
-      return calculateEmployeePayroll(emp, att, rules, bonusesPenalties, 10, 2026);
-    });
-  }, [rules, bonusesPenalties, wizardAttendance]);
+      const [
+        configsRes,
+        rulesRes,
+        periodsRes,
+        runsRes,
+        compRes,
+        employeesRes,
+        deptsRes,
+      ] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/payroll/periods`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/payroll/runs`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/payroll/compensation`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/employees?limit=200`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/departments`, { headers }),
+      ]);
 
-  // Aggregate totals
-  const cycleTotals = useMemo(() => {
-    return currentRunItems.reduce(
-      (acc, item) => {
-        acc.gross += item.grossPay;
-        acc.deductions += item.employeeDeductions;
-        acc.net += item.netPay;
-        acc.employerCost += item.totalEmployerCost;
-        acc.overtimeSpend += item.overtimeCompensation;
-        acc.productiveHours += item.productiveHours;
-        acc.missingPunches += item.missingPunchWarnings;
-        return acc;
-      },
-      {
-        gross: 0,
-        deductions: 0,
-        net: 0,
-        employerCost: 0,
-        overtimeSpend: 0,
-        productiveHours: 0,
-        missingPunches: 0,
+      if (configsRes.ok) {
+        const cData = await configsRes.json();
+        const confs: PayrollConfig[] = Array.isArray(cData) ? cData : [];
+        setConfigurations(confs);
+        if (confs[0]) {
+          setConfigCountry(confs[0].country);
+          setConfigCurrency(confs[0].currency);
+          setConfigHours(String((confs[0].standardMonthlyMinutes / 60).toFixed(2)));
+        }
       }
-    );
-  }, [currentRunItems]);
 
-  // Adjust modal state in wizard
-  const [adjustTarget, setAdjustTarget] = useState<PayrollCalculationResult | null>(null);
-  const [adjustHours, setAdjustHours] = useState('');
-  const [adjustOt, setAdjustOt] = useState('');
+      if (rulesRes.ok) {
+        const rData = await rulesRes.json();
+        const rulesList = Array.isArray(rData) ? rData : rData.data || [];
+        setTaxRules(rulesList);
+      }
 
-  const handleApplyAdjustment = () => {
-    if (!adjustTarget) return;
-    const empId = adjustTarget.employeeId;
-    const existing = wizardAttendance[empId];
-    if (existing) {
-      setWizardAttendance({
-        ...wizardAttendance,
-        [empId]: {
-          ...existing,
-          productiveHours: Number(adjustHours) || existing.productiveHours,
-          approvedOvertimeHours: Number(adjustOt) || existing.approvedOvertimeHours,
-          missingPunchCount: 0, // Cleared on audit adjustment
-        },
-      });
-      toast.success('Hours adjusted', `Updated attendance record for ${adjustTarget.employeeName}.`);
+      let loadedPeriods: PayrollPeriod[] = [];
+      if (periodsRes.ok) {
+        const pData = await periodsRes.json();
+        loadedPeriods = Array.isArray(pData) ? pData : [];
+        setPeriods(loadedPeriods);
+        if (loadedPeriods.length > 0 && !selectedPeriodId) {
+          // Select newest period
+          setSelectedPeriodId(loadedPeriods[0].id);
+        }
+      }
+
+      let loadedRuns: PayrollRunSummary[] = [];
+      if (runsRes.ok) {
+        const rData = await runsRes.json();
+        loadedRuns = Array.isArray(rData) ? rData : rData.data || [];
+        setRuns(loadedRuns);
+        if (loadedRuns.length > 0 && !selectedRunIdForPayslips) {
+          const latestApproved = loadedRuns.find((r) => r.status === "approved") || loadedRuns[0];
+          setSelectedRunIdForPayslips(latestApproved.id);
+        }
+      }
+
+      if (compRes.ok) {
+        const compData = await compRes.json();
+        setCompensationList(Array.isArray(compData) ? compData : []);
+      }
+
+      if (employeesRes.ok) {
+        const empData = await employeesRes.json();
+        const empList: PayrollEmployee[] = Array.isArray(empData) ? empData : empData.data || [];
+        // Only active/onboarding/leave employees are eligible for payroll
+        const eligible = empList.filter((e) => PAYROLL_STATUSES.includes(e.status));
+        setEmployees(eligible);
+      }
+
+      if (deptsRes.ok) {
+        const dData = await deptsRes.json();
+        const dList: Department[] = dData.data || dData || [];
+        setDepartments(dList);
+
+        // Fetch positions per department
+        const posArrays = await Promise.all(
+          dList.map(async (dept) => {
+            try {
+              const res = await fetch(`${API_BASE_URL}/api/v1/departments/${dept.id}/positions`, { headers });
+              if (!res.ok) return [];
+              const p = await res.json();
+              return ((p.data || p) as any[])
+                .filter((pos) => pos.status === "active")
+                .map((pos) => ({ id: pos.id, title: pos.title, departmentName: dept.name }));
+            } catch {
+              return [];
+            }
+          })
+        );
+        setPositions(posArrays.flat());
+      }
+    } catch (err) {
+      console.error("Error loading payroll data:", err);
+      toast.error("Could not load payroll data", "Please check your network connection and reload.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-    setAdjustTarget(null);
-  };
+  }, [getToken, selectedPeriodId, selectedRunIdForPayslips]);
 
-  // Execution of Finalize
-  const handleFinalizePayRun = () => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      runPayrollForPeriod('October 2026 Final Payroll', '2026-10-01', '2026-10-31', '2026-10-31');
-      setIsProcessing(false);
-      setPayrollRunSuccess(true);
-      setActiveTab('Overview');
-      setWizardStep(0);
-      toast.success('Payroll Finalized & Locked', 'October pay statements generated and locked for disbursement.');
-    }, 600);
-  };
+  useEffect(() => {
+    fetchPayrollData();
+  }, [fetchPayrollData]);
 
-  // Filtered Rules
-  const filteredRules = useMemo(() => {
-    return rules.filter((r) => {
-      if (ruleCategoryFilter !== 'all' && r.category !== ruleCategoryFilter) return false;
-      if (ruleSearch.trim() && !r.name.toLowerCase().includes(ruleSearch.toLowerCase()) && !r.description.toLowerCase().includes(ruleSearch.toLowerCase())) {
-        return false;
+  // Load payslips whenever the selected run for payslips changes
+  const loadPayslipsForRun = useCallback(
+    async (runId: string) => {
+      if (!runId) return;
+      setIsLoadingPayslips(true);
+      try {
+        const token = await getToken();
+        const res = await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${runId}/payslips`, {
+          headers: getAuthHeaders(token),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRunPayslips(data.data || []);
+        } else {
+          setRunPayslips([]);
+        }
+      } catch (err) {
+        console.error("Failed to load payslips", err);
+      } finally {
+        setIsLoadingPayslips(false);
       }
-      return true;
-    });
-  }, [rules, ruleCategoryFilter, ruleSearch]);
-
-  // All Paystubs repository
-  const allPaystubs = useMemo(() => {
-    const list: PayrollCalculationResult[] = [];
-    DEFAULT_ROSTER.forEach((emp) => {
-      const details = getEmployeeCompensationDetails(emp.employeeId);
-      list.push(...details);
-    });
-    return list.filter((p) => {
-      if (paystubMonthFilter !== 'all' && String(p.periodMonth) !== paystubMonthFilter) return false;
-      if (paystubSearch.trim() && !p.employeeName.toLowerCase().includes(paystubSearch.toLowerCase())) return false;
-      return true;
-    });
-  }, [getEmployeeCompensationDetails, paystubMonthFilter, paystubSearch]);
-
-  /* =========================================================================
-     TAB 1: OVERVIEW
-     ========================================================================= */
-  const renderOverview = () => (
-    <div>
-      <div className="row-between mb-32 align-center">
-        <div>
-          <h2 className="text-2xl fw-800 text-1 m-0">Payroll Engine &amp; Operations</h2>
-          <div className="row gap-8 mt-8 align-center">
-            <Badge variant="primary">Cycle: October 1 – October 31, 2026</Badge>
-            <span className="text-sm text-4">
-              Jurisdiction: {settings.defaultCountry} · Currency: {settings.defaultCurrency} · Standard: {settings.standardMonthlyHours}h/mo
-            </span>
-          </div>
-        </div>
-        <div className="row gap-10">
-          <button className="btn-neutral" onClick={() => setActiveTab('Rules Engine')}>
-            <Sliders size={15} className="mr-6" /> Configure Rules
-          </button>
-          <button className="btn-primary" onClick={() => setActiveTab('Run Payroll')}>
-            <DollarSign size={15} className="mr-6" /> Run Payroll Wizard
-          </button>
-        </div>
-      </div>
-
-      {payrollRunSuccess && (
-        <div className="mb-24 p-20 row gap-16 align-center" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 12, color: '#166534' }}>
-          <CheckCircle2 size={24} />
-          <div style={{ flex: 1 }}>
-            <div className="text-base fw-700">October 2026 Pay Run Successfully Finalized</div>
-            <div className="text-xs text-4 mt-2">All employee pay statements and tax schedules have been recorded. You can view or print them in the Paystubs tab.</div>
-          </div>
-          <button className="btn-secondary btn-sm" onClick={() => setActiveTab('Paystubs')}>
-            View Paystubs
-          </button>
-        </div>
-      )}
-
-      {/* Attendance & Time Tracking Audit Alert Banner */}
-      {cycleTotals.missingPunches > 0 && (
-        <div className="mb-28 p-16 row gap-16 align-center" style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10 }}>
-          <AlertTriangle size={20} style={{ color: '#D97706' }} />
-          <div style={{ flex: 1 }}>
-            <span className="text-sm fw-700 text-1">Attendance Audit Notice: </span>
-            <span className="text-sm text-4">
-              1 employee has an unresolved clock-out or attendance anomaly in this pay cycle. Please review in the Run Payroll wizard before finalizing.
-            </span>
-          </div>
-          <button className="btn-neutral btn-sm" onClick={() => { setActiveTab('Run Payroll'); setWizardStep(0); }}>
-            Review Anomaly
-          </button>
-        </div>
-      )}
-
-      {/* Aggregate Stats Ribbon */}
-      <StatRibbon
-        stats={[
-          {
-            label: 'Total Employer Cost',
-            value: formatMoney(cycleTotals.employerCost, settings.defaultCurrency),
-            color: 'var(--primary)',
-            icon: <Building size={18} />,
-            description: 'Gross pay + 10% employer NSSF',
-          },
-          {
-            label: 'Total Net Disbursed',
-            value: formatMoney(cycleTotals.net, settings.defaultCurrency),
-            color: '#16A34A',
-            icon: <DollarSign size={18} />,
-            description: 'Total take-home pay to employees',
-          },
-          {
-            label: 'Statutory Taxes & Deductions',
-            value: formatMoney(cycleTotals.deductions, settings.defaultCurrency),
-            color: '#EA580C',
-            icon: <FileText size={18} />,
-            description: 'PAYE + 5% employee NSSF + penalties',
-          },
-          {
-            label: 'Active Employees',
-            value: currentRunItems.length,
-            color: 'var(--text-1)',
-            icon: <Clock size={18} />,
-            description: 'Configured on dynamic payroll models',
-          },
-        ]}
-        style={{ marginBottom: 32 }}
-      />
-
-      {/* Secondary Metrics Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
-        <Card>
-          <CardBody style={{ padding: 20 }}>
-            <div className="row-between mb-16">
-              <h4 className="text-base fw-700 text-1 m-0">Supported Compensation Models</h4>
-              <Badge variant="neutral">{DEFAULT_ROSTER.length} Employees</Badge>
-            </div>
-            <p className="text-xs text-4 mb-16">
-              EasyHR dynamically computes each employee based on their contracted model without requiring code changes.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-              <div className="row-between p-8" style={{ background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="fw-600">Hourly (Rate × Productive Hours)</span>
-                <Badge variant="primary">1 Employee</Badge>
-              </div>
-              <div className="row-between p-8" style={{ background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="fw-600">Monthly Fixed Salary</span>
-                <Badge variant="primary">2 Employees</Badge>
-              </div>
-              <div className="row-between p-8" style={{ background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="fw-600">Overtime-Based (Base + Tiered Multipliers)</span>
-                <Badge variant="primary">1 Employee</Badge>
-              </div>
-              <div className="row-between p-8" style={{ background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="fw-600">Commission &amp; Mixed Compensation</span>
-                <Badge variant="primary">1 Employee</Badge>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody style={{ padding: 20 }}>
-            <div className="row-between mb-16">
-              <h4 className="text-base fw-700 text-1 m-0">Attendance &amp; Hours Utilization</h4>
-              <Badge variant="success">97.2% Scheduled</Badge>
-            </div>
-            <p className="text-xs text-4 mb-16">
-              Reconciled from biometric and mobile punches: Recorded vs Productive vs Billable vs Overtime.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-              <div style={{ padding: 12, background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="text-xs text-4 block">Productive Hours</span>
-                <strong className="text-base text-1">{cycleTotals.productiveHours.toFixed(1)} hrs</strong>
-              </div>
-              <div style={{ padding: 12, background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="text-xs text-4 block">Overtime Spend</span>
-                <strong className="text-base text-1" style={{ color: '#16A34A' }}>
-                  +{formatMoney(cycleTotals.overtimeSpend, settings.defaultCurrency)}
-                </strong>
-              </div>
-              <div style={{ padding: 12, background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="text-xs text-4 block">Active Dynamic Rules</span>
-                <strong className="text-base text-1">{rules.filter((r) => r.isActive).length} Active Rules</strong>
-              </div>
-              <div style={{ padding: 12, background: '#F8FAFC', borderRadius: 8 }}>
-                <span className="text-xs text-4 block">Employee Payslips Tab</span>
-                <strong className="text-base text-1" style={{ color: settings.showPayslipsTabToEmployees ? '#16A34A' : '#64748B' }}>
-                  {settings.showPayslipsTabToEmployees ? 'Enabled for All' : 'HR Only'}
-                </strong>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Recent Payroll Runs */}
-      <h3 className="text-xl fw-800 text-1 mb-16">Recent Payroll Runs</h3>
-      <Card>
-        <CardBody style={{ padding: 0 }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 700 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', background: '#F9FAFB', color: 'var(--text-4)', fontSize: 12, textTransform: 'uppercase' }}>
-                  <th style={{ padding: '16px 24px', fontWeight: 700 }}>Period &amp; Title</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 700 }}>Total Cost</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 700 }}>Net Disbursed</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 700 }}>Status</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payrollRuns.map((p) => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '16px 24px' }}>
-                      <div className="fw-700 text-1 text-sm">{p.title}</div>
-                      <div className="text-xs text-4 mt-2">{p.periodStart} – {p.periodEnd} (Paid: {p.payDate})</div>
-                    </td>
-                    <td style={{ padding: '16px 24px', fontSize: 14, fontWeight: 600 }}>
-                      {formatMoney(p.totalEmployerCost, p.currency)}
-                    </td>
-                    <td style={{ padding: '16px 24px', fontSize: 14, fontWeight: 700, color: '#16A34A' }}>
-                      {formatMoney(p.totalNetPay, p.currency)}
-                    </td>
-                    <td style={{ padding: '16px 24px' }}>
-                      <Badge variant={p.status === 'paid' || p.status === 'finalized' ? 'success' : 'primary'}>
-                        {p.status.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                      <button
-                        className="btn-neutral btn-sm"
-                        onClick={() => {
-                          setPaystubMonthFilter(p.periodStart.includes('-10-') ? '10' : p.periodStart.includes('-09-') ? '9' : '8');
-                          setActiveTab('Paystubs');
-                        }}
-                      >
-                        View Statements
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardBody>
-      </Card>
-    </div>
+    },
+    [getToken]
   );
 
-  /* =========================================================================
-     TAB 2: RULES ENGINE
-     ========================================================================= */
-  const renderRulesEngine = () => (
-    <div>
-      <div className="row-between mb-24 align-center">
+  useEffect(() => {
+    if (selectedRunIdForPayslips) {
+      loadPayslipsForRun(selectedRunIdForPayslips);
+    }
+  }, [selectedRunIdForPayslips, loadPayslipsForRun]);
+
+  // Load items for a run in wizard
+  const loadRunItems = useCallback(
+    async (runId: string) => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${runId}/items`, {
+          headers: getAuthHeaders(token),
+        });
+        if (res.ok) {
+          const items = await res.json();
+          setRunItems(Array.isArray(items) ? items : items.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load run items", err);
+      }
+    },
+    [getToken]
+  );
+
+  // Active config & currency
+  const activeConfig = configurations[0] || null;
+  const currentCurrency = activeConfig?.currency || settings.defaultCurrency || "UGX";
+  const currentCountry = activeConfig?.country || settings.defaultCountry || "UG";
+
+  // Map each employee to their most recent compensation record
+  const employeeSalaryMap = useMemo(() => {
+    const map = new Map<string, CompensationRecord>();
+    for (const comp of compensationList) {
+      if (!map.has(comp.employeeId)) {
+        map.set(comp.employeeId, comp);
+      }
+    }
+    return map;
+  }, [compensationList]);
+
+  // Roster with compensation details
+  const rosterWithComp = useMemo(() => {
+    return employees.map((emp) => {
+      const comp = employeeSalaryMap.get(emp.id);
+      return {
+        ...emp,
+        hasSalary: !!comp,
+        baseAmountMinor: comp?.baseAmountMinor || 0,
+        currency: comp?.currency || currentCurrency,
+        effectiveDate: comp?.effectiveDate || null,
+        reason: comp?.reason || "",
+      };
+    });
+  }, [employees, employeeSalaryMap, currentCurrency]);
+
+  const employeesMissingSalary = useMemo(() => {
+    return rosterWithComp.filter((e) => !e.hasSalary);
+  }, [rosterWithComp]);
+
+  // Aggregate stats from the most recent run (or live roster if no run yet)
+  const latestApprovedRun = useMemo(() => {
+    return runs.find((r) => r.status === "approved") || runs[0] || null;
+  }, [runs]);
+
+  const aggregateMetrics = useMemo(() => {
+    if (latestApprovedRun) {
+      return {
+        activeEmployees: latestApprovedRun.employeeCount || employees.length,
+        totalGross: latestApprovedRun.totalBasePay + latestApprovedRun.totalEarnings,
+        totalDeductions: latestApprovedRun.totalDeductions,
+        totalNet: latestApprovedRun.totalNetPay,
+        hasRun: true,
+      };
+    }
+    // Estimated from current active roster salaries
+    const totalGross = rosterWithComp.reduce((acc, emp) => acc + emp.baseAmountMinor, 0);
+    return {
+      activeEmployees: employees.length,
+      totalGross,
+      totalDeductions: 0,
+      totalNet: totalGross,
+      hasRun: false,
+    };
+  }, [latestApprovedRun, employees.length, rosterWithComp]);
+
+  // --------------------------------------------------------------------------
+  // ACTIONS: Save Settings
+  // --------------------------------------------------------------------------
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      const token = await getToken();
+      const minutes = Math.round((parseFloat(configHours) || 173.33) * 60);
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, {
+        method: "POST",
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+          country: configCountry.toUpperCase(),
+          currency: configCurrency.toUpperCase(),
+          standardMonthlyMinutes: minutes,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not save payroll settings.");
+      }
+
+      updateSettings({
+        defaultCountry: configCountry,
+        defaultCurrency: configCurrency,
+        standardMonthlyHours: parseFloat(configHours) || 173.33,
+      });
+
+      toast.success("Settings saved", `Payroll set to ${configCountry} (${configCurrency}).`);
+      await fetchPayrollData(true);
+    } catch (err: any) {
+      toast.error("Save failed", err?.message || "Could not save configuration.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // ACTIONS: Save Employee Compensation
+  // --------------------------------------------------------------------------
+  const handleSaveCompensation = async (payload: {
+    employeeId: string;
+    baseAmountMinor: number;
+    currency: string;
+    country: string;
+    effectiveDate: string;
+    reason: string;
+  }) => {
+    const token = await getToken();
+    const res = await fetch(`${API_BASE_URL}/api/v1/payroll/compensation`, {
+      method: "POST",
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Could not save employee compensation.");
+    }
+
+    toast.success("Salary saved", "Employee compensation record updated.");
+    await fetchPayrollData(true);
+  };
+
+  // --------------------------------------------------------------------------
+  // ACTIONS: Save Tax / Deduction Rule
+  // --------------------------------------------------------------------------
+  const handleSaveTaxRule = async (payload: any) => {
+    const token = await getToken();
+    const res = await fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`, {
+      method: "POST",
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Could not save deduction rule.");
+    }
+
+    toast.success("Rule saved", `Deduction rule "${payload.ruleName}" is now active.`);
+    await fetchPayrollData(true);
+  };
+
+  // Toggle active/inactive
+  const handleToggleRuleActive = async (ruleId: string, currentActive: boolean) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules/${ruleId}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({ active: !currentActive }),
+      });
+      if (!res.ok) throw new Error("Could not update rule status.");
+      toast.info(
+        !currentActive ? "Rule activated" : "Rule paused",
+        `Deduction is now ${!currentActive ? "active" : "inactive"}.`
+      );
+      await fetchPayrollData(true);
+    } catch (err: any) {
+      toast.error("Status update failed", err?.message);
+    }
+  };
+
+  // Delete rule
+  const handleDeleteRule = async (ruleId: string, ruleName: string) => {
+    if (!confirm(`Are you sure you want to delete "${ruleName}"?`)) return;
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules/${ruleId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(token),
+      });
+      if (!res.ok) throw new Error("Could not delete rule.");
+      toast.success("Rule removed", `Deleted "${ruleName}".`);
+      await fetchPayrollData(true);
+    } catch (err: any) {
+      toast.error("Delete failed", err?.message);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // ACTIONS: WIZARD & RUN LIFECYCLE
+  // --------------------------------------------------------------------------
+  // Create a period or use existing
+  const handleCreateOrSelectPeriod = async () => {
+    if (!activeConfig) {
+      toast.error("Settings required", "Please save your country and currency in Settings first.");
+      setActiveTab("Settings");
+      return;
+    }
+
+    setIsProcessingRun(true);
+    try {
+      const token = await getToken();
+      const headers = getAuthHeaders(token);
+
+      // Check if period for selected month already exists
+      const [y, m] = newPeriodMonth.split("-").map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      const mm = String(m).padStart(2, "0");
+      const startDate = `${y}-${mm}-01`;
+      const endDate = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`;
+      const payDate = endDate;
+
+      let targetPeriod = periods.find((p) => p.startDate === startDate && p.endDate === endDate);
+
+      if (!targetPeriod) {
+        // Create new period
+        const pRes = await fetch(`${API_BASE_URL}/api/v1/payroll/periods`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ startDate, endDate, payDate }),
+        });
+        if (!pRes.ok) {
+          const err = await pRes.json().catch(() => ({}));
+          throw new Error(err.detail || "Could not create pay period.");
+        }
+        targetPeriod = await pRes.json();
+        await fetchPayrollData(true);
+      }
+
+      if (!targetPeriod) throw new Error("Failed to initialize pay period.");
+
+      setSelectedPeriodId(targetPeriod.id);
+
+      // Check if there's already a run for this period
+      const runsForPeriodRes = await fetch(
+        `${API_BASE_URL}/api/v1/payroll/periods/${targetPeriod.id}/runs`,
+        { headers }
+      );
+      if (runsForPeriodRes.ok) {
+        const existingRuns: any[] = await runsForPeriodRes.json();
+        const activeOne = existingRuns.find((r) => r.status === "calculated" || r.status === "draft");
+        if (activeOne) {
+          setActiveRun(activeOne);
+          await loadRunItems(activeOne.id);
+          setWizardStep(1);
+          setIsProcessingRun(false);
+          return;
+        }
+      }
+
+      // Proceed to Step 1
+      setWizardStep(1);
+    } catch (err: any) {
+      toast.error("Period setup error", err?.message);
+    } finally {
+      setIsProcessingRun(false);
+    }
+  };
+
+  // Execute Calculate Run
+  const handleCalculateRun = async () => {
+    if (!selectedPeriodId) return;
+
+    if (employeesMissingSalary.length > 0) {
+      toast.error(
+        "Missing salaries",
+        `${employeesMissingSalary.length} active employee(s) do not have a salary set. Please assign their salaries first.`
+      );
+      return;
+    }
+
+    if (taxRules.filter((r) => r.active).length === 0) {
+      toast.error(
+        "No tax rules active",
+        "Add at least one active statutory tax or deduction rule before calculating payroll."
+      );
+      return;
+    }
+
+    setIsProcessingRun(true);
+    try {
+      const token = await getToken();
+      const headers = getAuthHeaders(token);
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/periods/${selectedPeriodId}/runs`, {
+        method: "POST",
+        headers,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Calculation failed.");
+      }
+
+      const createdRun = await res.json();
+      setActiveRun(createdRun);
+      await loadRunItems(createdRun.id);
+      await fetchPayrollData(true);
+      setWizardStep(2); // Go to review
+      toast.success("Payroll calculated", "Calculated earnings and statutory deductions for all eligible staff.");
+    } catch (err: any) {
+      toast.error("Calculation failed", err?.message);
+    } finally {
+      setIsProcessingRun(false);
+    }
+  };
+
+  // Lock & Finalize Run
+  const handleLockRun = async () => {
+    if (!activeRun) return;
+    setIsProcessingRun(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${activeRun.id}/lock`, {
+        method: "POST",
+        headers: getAuthHeaders(token),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not lock run.");
+      }
+
+      toast.success("Payroll finalized & locked", "Official employee payslips have been generated in the system.");
+      await fetchPayrollData(true);
+      setSelectedRunIdForPayslips(activeRun.id);
+      setWizardStep(3); // Success step
+    } catch (err: any) {
+      toast.error("Lock failed", err?.message);
+    } finally {
+      setIsProcessingRun(false);
+    }
+  };
+
+  // Discard Run
+  const handleDiscardRun = async (runId: string) => {
+    if (!confirm("Are you sure you want to discard this calculated run? This period will return to draft.")) return;
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${runId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(token),
+      });
+      if (!res.ok) throw new Error("Could not discard run.");
+      toast.info("Run discarded", "Pay period reset to draft.");
+      setActiveRun(null);
+      setRunItems([]);
+      setWizardStep(0);
+      await fetchPayrollData(true);
+    } catch (err: any) {
+      toast.error("Discard failed", err?.message);
+    }
+  };
+
+  // Email payslips
+  const handleEmailPayslips = async (runId: string) => {
+    setIsSendingEmails(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${runId}/payslips/email`, {
+        method: "POST",
+        headers: getAuthHeaders(token),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not send payslips.");
+      }
+      const data = await res.json();
+      toast.success("Payslips delivered", `Sent: ${data.sent} · Failed: ${data.failed}`);
+      await loadPayslipsForRun(runId);
+      await fetchPayrollData(true);
+    } catch (err: any) {
+      toast.error("Delivery failed", err?.message);
+    } finally {
+      setIsSendingEmails(false);
+    }
+  };
+
+  // ==========================================================================
+  // TAB 1: OVERVIEW
+  // ==========================================================================
+  const renderOverview = () => {
+    const selectedPeriodObj = periods.find((p) => p.id === selectedPeriodId) || periods[0];
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Walkthrough Widget (Workaround guide) */}
+        <PayrollWalkthroughWidget
+          onOpenHelp={() => setIsHelpModalOpen(true)}
+          onNavigateTab={setActiveTab}
+          hasConfig={!!activeConfig}
+          employeesWithComp={rosterWithComp.filter((e) => e.hasSalary).length}
+          totalEmployees={employees.length}
+          hasRules={taxRules.filter((r) => r.active).length > 0}
+        />
+
+        {/* Missing Salary Notice */}
+        {employeesMissingSalary.length > 0 && (
+          <div
+            style={{
+              padding: "12px 18px",
+              background: "#FFFBEB",
+              border: "1px solid #FDE68A",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <AlertTriangle size={20} style={{ color: "#D97706", flexShrink: 0 }} />
+              <div>
+                <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
+                  Compensation setup needed:{" "}
+                </strong>
+                <span style={{ fontSize: 12.5, color: "var(--text-3)" }}>
+                  {employeesMissingSalary.length} active employee(s) do not have a monthly base salary recorded. Add their salary so they are included in payroll calculations.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-neutral btn-sm"
+              onClick={() => setActiveTab("Salaries")}
+              style={{ flexShrink: 0 }}
+            >
+              Assign Salaries
+            </button>
+          </div>
+        )}
+
+        {/* Aggregate Stat Ribbon */}
+        <StatRibbon
+          stats={[
+            {
+              label: "Active on Payroll",
+              value: aggregateMetrics.activeEmployees,
+              icon: <UserCheck size={18} />,
+              color: "var(--primary)",
+              description: "Active employees in organization",
+            },
+            {
+              label: "Total Gross Payroll",
+              value: formatMoney(aggregateMetrics.totalGross, currentCurrency, { compact: true }),
+              icon: <Building size={18} />,
+              color: "var(--primary)",
+              description: "Total base compensation",
+            },
+            {
+              label: "Total Net Take-Home",
+              value: formatMoney(aggregateMetrics.totalNet, currentCurrency, { compact: true }),
+              icon: <DollarSign size={18} />,
+              color: "#16A34A",
+              description: "Take-home pay to team",
+            },
+            {
+              label: "Taxes & Deductions",
+              value: formatMoney(aggregateMetrics.totalDeductions, currentCurrency, { compact: true }),
+              icon: <FileText size={18} />,
+              color: "#EA580C",
+              description: "PAYE, NSSF & withholdings",
+            },
+          ]}
+        />
+
+        {/* Current Pay Period Card & Quick Launch */}
+        <Card>
+          <CardBody style={{ padding: "20px 24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
+                    {selectedPeriodObj ? monthLabel(selectedPeriodObj.startDate) : "Current Pay Period"}
+                  </h3>
+                  <Badge variant={selectedPeriodObj?.status === "locked" || selectedPeriodObj?.status === "paid" ? "success" : "primary"}>
+                    {selectedPeriodObj ? selectedPeriodObj.status.toUpperCase() : "READY"}
+                  </Badge>
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--text-4)", margin: "4px 0 0 0" }}>
+                  {selectedPeriodObj
+                    ? `Cycle: ${shortDate(selectedPeriodObj.startDate)} to ${shortDate(selectedPeriodObj.endDate)} · Pay Date: ${shortDate(selectedPeriodObj.payDate)}`
+                    : "No pay period created yet. Launch the wizard to begin."}
+                </p>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn-neutral"
+                  onClick={() => setActiveTab("Salaries")}
+                >
+                  <DollarSign size={14} className="mr-4" /> Salaries ({rosterWithComp.filter((e) => e.hasSalary).length}/{employees.length})
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    setActiveTab("Run Payroll");
+                    setWizardStep(0);
+                  }}
+                >
+                  <DollarSign size={15} className="mr-6" /> Run Payroll Wizard
+                </button>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Recent Payroll Runs Table */}
         <div>
-          <h2 className="text-2xl fw-800 text-1 m-0">Dynamic Payroll Rules Engine</h2>
-          <p className="text-sm text-4 mt-4 m-0">
-            Configure formulas, multipliers, allowances, public holiday premiums, and statutory tax brackets without code changes.
-          </p>
-        </div>
-        <div className="row gap-10">
-          <button className="btn-neutral btn-sm" onClick={resetRulesToDefault} title="Restore default templates">
-            <RefreshCw size={14} className="mr-6" /> Restore Templates
-          </button>
-          <button className="btn-primary btn-sm" onClick={() => setIsRuleModalOpen(true)}>
-            <Plus size={14} className="mr-6" /> Create Payroll Rule
-          </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
+              Recent Payroll Runs
+            </h3>
+            <span style={{ fontSize: 12, color: "var(--text-4)" }}>
+              {runs.length} run{runs.length === 1 ? "" : "s"} recorded
+            </span>
+          </div>
+
+          <Card>
+            <CardBody style={{ padding: 0 }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)" }}>
+                      <th style={{ padding: "12px 18px" }}>Pay Period</th>
+                      <th style={{ padding: "12px 18px" }}>Employees</th>
+                      <th style={{ padding: "12px 18px" }}>Gross Pay</th>
+                      <th style={{ padding: "12px 18px" }}>Deductions</th>
+                      <th style={{ padding: "12px 18px" }}>Net Disbursed</th>
+                      <th style={{ padding: "12px 18px" }}>Status</th>
+                      <th style={{ padding: "12px 18px", textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
+                          No payroll runs processed yet. Click <strong>Run Payroll Wizard</strong> above to process your first pay cycle.
+                        </td>
+                      </tr>
+                    ) : (
+                      runs.map((r) => (
+                        <tr key={r.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                          <td style={{ padding: "12px 18px" }}>
+                            <div style={{ fontWeight: 700, color: "var(--text-1)" }}>
+                              {monthLabel(r.periodStart)}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>
+                              {shortDate(r.periodStart)} – {shortDate(r.periodEnd)}
+                            </div>
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-2)" }}>
+                            {r.employeeCount} staff
+                          </td>
+                          <td style={{ padding: "12px 18px", fontWeight: 600 }}>
+                            {formatMoney(r.totalBasePay + r.totalEarnings, r.currency || currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "#DC2626", fontWeight: 600 }}>
+                            -{formatMoney(r.totalDeductions, r.currency || currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", fontWeight: 700, color: "#16A34A" }}>
+                            {formatMoney(r.totalNetPay, r.currency || currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px" }}>
+                            <Badge variant={r.status === "approved" ? "success" : "warning"}>
+                              {r.status.toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td style={{ padding: "12px 18px", textAlign: "right" }}>
+                            <div style={{ display: "inline-flex", gap: 6 }}>
+                              {r.status === "approved" ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    onClick={() => {
+                                      setSelectedRunIdForPayslips(r.id);
+                                      setActiveTab("Paystubs");
+                                    }}
+                                  >
+                                    <Eye size={12} className="mr-4" /> Payslips
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    disabled={isSendingEmails}
+                                    onClick={() => handleEmailPayslips(r.id)}
+                                    title="Email payslips to team"
+                                  >
+                                    <Mail size={12} className="mr-4" /> Email
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-primary btn-sm"
+                                    onClick={() => {
+                                      setActiveRun(r);
+                                      setSelectedPeriodId(r.payrollPeriodId);
+                                      loadRunItems(r.id);
+                                      setWizardStep(2);
+                                      setActiveTab("Run Payroll");
+                                    }}
+                                  >
+                                    Review &amp; Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    style={{ color: "#DC2626" }}
+                                    onClick={() => handleDiscardRun(r.id)}
+                                    title="Discard run"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardBody>
+          </Card>
         </div>
       </div>
+    );
+  };
 
-      {/* Filter and search bar */}
-      <div className="row-between mb-20 gap-16 flex-wrap align-center">
-        <div className="row gap-6 flex-wrap">
-          {['all', 'base_pay', 'overtime', 'higher_rate', 'statutory_tax', 'pension_employee', 'pension_employer', 'allowance', 'bonus'].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setRuleCategoryFilter(cat)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 20,
-                fontSize: 12,
-                fontWeight: 600,
-                border: '1px solid',
-                borderColor: ruleCategoryFilter === cat ? 'var(--primary)' : 'var(--border)',
-                background: ruleCategoryFilter === cat ? 'var(--primary-tint, #EEF2F6)' : '#FFFFFF',
-                color: ruleCategoryFilter === cat ? 'var(--primary)' : 'var(--text-2)',
-                cursor: 'pointer',
-                textTransform: 'capitalize',
-              }}
-            >
-              {cat.replace('_', ' ')}
-            </button>
+  // ==========================================================================
+  // TAB 2: RUN PAYROLL WIZARD
+  // ==========================================================================
+  const renderRunPayrollWizard = () => {
+    return (
+      <div style={{ maxWidth: 940, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Wizard Stepper Bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            background: "#FFFFFF",
+            border: "1px solid var(--card-border)",
+            borderRadius: 14,
+            padding: "14px 20px",
+          }}
+        >
+          {["1. Pay Period & Roster", "2. Calculate & Review", "3. Finalize & Disburse"].map((step, idx) => (
+            <React.Fragment key={idx}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  opacity: wizardStep >= idx ? 1 : 0.45,
+                  cursor: idx <= wizardStep ? "pointer" : "default",
+                }}
+                onClick={() => {
+                  if (idx <= wizardStep) setWizardStep(idx);
+                }}
+              >
+                <div
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 999,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    background: wizardStep > idx ? "#16A34A" : wizardStep === idx ? "var(--primary)" : "#E4E4E7",
+                    color: "#FFFFFF",
+                  }}
+                >
+                  {wizardStep > idx ? <Check size={14} /> : idx + 1}
+                </div>
+                <span style={{ fontSize: 12.5, fontWeight: wizardStep === idx ? 700 : 500, color: "var(--text-1)" }}>
+                  {step}
+                </span>
+              </div>
+              {idx < 2 && (
+                <div
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    background: wizardStep > idx ? "#16A34A" : "#E4E4E7",
+                    margin: "0 14px",
+                  }}
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
 
-        <div style={{ position: 'relative', minWidth: 240 }}>
-          <Search size={14} style={{ position: 'absolute', left: 12, top: 11, color: '#94A3B8' }} />
-          <input
-            className="input"
-            style={{ paddingLeft: 34, fontSize: 12.5 }}
-            placeholder="Search rules..."
-            value={ruleSearch}
-            onChange={(e) => setRuleSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Rules Table */}
-      <Card>
-        <CardBody style={{ padding: 0 }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Rule Name &amp; Description</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Category</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Calculation Method</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Rate / Value</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Scope</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Status</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRules.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
-                      No rules match the selected filter.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRules.map((r) => (
-                    <tr key={r.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '14px 20px', maxWidth: 280 }}>
-                        <div className="fw-700 text-1">{r.name}</div>
-                        <div className="text-xs text-4 mt-2">{r.description}</div>
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <Badge variant="neutral">{r.category.replace('_', ' ').toUpperCase()}</Badge>
-                      </td>
-                      <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: 11.5, color: '#334155' }}>
-                        {r.calculationMethod.replace(/_/g, ' ')}
-                      </td>
-                      <td style={{ padding: '14px 20px', fontWeight: 600 }}>
-                        {r.multiplier ? `${r.multiplier}× Multiplier` : r.brackets ? `${r.brackets.length} Tax Brackets` : `${r.rateOrAmount}%`}
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <span style={{ fontSize: 12, color: '#475569' }}>
-                          {r.scope.toUpperCase()} ({r.countryCode})
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <button
-                          type="button"
-                          onClick={() => toggleRuleActive(r.id)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '4px 10px',
-                            borderRadius: 14,
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            background: r.isActive ? '#DCFCE7' : '#F1F5F9',
-                            color: r.isActive ? '#15803D' : '#64748B',
-                          }}
-                        >
-                          {r.isActive ? <Check size={12} /> : <X size={12} />}
-                          {r.isActive ? 'ACTIVE' : 'INACTIVE'}
-                        </button>
-                      </td>
-                      <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={() => deleteRule(r.id)}
-                          className="btn-neutral btn-sm"
-                          style={{ padding: '5px 8px', color: '#DC2626' }}
-                          title="Delete rule"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardBody>
-      </Card>
-    </div>
-  );
-
-  /* =========================================================================
-     TAB 3: RUN PAYROLL WIZARD
-     ========================================================================= */
-  const renderWizard = () => (
-    <div style={{ margin: '0 auto' }}>
-      <div className="row-between mb-24 align-center">
-        <div>
-          <h2 className="text-2xl fw-800 text-1 m-0">Run Payroll Cycle</h2>
-          <div className="row gap-8 mt-6">
-            <Badge variant="primary">Cycle: October 2026 ({currentRunItems.length} Employees)</Badge>
-          </div>
-        </div>
-        <button className="btn-neutral" onClick={() => setActiveTab('Overview')}>Save &amp; Exit</button>
-      </div>
-
-      {/* Stepper Header */}
-      <div className="row mb-28" style={{ background: '#FFFFFF', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-        {WIZARD_STEPS.map((step, idx) => (
-          <div key={idx} className="row" style={{ flex: 1, alignItems: 'center' }}>
-            <div
-              className="row gap-10 align-center cursor-pointer"
-              onClick={() => setWizardStep(idx)}
-              style={{ opacity: wizardStep === idx ? 1 : 0.6 }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: wizardStep >= idx ? 'var(--primary)' : '#F1F5F9',
-                  color: wizardStep >= idx ? '#FFFFFF' : '#64748B',
-                }}
-              >
-                {wizardStep > idx ? <Check size={14} /> : idx + 1}
-              </div>
-              <span className="text-xs fw-700 text-1">{step}</span>
-            </div>
-            {idx < WIZARD_STEPS.length - 1 && (
-              <div style={{ flex: 1, height: 2, background: wizardStep > idx ? 'var(--primary)' : '#E2E8F0', margin: '0 16px' }} />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Wizard Content Container */}
-      <Card style={{ overflow: 'hidden', marginBottom: 28 }}>
-        <CardBody style={{ padding: 0 }}>
-          {/* STEP 1: Hours & Attendance Reconciliation */}
-          {wizardStep === 0 && (
-            <div>
-              <div style={{ padding: '24px 28px', borderBottom: '1px solid #F1F5F9' }}>
-                <h3 className="text-lg fw-700 text-1 m-0">Step 1: Hours &amp; Attendance Reconciliation</h3>
-                <p className="text-xs text-4 mt-4 m-0">
-                  Separating Recorded hours, Productive hours, Billable hours, and Approved Overtime before executing pay calculation.
+        {/* STEP 0: Select Period & Review Roster */}
+        {wizardStep === 0 && (
+          <Card>
+            <CardHeader title="Step 1: Select Pay Period & Verify Team Compensation" />
+            <CardBody style={{ padding: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <p style={{ fontSize: 13, color: "var(--text-3)", margin: 0 }}>
+                  Choose the month you are running payroll for. EasyHR will verify that all active team members have their base compensation set before computing taxes and deductions.
                 </p>
-              </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 12.5 }}>
-                  <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
-                    <tr>
-                      <th style={{ padding: '14px 24px', fontWeight: 700 }}>Employee</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Recorded Hours</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Productive Hours</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Schedule %</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Approved Overtime</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Status / Anomaly</th>
-                      <th style={{ padding: '14px 24px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentRunItems.map((r) => (
-                      <tr key={r.employeeId} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                        <td style={{ padding: '14px 24px' }}>
-                          <div className="fw-700 text-1">{r.employeeName}</div>
-                          <div className="text-xs text-4 mt-1">{r.payRateDisplay} · {r.compensationModel}</div>
-                        </td>
-                        <td style={{ padding: '14px 20px', color: '#475569' }}>{r.recordedHours} hrs</td>
-                        <td style={{ padding: '14px 20px', fontWeight: 600, color: '#0F766E' }}>{r.productiveHours} hrs</td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <span style={{ fontWeight: 600, color: r.productiveHoursPercent >= 95 ? '#16A34A' : '#D97706' }}>
-                            {r.productiveHoursPercent}%
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          {r.approvedOvertimeHours > 0 ? (
-                            <Badge variant="warning">{r.approvedOvertimeHours}h (1.5×)</Badge>
-                          ) : (
-                            <span style={{ color: '#94A3B8' }}>0h</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          {r.missingPunchWarnings > 0 ? (
-                            <Badge variant="danger">1 Missing Clock-out</Badge>
-                          ) : (
-                            <Badge variant="success">Punches Reconciled</Badge>
-                          )}
-                        </td>
-                        <td style={{ padding: '14px 24px', textAlign: 'right' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAdjustTarget(r);
-                              setAdjustHours(String(r.productiveHours));
-                              setAdjustOt(String(r.approvedOvertimeHours));
-                            }}
-                            className="btn-neutral btn-sm"
-                            style={{ fontSize: 11.5 }}
-                          >
-                            <Edit3 size={12} className="mr-4" /> Adjust
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Earnings & Adjustments */}
-          {wizardStep === 1 && (
-            <div>
-              <div style={{ padding: '24px 28px', borderBottom: '1px solid #F1F5F9' }}>
-                <h3 className="text-lg fw-700 text-1 m-0">Step 2: Earnings &amp; Adjustments</h3>
-                <p className="text-xs text-4 mt-4 m-0">
-                  Review Base Compensation, Overtime multipliers, Differentials, and One-time Bonuses recorded in the Job section.
-                </p>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 12.5 }}>
-                  <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
-                    <tr>
-                      <th style={{ padding: '14px 24px', fontWeight: 700 }}>Employee</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Regular Base Pay</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Overtime Pay</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Higher Rates</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Bonuses (Job Sec)</th>
-                      <th style={{ padding: '14px 24px', fontWeight: 700, textAlign: 'right' }}>Total Gross</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentRunItems.map((r) => (
-                      <tr key={r.employeeId} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                        <td style={{ padding: '14px 24px', fontWeight: 600 }}>{r.employeeName}</td>
-                        <td style={{ padding: '14px 20px' }}>{formatMoney(r.regularCompensation, r.currency)}</td>
-                        <td style={{ padding: '14px 20px', color: r.overtimeCompensation > 0 ? '#16A34A' : '#94A3B8' }}>
-                          {r.overtimeCompensation > 0 ? `+${formatMoney(r.overtimeCompensation, r.currency)}` : '—'}
-                        </td>
-                        <td style={{ padding: '14px 20px', color: r.higherRateCompensation > 0 ? '#2563EB' : '#94A3B8' }}>
-                          {r.higherRateCompensation > 0 ? `+${formatMoney(r.higherRateCompensation, r.currency)}` : '—'}
-                        </td>
-                        <td style={{ padding: '14px 20px', color: r.bonusesTotal > 0 ? '#16A34A' : '#94A3B8' }}>
-                          {r.bonusesTotal > 0 ? `+${formatMoney(r.bonusesTotal, r.currency)}` : '—'}
-                        </td>
-                        <td style={{ padding: '14px 24px', textAlign: 'right', fontWeight: 700 }}>
-                          {formatMoney(r.grossPay, r.currency)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Taxes & Deductions */}
-          {wizardStep === 2 && (
-            <div>
-              <div style={{ padding: '24px 28px', borderBottom: '1px solid #F1F5F9' }}>
-                <h3 className="text-lg fw-700 text-1 m-0">Step 3: Statutory Taxes &amp; Authorized Deductions</h3>
-                <p className="text-xs text-4 mt-4 m-0">
-                  Applied statutory PAYE marginal tax brackets, 5% employee NSSF, and authorized job penalties.
-                </p>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 12.5 }}>
-                  <thead style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
-                    <tr>
-                      <th style={{ padding: '14px 24px', fontWeight: 700 }}>Employee</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Gross Pay</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>NSSF Employee (5%)</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>PAYE Income Tax</th>
-                      <th style={{ padding: '14px 20px', fontWeight: 700 }}>Penalties / Adv</th>
-                      <th style={{ padding: '14px 24px', fontWeight: 700, textAlign: 'right' }}>Total Deductions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentRunItems.map((r) => {
-                      const nssf = r.breakdown.find((b) => b.category === 'pension_employee')?.amount || 0;
-                      const paye = r.breakdown.find((b) => b.category === 'statutory_tax')?.amount || 0;
-                      return (
-                        <tr key={r.employeeId} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '14px 24px', fontWeight: 600 }}>{r.employeeName}</td>
-                          <td style={{ padding: '14px 20px' }}>{formatMoney(r.grossPay, r.currency)}</td>
-                          <td style={{ padding: '14px 20px', color: '#DC2626' }}>-{formatMoney(nssf, r.currency)}</td>
-                          <td style={{ padding: '14px 20px', color: '#DC2626' }}>-{formatMoney(paye, r.currency)}</td>
-                          <td style={{ padding: '14px 20px', color: r.penaltiesTotal > 0 ? '#DC2626' : '#94A3B8' }}>
-                            {r.penaltiesTotal > 0 ? `-${formatMoney(r.penaltiesTotal, r.currency)}` : '—'}
-                          </td>
-                          <td style={{ padding: '14px 24px', textAlign: 'right', fontWeight: 700, color: '#DC2626' }}>
-                            -{formatMoney(r.employeeDeductions, r.currency)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: Review & Finalize */}
-          {wizardStep === 3 && (
-            <div>
-              <div style={{ padding: '24px 28px', borderBottom: '1px solid #F1F5F9' }}>
-                <h3 className="text-lg fw-700 text-1 m-0">Step 4: Final Review &amp; Executive Approval</h3>
-                <p className="text-xs text-4 mt-4 m-0">
-                  Review the complete payroll disbursement summary. Once approved, employee payslips will be generated and available.
-                </p>
-              </div>
-
-              <div style={{ padding: 24 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-                  <div style={{ padding: 16, background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-                    <span className="text-xs text-4 block">Total Gross Pay</span>
-                    <strong className="text-lg text-1">{formatMoney(cycleTotals.gross, settings.defaultCurrency)}</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                      Pay Period Month
+                    </label>
+                    <input
+                      type="month"
+                      className="input"
+                      value={newPeriodMonth}
+                      onChange={(e) => setNewPeriodMonth(e.target.value)}
+                    />
                   </div>
-                  <div style={{ padding: 16, background: '#FEF2F2', borderRadius: 10, border: '1px solid #FEE2E2' }}>
-                    <span className="text-xs text-error block">Total Deductions</span>
-                    <strong className="text-lg text-error">-{formatMoney(cycleTotals.deductions, settings.defaultCurrency)}</strong>
-                  </div>
-                  <div style={{ padding: 16, background: '#F0FDF4', borderRadius: 10, border: '1px solid #BBF7D0' }}>
-                    <span className="text-xs text-success block">Total Net Disbursement</span>
-                    <strong className="text-lg text-success">{formatMoney(cycleTotals.net, settings.defaultCurrency)}</strong>
-                  </div>
-                  <div style={{ padding: 16, background: '#EFF6FF', borderRadius: 10, border: '1px solid #BFDBFE' }}>
-                    <span className="text-xs text-primary block">Total Employer Cost</span>
-                    <strong className="text-lg text-primary">{formatMoney(cycleTotals.employerCost, settings.defaultCurrency)}</strong>
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                      Active Company Jurisdiction
+                    </label>
+                    <div style={{ padding: "9px 12px", background: "#FAF9F7", border: "1px solid var(--card-border)", borderRadius: 10, fontSize: 13 }}>
+                      <strong>{countryName(currentCountry)} ({currentCountry})</strong> · Currency: <strong>{currentCurrency}</strong>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: 10 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12.5 }}>
-                    <thead style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: 11.5 }}>
-                      <tr>
-                        <th style={{ padding: '12px 18px' }}>Employee</th>
-                        <th style={{ padding: '12px 18px' }}>Model</th>
-                        <th style={{ padding: '12px 18px' }}>Gross</th>
-                        <th style={{ padding: '12px 18px' }}>Deductions</th>
-                        <th style={{ padding: '12px 18px' }}>Net Pay</th>
-                        <th style={{ padding: '12px 18px' }}>Employer Cost</th>
+                {/* Roster Check Summary */}
+                <div
+                  style={{
+                    border: "1px solid var(--card-border)",
+                    borderRadius: 10,
+                    padding: 16,
+                    background: employeesMissingSalary.length === 0 ? "#F0FDF4" : "#FFFBEB",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {employeesMissingSalary.length === 0 ? (
+                        <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
+                      ) : (
+                        <AlertTriangle size={18} style={{ color: "#D97706" }} />
+                      )}
+                      <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
+                        {employeesMissingSalary.length === 0
+                          ? `All ${employees.length} active employees have salaries recorded.`
+                          : `${employeesMissingSalary.length} employee(s) missing salary configuration.`}
+                      </strong>
+                    </div>
+                    {employeesMissingSalary.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn-neutral btn-sm"
+                        onClick={() => setActiveTab("Salaries")}
+                      >
+                        Assign Missing Salaries
+                      </button>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--text-3)", margin: 0 }}>
+                    Active deduction rules for this run: <strong>{taxRules.filter((r) => r.active).length} rule(s)</strong> (PAYE, NSSF, etc.).
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+                  <button type="button" className="btn-neutral" onClick={() => setActiveTab("Overview")}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={isProcessingRun}
+                    onClick={handleCreateOrSelectPeriod}
+                  >
+                    {isProcessingRun ? <Loader2 size={14} className="animate-spin mr-6" /> : null}
+                    Proceed to Calculation <ChevronRight size={14} className="ml-4" />
+                  </button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* STEP 1: Ready to Calculate */}
+        {wizardStep === 1 && (
+          <Card>
+            <CardHeader title="Step 2: Calculate Pay Run" />
+            <CardBody style={{ padding: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <p style={{ fontSize: 13, color: "var(--text-3)", margin: 0 }}>
+                  Ready to calculate earnings, progressive income taxes, and statutory deductions for {employees.length} team members for {monthLabel(newPeriodMonth + "-01")}.
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                  <div style={{ padding: "14px 16px", background: "#FAF9F7", borderRadius: 10, border: "1px solid var(--card-border)" }}>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Employees in Run</span>
+                    <strong style={{ fontSize: 18, color: "var(--text-1)" }}>{employees.length} staff</strong>
+                  </div>
+                  <div style={{ padding: "14px 16px", background: "#FAF9F7", borderRadius: 10, border: "1px solid var(--card-border)" }}>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Active Tax Rules</span>
+                    <strong style={{ fontSize: 18, color: "var(--text-1)" }}>
+                      {taxRules.filter((r) => r.active).length} Active
+                    </strong>
+                  </div>
+                  <div style={{ padding: "14px 16px", background: "#FAF9F7", borderRadius: 10, border: "1px solid var(--card-border)" }}>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Disbursement Currency</span>
+                    <strong style={{ fontSize: 18, color: "var(--primary)" }}>{currentCurrency}</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                  <button type="button" className="btn-neutral" onClick={() => setWizardStep(0)}>
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={isProcessingRun}
+                    onClick={handleCalculateRun}
+                  >
+                    {isProcessingRun ? <Loader2 size={14} className="animate-spin mr-6" /> : <Sparkles size={14} className="mr-6" />}
+                    Calculate Payroll Now
+                  </button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* STEP 2: Review Calculated Run Items */}
+        {wizardStep === 2 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Card>
+              <CardHeader
+                title="Step 3: Review Calculated Payroll & Approve"
+                action={
+                  activeRun && (
+                    <button
+                      type="button"
+                      className="btn-neutral btn-sm"
+                      style={{ color: "#DC2626" }}
+                      onClick={() => handleDiscardRun(activeRun.id)}
+                    >
+                      <Trash2 size={12} className="mr-4" /> Discard &amp; Recompute
+                    </button>
+                  )
+                }
+              />
+              <CardBody style={{ padding: 0 }}>
+                {/* Aggregate Summary Ribbon */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, 1fr)",
+                    gap: 12,
+                    padding: "16px 20px",
+                    background: "#FAF9F7",
+                    borderBottom: "1px solid var(--card-border)",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Total Gross</span>
+                    <strong style={{ fontSize: 15, color: "var(--text-1)" }}>
+                      {formatMoney(runItems.reduce((s, i) => s + i.basePay + i.earnings, 0), currentCurrency)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Total Deductions</span>
+                    <strong style={{ fontSize: 15, color: "#DC2626" }}>
+                      -{formatMoney(runItems.reduce((s, i) => s + i.deductions, 0), currentCurrency)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Net Take-Home Pay</span>
+                    <strong style={{ fontSize: 16, color: "#16A34A" }}>
+                      {formatMoney(runItems.reduce((s, i) => s + i.netPay, 0), currentCurrency)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-4)", display: "block" }}>Employees Count</span>
+                    <strong style={{ fontSize: 15, color: "var(--text-1)" }}>{runItems.length} Staff</strong>
+                  </div>
+                </div>
+
+                {/* Run Items Table */}
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: "#FFFFFF", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
+                        <th style={{ padding: "12px 18px" }}>Employee</th>
+                        <th style={{ padding: "12px 18px" }}>Department</th>
+                        <th style={{ padding: "12px 18px" }}>Base Salary</th>
+                        <th style={{ padding: "12px 18px" }}>Deductions</th>
+                        <th style={{ padding: "12px 18px" }}>Net Pay</th>
+                        <th style={{ padding: "12px 18px", textAlign: "right" }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {currentRunItems.map((r) => (
-                        <tr key={r.employeeId} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '12px 18px', fontWeight: 600 }}>{r.employeeName}</td>
-                          <td style={{ padding: '12px 18px' }}>
-                            <Badge variant="neutral">{r.compensationModel.toUpperCase()}</Badge>
+                      {runItems.map((item) => (
+                        <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                          <td style={{ padding: "12px 18px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Avatar name={item.employeeName} size="sm" src={item.avatarUrl} />
+                              <strong style={{ color: "var(--text-1)" }}>{item.employeeName}</strong>
+                            </div>
                           </td>
-                          <td style={{ padding: '12px 18px' }}>{formatMoney(r.grossPay, r.currency)}</td>
-                          <td style={{ padding: '12px 18px', color: '#DC2626' }}>-{formatMoney(r.employeeDeductions, r.currency)}</td>
-                          <td style={{ padding: '12px 18px', fontWeight: 700, color: '#16A34A' }}>{formatMoney(r.netPay, r.currency)}</td>
-                          <td style={{ padding: '12px 18px', fontWeight: 600 }}>{formatMoney(r.totalEmployerCost, r.currency)}</td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-3)" }}>
+                            {item.department || "General"}
+                          </td>
+                          <td style={{ padding: "12px 18px", fontWeight: 600 }}>
+                            {formatMoney(item.basePay, currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "#DC2626", fontWeight: 600 }}>
+                            -{formatMoney(item.deductions, currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "#16A34A", fontWeight: 700 }}>
+                            {formatMoney(item.netPay, currentCurrency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", textAlign: "right" }}>
+                            <button
+                              type="button"
+                              className="btn-neutral btn-sm"
+                              onClick={() => setStatementPayslip({ ...item, currency: currentCurrency })}
+                            >
+                              <Eye size={12} className="mr-4" /> Preview
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            </div>
-          )}
-        </CardBody>
-      </Card>
 
-      {/* Stepper Footer Controls */}
-      <div className="row-between">
-        <button
-          className="btn-neutral"
-          disabled={wizardStep === 0}
-          onClick={() => setWizardStep((prev) => Math.max(0, prev - 1))}
-        >
-          Previous Step
-        </button>
-
-        {wizardStep < 3 ? (
-          <button className="btn-primary" onClick={() => setWizardStep((prev) => Math.min(3, prev + 1))}>
-            Proceed to {WIZARD_STEPS[wizardStep + 1]} <ChevronRight size={16} className="ml-6" />
-          </button>
-        ) : (
-          <button className="btn-primary" onClick={handleFinalizePayRun} disabled={isProcessing}>
-            {isProcessing ? <Loader2 size={16} className="animate-spin mr-6" /> : <ShieldCheck size={16} className="mr-6" />}
-            Finalize &amp; Approve Payroll Run
-          </button>
+                {/* Footer Approve Button */}
+                <div style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button type="button" className="btn-neutral" onClick={() => setWizardStep(1)}>
+                    Back to Calculation
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={isProcessingRun}
+                    onClick={handleLockRun}
+                    style={{ padding: "10px 22px", fontSize: 13.5 }}
+                  >
+                    {isProcessingRun ? <Loader2 size={15} className="animate-spin mr-6" /> : <ShieldCheck size={16} className="mr-6" />}
+                    Approve &amp; Lock Payroll Run
+                  </button>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
         )}
-      </div>
-    </div>
-  );
 
-  /* =========================================================================
-     TAB 4: PAYSTUBS REPOSITORY
-     ========================================================================= */
-  const renderPaystubs = () => (
-    <div>
-      <div className="row-between mb-24 align-center">
-        <div>
-          <h2 className="text-2xl fw-800 text-1 m-0">Paystubs &amp; Compensation Statements</h2>
-          <p className="text-sm text-4 mt-4 m-0">Official calculated payslips across company pay periods.</p>
-        </div>
-      </div>
-
-      {/* Filter and search bar */}
-      <div className="row-between mb-20 gap-16 flex-wrap align-center">
-        <div className="row gap-8 align-center">
-          <label className="text-xs fw-700 text-4 uppercase">Period:</label>
-          <select
-            className="select"
-            value={paystubMonthFilter}
-            onChange={(e) => setPaystubMonthFilter(e.target.value)}
-            style={{ fontSize: 13, minWidth: 160 }}
-          >
-            <option value="all">All Pay Periods</option>
-            <option value="10">October 2026</option>
-            <option value="9">September 2026</option>
-            <option value="8">August 2026</option>
-          </select>
-        </div>
-
-        <div style={{ position: 'relative', minWidth: 260 }}>
-          <Search size={14} style={{ position: 'absolute', left: 12, top: 11, color: '#94A3B8' }} />
-          <input
-            className="input"
-            style={{ paddingLeft: 34, fontSize: 12.5 }}
-            placeholder="Search employee name..."
-            value={paystubSearch}
-            onChange={(e) => setPaystubSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Card>
-        <CardBody style={{ padding: 0 }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800, fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#64748B', fontSize: 11.5, textTransform: 'uppercase' }}>
-                  <th style={{ padding: '14px 24px', fontWeight: 700 }}>Employee</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Pay Period</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Gross Pay</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Deductions</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Net Pay</th>
-                  <th style={{ padding: '14px 20px', fontWeight: 700 }}>Status</th>
-                  <th style={{ padding: '14px 24px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allPaystubs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
-                      No paystubs found matching the criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  allPaystubs.map((p, idx) => (
-                    <tr key={`${p.employeeId}-${p.periodMonth}-${p.periodYear}-${idx}`} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '14px 24px' }}>
-                        <div className="fw-700 text-1">{p.employeeName}</div>
-                        <div className="text-xs text-4">{p.compensationModel} · {p.payRateDisplay}</div>
-                      </td>
-                      <td style={{ padding: '14px 20px', color: '#475569' }}>
-                        Month {p.periodMonth}, {p.periodYear}
-                      </td>
-                      <td style={{ padding: '14px 20px', fontWeight: 600 }}>
-                        {formatMoney(p.grossPay, p.currency)}
-                      </td>
-                      <td style={{ padding: '14px 20px', color: '#DC2626' }}>
-                        -{formatMoney(p.employeeDeductions, p.currency)}
-                      </td>
-                      <td style={{ padding: '14px 20px', fontWeight: 700, color: '#16A34A' }}>
-                        {formatMoney(p.netPay, p.currency)}
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <Badge variant="success">FINALIZED</Badge>
-                      </td>
-                      <td style={{ padding: '14px 24px', textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaystub(p)}
-                          className="btn-neutral btn-sm"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12 }}
-                        >
-                          <Eye size={13} /> View Statement
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardBody>
-      </Card>
-    </div>
-  );
-
-  /* =========================================================================
-     TAB 5: SETTINGS & VISIBILITY TOGGLE
-     ========================================================================= */
-  const renderSettings = () => (
-    <div style={{ maxWidth: 840 }}>
-      <h2 className="text-2xl fw-800 text-1 mb-8">Payroll Engine Settings</h2>
-      <p className="text-base text-4 mb-28">
-        Configure company jurisdiction, currency, standard work hours, and employee portal visibility.
-      </p>
-
-      {/* Feature 1: Employee Payslips Tab Visibility Toggle */}
-      <Card style={{ marginBottom: 24, border: '1px solid #BFDBFE', background: '#F8FAFC' }}>
-        <CardBody style={{ padding: 24 }}>
-          <div className="row-between align-center">
-            <div style={{ flex: 1, paddingRight: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h3 className="text-base fw-700 text-1 m-0">Employee Profile &amp; Payslips Tab Visibility</h3>
-                <Badge variant={settings.showPayslipsTabToEmployees ? 'success' : 'neutral'}>
-                  {settings.showPayslipsTabToEmployees ? 'VISIBLE TO EMPLOYEES' : 'RESTRICTED (HR ONLY)'}
-                </Badge>
-              </div>
-              <p className="text-xs text-4 mt-6 m-0" style={{ lineHeight: 1.6 }}>
-                When enabled, employees can view the <strong>Payslips</strong> tab and live <strong>Calculation Formula</strong> directly in their profile (<code>/people/me</code>). When disabled, the tab is hidden from regular employees. HR Administrators and Line Managers always retain full access.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={toggleEmployeePayslipsVisibility}
-              className={settings.showPayslipsTabToEmployees ? 'btn-neutral' : 'btn-primary'}
-              style={{ padding: '10px 18px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 8 }}
-            >
-              {settings.showPayslipsTabToEmployees ? (
-                <>
-                  <ToggleRight size={18} style={{ color: '#16A34A' }} />
-                  <span>Disable for Employees</span>
-                </>
-              ) : (
-                <>
-                  <ToggleLeft size={18} />
-                  <span>Enable for Employees</span>
-                </>
-              )}
-            </button>
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Jurisdiction & Base Currency */}
-      <Card style={{ marginBottom: 24 }}>
-        <CardHeader title="Company Jurisdiction & Currency" />
-        <CardBody>
-          <div className="row gap-20 mb-20">
-            <label className="col gap-8" style={{ flex: 1 }}>
-              <span className="text-sm fw-600 text-2">Primary Country</span>
-              <select
-                className="select"
-                value={configCountry}
-                onChange={(e) => {
-                  const opt = COUNTRY_OPTIONS.find((c) => c.code === e.target.value);
-                  setConfigCountry(e.target.value);
-                  if (opt?.currency) setConfigCurrency(opt.currency);
+        {/* STEP 3: Completed */}
+        {wizardStep === 3 && (
+          <Card>
+            <CardBody style={{ padding: 40, textAlign: "center" }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 999,
+                  background: "#DCFCE7",
+                  color: "#16A34A",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px auto",
                 }}
               >
-                {COUNTRY_OPTIONS.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.name} ({c.code}) · {c.currency}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <CheckCircle2 size={32} />
+              </div>
+              <h3 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 6px 0", color: "var(--text-1)" }}>
+                Payroll Finalized &amp; Locked!
+              </h3>
+              <p style={{ fontSize: 13, color: "var(--text-3)", maxWidth: 460, margin: "0 auto 24px auto" }}>
+                Official pay statements have been generated for {runItems.length} employees. You can now distribute them via email or view/print individual payslips.
+              </p>
 
-            <label className="col gap-8" style={{ flex: 1 }}>
-              <span className="text-sm fw-600 text-2">Disbursement Currency</span>
-              <input
-                className="input"
-                maxLength={3}
-                value={configCurrency}
-                onChange={(e) => setConfigCurrency(e.target.value.toUpperCase())}
-              />
-            </label>
+              <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn-neutral"
+                  onClick={() => {
+                    setActiveTab("Overview");
+                    setWizardStep(0);
+                  }}
+                >
+                  Back to Dashboard
+                </button>
+                {activeRun && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={isSendingEmails}
+                    onClick={() => handleEmailPayslips(activeRun.id)}
+                  >
+                    {isSendingEmails ? <Loader2 size={14} className="animate-spin mr-6" /> : <Mail size={15} className="mr-6" />}
+                    Email Payslips to Team
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-neutral"
+                  onClick={() => {
+                    if (activeRun) setSelectedRunIdForPayslips(activeRun.id);
+                    setActiveTab("Paystubs");
+                  }}
+                >
+                  View Paystubs Archive
+                </button>
+              </div>
+            </CardBody>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // TAB 3: SALARIES & COMPENSATION
+  // ==========================================================================
+  const renderSalaries = () => {
+    const filteredRoster = rosterWithComp.filter((emp) => {
+      if (salaryDeptFilter !== "all" && emp.departmentId !== salaryDeptFilter) return false;
+      if (salarySearch.trim()) {
+        const q = salarySearch.toLowerCase();
+        const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
+        if (!fullName.includes(q) && !emp.jobTitle?.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "var(--text-1)" }}>
+              Employee Salaries &amp; Compensation
+            </h3>
+            <p style={{ fontSize: 12.5, color: "var(--text-3)", margin: "3px 0 0 0" }}>
+              Every active staff member must have an effective monthly salary to be included in payroll cycles.
+            </p>
           </div>
-
-          <label className="col gap-8 mb-24" style={{ maxWidth: 360 }}>
-            <span className="text-sm fw-600 text-2">Standard Monthly Expected Hours</span>
-            <input
-              className="input"
-              type="number"
-              value={configHours}
-              onChange={(e) => setConfigHours(e.target.value)}
-            />
-            <small className="text-4">Typically 173.33 hours (40 hrs/wk × 52 wks ÷ 12 mos)</small>
-          </label>
 
           <button
             type="button"
             className="btn-primary"
             onClick={() => {
-              updateSettings({
-                defaultCountry: configCountry,
-                defaultCurrency: configCurrency,
-                standardMonthlyHours: Number(configHours) || 173.33,
-              });
+              setSelectedCompEmployeeId(employees[0]?.id || "");
+              setIsCompModalOpen(true);
             }}
           >
-            <Save size={15} className="mr-6" /> Save Settings
+            <Plus size={14} className="mr-6" /> Set Employee Salary
           </button>
-        </CardBody>
-      </Card>
-    </div>
-  );
+        </div>
 
+        {/* Filter bar */}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", minWidth: 260 }}>
+            <Search size={14} style={{ position: "absolute", left: 12, top: 11, color: "var(--text-4)" }} />
+            <input
+              type="text"
+              className="input"
+              style={{ paddingLeft: 34, fontSize: 12.5 }}
+              placeholder="Search employee or job title..."
+              value={salarySearch}
+              onChange={(e) => setSalarySearch(e.target.value)}
+            />
+          </div>
+
+          <select
+            className="select"
+            style={{ width: 180, fontSize: 12.5 }}
+            value={salaryDeptFilter}
+            onChange={(e) => setSalaryDeptFilter(e.target.value)}
+          >
+            <option value="all">All Departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Roster Table */}
+        <Card>
+          <CardBody style={{ padding: 0 }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
+                    <th style={{ padding: "12px 18px" }}>Employee</th>
+                    <th style={{ padding: "12px 18px" }}>Department &amp; Job Title</th>
+                    <th style={{ padding: "12px 18px" }}>Monthly Salary</th>
+                    <th style={{ padding: "12px 18px" }}>Effective Date</th>
+                    <th style={{ padding: "12px 18px" }}>Status</th>
+                    <th style={{ padding: "12px 18px", textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRoster.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
+                        No employees match the selected criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRoster.map((emp) => (
+                      <tr key={emp.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                        <td style={{ padding: "12px 18px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <Avatar name={`${emp.firstName} ${emp.lastName}`} size="sm" src={emp.avatar} />
+                            <div>
+                              <strong style={{ color: "var(--text-1)" }}>
+                                {emp.firstName} {emp.lastName}
+                              </strong>
+                              {emp.workEmail && (
+                                <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>{emp.workEmail}</div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 18px", color: "var(--text-3)" }}>
+                          <div>{emp.jobTitle || "Staff"}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-4)" }}>{emp.department || "General"}</div>
+                        </td>
+                        <td style={{ padding: "12px 18px" }}>
+                          {emp.hasSalary ? (
+                            <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>
+                              {formatMoney(emp.baseAmountMinor, emp.currency)}
+                            </strong>
+                          ) : (
+                            <span style={{ fontSize: 12, color: "#D97706", fontWeight: 600 }}>
+                              Not set
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "12px 18px", color: "var(--text-4)", fontSize: 12 }}>
+                          {emp.effectiveDate ? shortDate(emp.effectiveDate) : "—"}
+                        </td>
+                        <td style={{ padding: "12px 18px" }}>
+                          <Badge variant={emp.hasSalary ? "success" : "warning"}>
+                            {emp.hasSalary ? "CONFIGURED" : "MISSING"}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: "12px 18px", textAlign: "right" }}>
+                          <button
+                            type="button"
+                            className="btn-neutral btn-sm"
+                            onClick={() => {
+                              setSelectedCompEmployeeId(emp.id);
+                              setIsCompModalOpen(true);
+                            }}
+                          >
+                            <Edit3 size={12} className="mr-4" /> {emp.hasSalary ? "Update" : "Set Salary"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // TAB 4: DEDUCTIONS & RULES
+  // ==========================================================================
+  const renderRules = () => {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "var(--text-1)" }}>
+              Statutory Taxes &amp; Company Deductions
+            </h3>
+            <p style={{ fontSize: 12.5, color: "var(--text-3)", margin: "3px 0 0 0" }}>
+              Configure progressive income tax brackets, social security withholdings, and custom company deductions.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setIsTaxRuleModalOpen(true)}
+            >
+              <Plus size={14} className="mr-6" /> Add Deduction Rule
+            </button>
+          </div>
+        </div>
+
+        <Card>
+          <CardBody style={{ padding: 0 }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
+                    <th style={{ padding: "12px 18px" }}>Rule Name</th>
+                    <th style={{ padding: "12px 18px" }}>Type</th>
+                    <th style={{ padding: "12px 18px" }}>Calculation Formula</th>
+                    <th style={{ padding: "12px 18px" }}>Applies To</th>
+                    <th style={{ padding: "12px 18px" }}>Status</th>
+                    <th style={{ padding: "12px 18px", textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {taxRules.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
+                        No deduction rules configured. Click <strong>Add Deduction Rule</strong> or choose a 1-click template to add statutory rules.
+                      </td>
+                    </tr>
+                  ) : (
+                    taxRules.map((rule) => (
+                      <tr key={rule.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                        <td style={{ padding: "12px 18px" }}>
+                          <strong style={{ color: "var(--text-1)" }}>{rule.ruleName}</strong>
+                          <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>
+                            Country: {rule.country} · {rule.currency}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 18px" }}>
+                          <Badge variant="neutral">
+                            {rule.ruleType === "progressive_tax" ? "PROGRESSIVE TAX" : "FLAT DEDUCTION"}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: "12px 18px", color: "var(--text-2)", fontSize: 12.5 }}>
+                          {describeRule(rule, rule.currency || currentCurrency)}
+                        </td>
+                        <td style={{ padding: "12px 18px", color: "var(--text-3)", fontSize: 12 }}>
+                          {rule.appliesTo === "all_employees"
+                            ? "All Employees"
+                            : `${rule.appliesTo.toUpperCase()}`}
+                        </td>
+                        <td style={{ padding: "12px 18px" }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRuleActive(rule.id, rule.active)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: "3px 10px",
+                              borderRadius: 999,
+                              border: "none",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              background: rule.active ? "#DCFCE7" : "#F4F4F5",
+                              color: rule.active ? "#15803D" : "#71717A",
+                            }}
+                          >
+                            {rule.active ? <Check size={12} /> : <X size={12} />}
+                            {rule.active ? "ACTIVE" : "PAUSED"}
+                          </button>
+                        </td>
+                        <td style={{ padding: "12px 18px", textAlign: "right" }}>
+                          <button
+                            type="button"
+                            className="btn-neutral btn-sm"
+                            style={{ color: "#DC2626" }}
+                            onClick={() => handleDeleteRule(rule.id, rule.ruleName)}
+                            title="Delete rule"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // TAB 5: PAYSTUBS
+  // ==========================================================================
+  const renderPaystubs = () => {
+    const filteredPayslips = runPayslips.filter((slip) => {
+      if (paystubSearch.trim()) {
+        const q = paystubSearch.toLowerCase();
+        return slip.employeeName.toLowerCase().includes(q) || slip.email?.toLowerCase().includes(q);
+      }
+      return true;
+    });
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "var(--text-1)" }}>
+              Paystubs &amp; Official Statements
+            </h3>
+            <p style={{ fontSize: 12.5, color: "var(--text-3)", margin: "3px 0 0 0" }}>
+              Archive of finalized payslips generated for each payroll run.
+            </p>
+          </div>
+
+          {selectedRunIdForPayslips && (
+            <button
+              type="button"
+              className="btn-neutral"
+              disabled={isSendingEmails || runPayslips.length === 0}
+              onClick={() => handleEmailPayslips(selectedRunIdForPayslips)}
+            >
+              {isSendingEmails ? <Loader2 size={14} className="animate-spin mr-6" /> : <Mail size={14} className="mr-6" />}
+              Email Payslips to Team
+            </button>
+          )}
+        </div>
+
+        {/* Filter bar */}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-4)", textTransform: "uppercase" }}>
+              Pay Run:
+            </label>
+            <select
+              className="select"
+              style={{ width: 220, fontSize: 12.5 }}
+              value={selectedRunIdForPayslips}
+              onChange={(e) => setSelectedRunIdForPayslips(e.target.value)}
+            >
+              {runs.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {monthLabel(r.periodStart)} ({r.status.toUpperCase()})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ position: "relative", minWidth: 260 }}>
+            <Search size={14} style={{ position: "absolute", left: 12, top: 11, color: "var(--text-4)" }} />
+            <input
+              type="text"
+              className="input"
+              style={{ paddingLeft: 34, fontSize: 12.5 }}
+              placeholder="Search employee name..."
+              value={paystubSearch}
+              onChange={(e) => setPaystubSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Payslips Table */}
+        <Card>
+          <CardBody style={{ padding: 0 }}>
+            {isLoadingPayslips ? (
+              <div style={{ padding: 48, textAlign: "center", color: "var(--text-4)" }}>
+                <Loader2 size={24} className="animate-spin mb-8 mx-auto" />
+                <span>Loading payslips for this run...</span>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
+                      <th style={{ padding: "12px 18px" }}>Employee</th>
+                      <th style={{ padding: "12px 18px" }}>Pay Period</th>
+                      <th style={{ padding: "12px 18px" }}>Gross Pay</th>
+                      <th style={{ padding: "12px 18px" }}>Deductions</th>
+                      <th style={{ padding: "12px 18px" }}>Net Pay</th>
+                      <th style={{ padding: "12px 18px" }}>Delivery</th>
+                      <th style={{ padding: "12px 18px", textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPayslips.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: "36px 18px", textAlign: "center", color: "var(--text-4)" }}>
+                          No payslips found for this run. Once a run is approved and locked, paystubs appear here.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPayslips.map((slip) => (
+                        <tr key={slip.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                          <td style={{ padding: "12px 18px" }}>
+                            <strong style={{ color: "var(--text-1)" }}>{slip.employeeName}</strong>
+                            {slip.email && (
+                              <div style={{ fontSize: 11.5, color: "var(--text-4)" }}>{slip.email}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "var(--text-3)", fontSize: 12 }}>
+                            {shortDate(slip.periodStart)} – {shortDate(slip.periodEnd)}
+                          </td>
+                          <td style={{ padding: "12px 18px", fontWeight: 600 }}>
+                            {formatMoney(slip.basePay + slip.earnings, slip.currency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", color: "#DC2626", fontWeight: 600 }}>
+                            -{formatMoney(slip.deductions, slip.currency)}
+                          </td>
+                          <td style={{ padding: "12px 18px", fontWeight: 700, color: "#16A34A" }}>
+                            {formatMoney(slip.netPay, slip.currency)}
+                          </td>
+                          <td style={{ padding: "12px 18px" }}>
+                            <Badge variant={slip.deliveryStatus === "delivered" ? "success" : "neutral"}>
+                              {slip.deliveryStatus.toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td style={{ padding: "12px 18px", textAlign: "right" }}>
+                            <button
+                              type="button"
+                              className="btn-neutral btn-sm"
+                              onClick={() => setStatementPayslip(slip)}
+                            >
+                              <Eye size={12} className="mr-4" /> View Statement
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // TAB 6: SETTINGS
+  // ==========================================================================
+  const renderSettings = () => {
+    return (
+      <div style={{ maxWidth: 840, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "var(--text-1)" }}>
+            Payroll Configuration &amp; Visibility
+          </h3>
+          <p style={{ fontSize: 12.5, color: "var(--text-3)", margin: "3px 0 0 0" }}>
+            Set your primary tax jurisdiction, disbursement currency, and employee portal permissions.
+          </p>
+        </div>
+
+        {/* Employee Portal Visibility Card */}
+        <Card>
+          <CardBody style={{ padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>
+                    Employee Profile Payslips Tab
+                  </strong>
+                  <Badge variant={settings.showPayslipsTabToEmployees ? "success" : "neutral"}>
+                    {settings.showPayslipsTabToEmployees ? "VISIBLE TO ALL" : "HR ONLY"}
+                  </Badge>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--text-3)", margin: "4px 0 0 0", lineHeight: 1.4 }}>
+                  When enabled, employees can view their approved payslips directly on their personal profile page (<code>/people/me</code>). When hidden, only HR Managers can access payslips.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={settings.showPayslipsTabToEmployees ? "btn-neutral" : "btn-primary"}
+                onClick={toggleEmployeePayslipsVisibility}
+                style={{ flexShrink: 0 }}
+              >
+                {settings.showPayslipsTabToEmployees ? "Disable for Employees" : "Enable for Employees"}
+              </button>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Jurisdiction & Currency Form */}
+        <Card>
+          <CardHeader title="Company Jurisdiction & Currency" />
+          <CardBody style={{ padding: 20 }}>
+            <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                    Primary Country
+                  </label>
+                  <select
+                    className="select"
+                    value={configCountry}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setConfigCountry(code);
+                      if (COUNTRY_CURRENCIES[code]) {
+                        setConfigCurrency(COUNTRY_CURRENCIES[code]);
+                      }
+                    }}
+                  >
+                    {COUNTRY_OPTIONS.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.name} ({c.code}) · {c.currency}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                    Disbursement Currency (3 Letters)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    className="input"
+                    value={configCurrency}
+                    onChange={(e) => setConfigCurrency(e.target.value.toUpperCase())}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                  Standard Monthly Hours
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="input"
+                  style={{ maxWidth: 280 }}
+                  value={configHours}
+                  onChange={(e) => setConfigHours(e.target.value)}
+                  required
+                />
+                <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
+                  Standard full-time hours (usually 173.33 hours = 40 hours/week × 52 weeks ÷ 12 months).
+                </small>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                <button type="submit" className="btn-primary" disabled={isSavingSettings}>
+                  {isSavingSettings ? <Loader2 size={14} className="animate-spin mr-6" /> : <Save size={14} className="mr-6" />}
+                  Save Payroll Settings
+                </button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // MAIN RENDER
+  // ==========================================================================
   return (
-    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
+    <>
       <PageHeader
-        title="Payroll Engine"
-        subtitle="Dynamic, configurable compensation, rule engine, and pay run lifecycle."
+        title="Payroll"
+        subtitle="Manage salaries, calculate deductions, and disburse company payroll on time."
+        icon={<DollarSign size={24} />}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              type="button"
+              className="btn-neutral"
+              style={{ background: "white", color: "var(--primary)", borderColor: "transparent" }}
+              onClick={() => setIsHelpModalOpen(true)}
+            >
+              <HelpCircle size={15} className="mr-4" /> Setup Guide &amp; Help
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ background: "white", color: "var(--primary)" }}
+              onClick={() => {
+                setActiveTab("Run Payroll");
+                setWizardStep(0);
+              }}
+            >
+              <DollarSign size={15} /> Run Payroll
+            </button>
+          </div>
+        }
         tabs={TABS}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '36px 48px', background: 'var(--bg-page)' }}>
-        {activeTab === 'Overview' && renderOverview()}
-        {activeTab === 'Rules Engine' && renderRulesEngine()}
-        {activeTab === 'Run Payroll' && renderWizard()}
-        {activeTab === 'Paystubs' && renderPaystubs()}
-        {activeTab === 'Settings' && renderSettings()}
-      </div>
-
-      {/* MODAL: VIEW / PRINT PAYSTUB STATEMENT */}
-      {selectedPaystub && (
-        <Modal
-          isOpen={!!selectedPaystub}
-          onClose={() => setSelectedPaystub(null)}
-          title={`Official Pay Statement — Month ${selectedPaystub.periodMonth}, ${selectedPaystub.periodYear}`}
-          width={760}
-        >
-          <div style={{ padding: '8px 4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 16, marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)' }}>EasyHR / Helpware</div>
-                <div style={{ fontSize: 12, color: '#64748B' }}>Corporate Payroll Disbursement Statement</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--primary)', marginTop: 8 }}>{selectedPaystub.employeeName}</div>
-                <div style={{ fontSize: 12, color: '#64748B' }}>Model: {selectedPaystub.compensationModel.toUpperCase()} · Rate: {selectedPaystub.payRateDisplay}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <Badge variant="success">PAYSLIP FINALIZED</Badge>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Period: Month {selectedPaystub.periodMonth}, {selectedPaystub.periodYear}</div>
-                <div style={{ fontSize: 12, color: '#64748B' }}>Currency: {selectedPaystub.currency}</div>
-              </div>
-            </div>
-
-            <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 10, border: '1px solid #E2E8F0', marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 12 }}>
-              <div>
-                <span style={{ color: '#64748B', display: 'block' }}>Productive Hours:</span>
-                <strong style={{ fontSize: 14, color: '#0F766E' }}>{selectedPaystub.productiveHours} hrs</strong>
-              </div>
-              <div>
-                <span style={{ color: '#64748B', display: 'block' }}>Approved Overtime:</span>
-                <strong style={{ fontSize: 14, color: 'var(--text-1)' }}>{selectedPaystub.approvedOvertimeHours} hrs</strong>
-              </div>
-              <div>
-                <span style={{ color: '#64748B', display: 'block' }}>Days Worked:</span>
-                <strong style={{ fontSize: 14, color: 'var(--text-1)' }}>{selectedPaystub.daysWorked} days</strong>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-              <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#166534', marginBottom: 10 }}>Earnings (Additions)</div>
-                <table style={{ width: '100%', fontSize: 12.5 }}>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '6px 0' }}>Base Productive Pay</td>
-                      <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600 }}>{formatMoney(selectedPaystub.regularCompensation, selectedPaystub.currency)}</td>
-                    </tr>
-                    {selectedPaystub.overtimeCompensation > 0 && (
-                      <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                        <td style={{ padding: '6px 0' }}>Approved Overtime</td>
-                        <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600, color: '#16A34A' }}>+{formatMoney(selectedPaystub.overtimeCompensation, selectedPaystub.currency)}</td>
-                      </tr>
-                    )}
-                    {selectedPaystub.bonusesTotal > 0 && (
-                      <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                        <td style={{ padding: '6px 0' }}>Bonuses (Job Sec)</td>
-                        <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 600, color: '#16A34A' }}>+{formatMoney(selectedPaystub.bonusesTotal, selectedPaystub.currency)}</td>
-                      </tr>
-                    )}
-                    <tr style={{ borderTop: '2px solid #CBD5E1' }}>
-                      <td style={{ padding: '8px 0', fontWeight: 700 }}>Total Gross</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 800 }}>{formatMoney(selectedPaystub.grossPay, selectedPaystub.currency)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#991B1B', marginBottom: 10 }}>Deductions (Subtractions)</div>
-                <table style={{ width: '100%', fontSize: 12.5 }}>
-                  <tbody>
-                    {selectedPaystub.breakdown
-                      .filter((b) => !b.isAddition && !b.isEmployerCost)
-                      .map((item) => (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '6px 0' }}>{item.name}</td>
-                          <td style={{ padding: '6px 0', textAlign: 'right', color: '#DC2626', fontWeight: 600 }}>-{formatMoney(item.amount, selectedPaystub.currency)}</td>
-                        </tr>
-                      ))}
-                    <tr style={{ borderTop: '2px solid #CBD5E1' }}>
-                      <td style={{ padding: '8px 0', fontWeight: 700, color: '#991B1B' }}>Total Deductions</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 800, color: '#991B1B' }}>-{formatMoney(selectedPaystub.employeeDeductions, selectedPaystub.currency)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div style={{ background: '#DCFCE7', padding: '16px 20px', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>Net Take-Home Pay</div>
-                <div style={{ fontSize: 11, color: '#15803D' }}>Approved for electronic bank / wallet disbursement</div>
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#15803D' }}>
-                {formatMoney(selectedPaystub.netPay, selectedPaystub.currency)}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button type="button" className="btn-neutral" onClick={() => setSelectedPaystub(null)}>Close</button>
-              <button type="button" className="btn-primary" onClick={() => window.print()}>
-                <Printer size={15} className="mr-6" /> Print / Save PDF
-              </button>
-            </div>
+      <main style={{ padding: "0 24px 32px" }}>
+        {isLoading ? (
+          <div style={{ padding: 64, textAlign: "center", color: "var(--text-4)" }}>
+            <Loader2 size={28} className="animate-spin mb-10 mx-auto" style={{ color: "var(--primary)" }} />
+            <p style={{ fontSize: 13, margin: 0 }}>Connecting to payroll engine &amp; loading organization records...</p>
           </div>
-        </Modal>
-      )}
+        ) : (
+          <>
+            {activeTab === "Overview" && renderOverview()}
+            {activeTab === "Run Payroll" && renderRunPayrollWizard()}
+            {activeTab === "Salaries" && renderSalaries()}
+            {activeTab === "Deductions & Rules" && renderRules()}
+            {activeTab === "Paystubs" && renderPaystubs()}
+            {activeTab === "Settings" && renderSettings()}
+          </>
+        )}
+      </main>
 
-      {/* MODAL: CREATE CUSTOM RULE */}
-      {isRuleModalOpen && (
-        <Modal
-          isOpen={isRuleModalOpen}
-          onClose={() => setIsRuleModalOpen(false)}
-          title="Create Dynamic Payroll Rule"
-          width={520}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              addRule({
-                name: ruleForm.name,
-                description: ruleForm.description,
-                category: ruleForm.category,
-                scope: ruleForm.scope,
-                countryCode: ruleForm.countryCode,
-                calculationMethod: ruleForm.calculationMethod,
-                rateOrAmount: Number(ruleForm.rateOrAmount) || 0,
-                multiplier: Number(ruleForm.multiplier) || 1.0,
-                isTaxable: ruleForm.isTaxable,
-                isPensionable: ruleForm.isPensionable,
-                isRecurring: true,
-                requiresApproval: ruleForm.requiresApproval,
-                isActive: true,
-                priority: Number(ruleForm.priority) || 20,
-                effectiveFrom: new Date().toISOString().slice(0, 10),
-              });
-              setIsRuleModalOpen(false);
-            }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-          >
-            <div>
-              <label className="text-xs fw-700 text-2 block mb-4">Rule Name</label>
-              <input
-                className="input"
-                placeholder="E.g. Weekend Differential or Customer Satisfaction Bonus"
-                value={ruleForm.name}
-                onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
-                required
-              />
-            </div>
+      {/* HELP MODAL */}
+      <PayrollHelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === "Run Payroll") setWizardStep(0);
+        }}
+        hasConfig={!!activeConfig}
+        configuredCountry={currentCountry}
+        configuredCurrency={currentCurrency}
+        employeesWithComp={rosterWithComp.filter((e) => e.hasSalary).length}
+        totalEmployees={employees.length}
+        ruleCount={taxRules.filter((r) => r.active).length}
+        periodCount={periods.length}
+      />
 
-            <div>
-              <label className="text-xs fw-700 text-2 block mb-4">Description</label>
-              <input
-                className="input"
-                placeholder="Calculation formula explanation..."
-                value={ruleForm.description}
-                onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
-                required
-              />
-            </div>
+      {/* COMPENSATION MODAL */}
+      <CompensationModal
+        isOpen={isCompModalOpen}
+        onClose={() => setIsCompModalOpen(false)}
+        employees={employees}
+        currency={currentCurrency}
+        country={currentCountry}
+        defaultEmployeeId={selectedCompEmployeeId}
+        onSave={handleSaveCompensation}
+      />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label className="text-xs fw-700 text-2 block mb-4">Category</label>
-                <select
-                  className="select"
-                  value={ruleForm.category}
-                  onChange={(e) => setRuleForm({ ...ruleForm, category: e.target.value as RuleCategory })}
-                >
-                  <option value="overtime">Overtime (1.5x / 2.0x)</option>
-                  <option value="higher_rate">Higher Rate / Differential</option>
-                  <option value="allowance">Allowance (Transport / Housing)</option>
-                  <option value="bonus">Bonus / Incentive</option>
-                  <option value="commission">Sales Commission</option>
-                  <option value="penalty_deduction">Penalty / Deduction</option>
-                </select>
-              </div>
+      {/* TAX RULE MODAL */}
+      <TaxRuleModal
+        isOpen={isTaxRuleModalOpen}
+        onClose={() => setIsTaxRuleModalOpen(false)}
+        country={currentCountry}
+        currency={currentCurrency}
+        departments={departments}
+        positions={positions}
+        onSave={handleSaveTaxRule}
+      />
 
-              <div>
-                <label className="text-xs fw-700 text-2 block mb-4">Calculation Method</label>
-                <select
-                  className="select"
-                  value={ruleForm.calculationMethod}
-                  onChange={(e) => setRuleForm({ ...ruleForm, calculationMethod: e.target.value as CalculationMethod })}
-                >
-                  <option value="multiplier_x_base_rate">Multiplier × Base Rate</option>
-                  <option value="rate_x_productive_hours">Rate × Productive Hours</option>
-                  <option value="percent_of_gross">% of Gross Earnings</option>
-                  <option value="percent_of_base">% of Base Pay</option>
-                  <option value="fixed_amount">Fixed Amount</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label className="text-xs fw-700 text-2 block mb-4">Rate / Multiplier / Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  placeholder="e.g. 1.5 or 5"
-                  value={ruleForm.multiplier}
-                  onChange={(e) =>
-                    setRuleForm({
-                      ...ruleForm,
-                      multiplier: Number(e.target.value) || 1,
-                      rateOrAmount: Number(e.target.value) || 1,
-                    })
-                  }
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs fw-700 text-2 block mb-4">Scope</label>
-                <select
-                  className="select"
-                  value={ruleForm.scope}
-                  onChange={(e) => setRuleForm({ ...ruleForm, scope: e.target.value as RuleScope })}
-                >
-                  <option value="company">Entire Company</option>
-                  <option value="department">Department</option>
-                  <option value="job">Specific Job Position</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={ruleForm.isTaxable}
-                  onChange={(e) => setRuleForm({ ...ruleForm, isTaxable: e.target.checked })}
-                />
-                Subject to Income Tax (PAYE)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={ruleForm.requiresApproval}
-                  onChange={(e) => setRuleForm({ ...ruleForm, requiresApproval: e.target.checked })}
-                />
-                Requires Manager Approval
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-              <button type="button" className="btn-neutral" onClick={() => setIsRuleModalOpen(false)}>
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary">
-                Add Rule to Engine
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* MODAL: ADJUST HOURS & ANOMALY */}
-      {adjustTarget && (
-        <Modal
-          isOpen={!!adjustTarget}
-          onClose={() => setAdjustTarget(null)}
-          title={`Adjust Attendance Hours — ${adjustTarget.employeeName}`}
-          width={480}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <p className="text-xs text-4 m-0">
-              Audit corrections apply directly to the October 2026 pay cycle calculation.
-            </p>
-
-            <div>
-              <label className="text-xs fw-700 text-2 block mb-4">Eligible Productive Hours</label>
-              <input
-                type="number"
-                step="0.5"
-                className="input"
-                value={adjustHours}
-                onChange={(e) => setAdjustHours(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs fw-700 text-2 block mb-4">Approved Overtime Hours (1.5×)</label>
-              <input
-                type="number"
-                step="0.5"
-                className="input"
-                value={adjustOt}
-                onChange={(e) => setAdjustOt(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <button type="button" className="btn-neutral" onClick={() => setAdjustTarget(null)}>Cancel</button>
-              <button type="button" className="btn-primary" onClick={handleApplyAdjustment}>Apply &amp; Reconcile</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
+      {/* PAYSTUB STATEMENT MODAL */}
+      <PaystubStatementModal
+        isOpen={!!statementPayslip}
+        onClose={() => setStatementPayslip(null)}
+        payslip={statementPayslip}
+        currency={currentCurrency}
+      />
+    </>
   );
 }
