@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Building2,
   Globe2,
@@ -22,11 +23,13 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { useCompany } from "@/context/CompanyContext";
+import { useRole } from "@/context/RoleContext";
 import { FilePicker } from "@/components/ui/FilePicker";
 import { Modal } from "@/components/ui/Modal";
 import { CompanySettingsSkeleton } from "@/components/ui/Skeleton";
 
 export default function CompanySettingsPage() {
+  const { isHRAdmin } = useRole();
   const {
     company,
     locations,
@@ -162,6 +165,40 @@ export default function CompanySettingsPage() {
 
   if (isLoading && !company) {
     return <CompanySettingsSkeleton />;
+  }
+
+  if (!isHRAdmin) {
+    return (
+      <main style={{ padding: "48px 24px", maxWidth: 540, margin: "0 auto", textAlign: "center" }}>
+        <Card>
+          <CardBody style={{ padding: "40px 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 999,
+                background: "rgba(220, 38, 38, 0.1)",
+                color: "#DC2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <AlertCircle size={26} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
+              Access Restricted
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--text-3)", margin: 0, lineHeight: 1.5 }}>
+              Company settings are reserved for organization owners and administrators. Standard employee accounts cannot view or modify company settings.
+            </p>
+            <Link href="/dashboard" className="btn-primary" style={{ marginTop: 10, textDecoration: "none" }}>
+              Back to Dashboard
+            </Link>
+          </CardBody>
+        </Card>
+      </main>
+    );
   }
 
   return (

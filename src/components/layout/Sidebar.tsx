@@ -1213,25 +1213,27 @@ export function Sidebar() {
                 >
                   <UserCheck size={14} color="#4F46E5" /> View Profile
                 </Link>
-                <Link
-                  href="/company-settings"
-                  onClick={() => setUserMenuOpen(false)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: "#374151",
-                    textDecoration: "none",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#F3F4F6")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <Settings size={14} color="#4F46E5" /> Company Settings
-                </Link>
+                {isHRAdmin && (
+                  <Link
+                    href="/company-settings"
+                    onClick={() => setUserMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: "#374151",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#F3F4F6")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <Settings size={14} color="#4F46E5" /> Company Settings
+                  </Link>
+                )}
                 <div style={{ height: 1, background: "#E5E7EB", margin: "4px 0" }} />
                 <button
                   onClick={() => {
