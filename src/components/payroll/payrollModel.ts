@@ -148,20 +148,21 @@ export const COUNTRY_OPTIONS = Object.keys(COUNTRY_CURRENCIES)
 export const toMinor = (major: number) => Math.round(major * 100);
 export const toMajor = (minor: number) => minor / 100;
 
-export function formatMoney(minor: number, currency: string, opts: { compact?: boolean } = {}): string {
+export function formatMoney(minor: number, currency: string = 'UGX', opts: { compact?: boolean } = {}): string {
   const value = toMajor(minor || 0);
+  const curr = (currency || 'UGX').toUpperCase().trim();
   try {
     return new Intl.NumberFormat('en', {
       style: 'currency',
-      currency: currency || 'USD',
-      currencyDisplay: 'code',
+      currency: curr,
+      currencyDisplay: curr === 'USD' ? 'narrowSymbol' : 'code',
       notation: opts.compact ? 'compact' : 'standard',
       maximumFractionDigits: opts.compact ? 1 : value % 1 === 0 ? 0 : 2,
     })
       .format(value)
       .replace(/\u00a0/g, ' ');
   } catch {
-    return `${currency} ${value.toLocaleString('en')}`;
+    return `${curr} ${value.toLocaleString('en')}`;
   }
 }
 
