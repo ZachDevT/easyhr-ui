@@ -1142,7 +1142,7 @@ export function CompulsoryTimeOffWidget() {
       const [balRes, typesRes, meRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/leave/balances`, { headers }).catch(() => null),
         fetch(`${API_BASE_URL}/api/v1/leave/types`, { headers }).catch(() => null),
-        fetch(`${API_BASE_URL}/api/v1/people/me`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/employees/me`, { headers }).catch(() => null),
       ]);
 
       if (balRes && balRes.ok) {
