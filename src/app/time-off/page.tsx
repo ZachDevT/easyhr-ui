@@ -293,6 +293,7 @@ export default function TimeOffPage() {
 
   // Modal state
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestMode, setRequestMode] = useState<"days" | "hours">("days");
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -1812,43 +1813,192 @@ export default function TimeOffPage() {
             </select>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label className="form-label">Start Date *</label>
-              <input
-                type="date"
-                value={requestForm.startDate}
-                onChange={(e) => setRequestForm({ ...requestForm, startDate: e.target.value })}
-                className="input"
-                required
-              />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label className="form-label">End Date *</label>
-              <input
-                type="date"
-                value={requestForm.endDate}
-                onChange={(e) => setRequestForm({ ...requestForm, endDate: e.target.value })}
-                className="input"
-                required
-              />
+          {/* Mode Toggle: Full Days vs Hours */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label className="form-label">Request Type *</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setRequestMode("days");
+                  const days = 1;
+                  setRequestForm((prev) => ({
+                    ...prev,
+                    hours: days * 8,
+                  }));
+                }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${requestMode === "days" ? "var(--primary, #2563EB)" : "var(--card-border, #E8ECE8)"}`,
+                  background: requestMode === "days" ? "var(--primary-tint, #EFF6FF)" : "#FFFFFF",
+                  color: requestMode === "days" ? "var(--primary, #2563EB)" : "var(--text-2, #374151)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                📅 Full Day(s)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRequestMode("hours");
+                  setRequestForm((prev) => ({
+                    ...prev,
+                    endDate: prev.startDate || prev.endDate,
+                    hours: 2,
+                  }));
+                }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${requestMode === "hours" ? "var(--primary, #2563EB)" : "var(--card-border, #E8ECE8)"}`,
+                  background: requestMode === "hours" ? "var(--primary-tint, #EFF6FF)" : "#FFFFFF",
+                  color: requestMode === "hours" ? "var(--primary, #2563EB)" : "var(--text-2, #374151)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                ⏱️ Hours / Partial Day
+              </button>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label className="form-label">Total Requested Hours *</label>
-            <input
-              type="number"
-              min={0.5}
-              step={0.5}
-              value={requestForm.hours}
-              onChange={(e) =>
-                setRequestForm({ ...requestForm, hours: parseFloat(e.target.value) || 0 })
-              }
-              className="input"
-              required
-            />
-          </div>
+          {requestMode === "hours" ? (
+            /* Hours / Partial Day selection */
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="form-label">Date *</label>
+                <input
+                  type="date"
+                  value={requestForm.startDate}
+                  onChange={(e) =>
+                    setRequestForm({
+                      ...requestForm,
+                      startDate: e.target.value,
+                      endDate: e.target.value,
+                    })
+                  }
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="form-label">Requested Duration (Hours) *</label>
+                {/* Quick hour presets */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                  {[1, 2, 3, 4, 6, 8].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setRequestForm({ ...requestForm, hours: preset })}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: 6,
+                        border: `1px solid ${requestForm.hours === preset ? "var(--primary, #2563EB)" : "var(--card-border, #E8ECE8)"}`,
+                        background: requestForm.hours === preset ? "var(--primary, #2563EB)" : "#FFFFFF",
+                        color: requestForm.hours === preset ? "#FFFFFF" : "var(--text-2, #374151)",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {preset} {preset === 1 ? "Hour" : preset === 4 ? "Hours (Half Day)" : "Hours"}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min={0.5}
+                  max={24}
+                  step={0.5}
+                  value={requestForm.hours}
+                  onChange={(e) =>
+                    setRequestForm({ ...requestForm, hours: parseFloat(e.target.value) || 0 })
+                  }
+                  className="input"
+                  required
+                />
+                <small style={{ color: "var(--text-4, #9CA3AF)", fontSize: 11.5 }}>
+                  E.g., 2 hours for doctor&apos;s appointment, medical visit, or leaving early. Deducts {requestForm.hours}h from balance.
+                </small>
+              </div>
+            </div>
+          ) : (
+            /* Full Days selection */
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label className="form-label">Start Date *</label>
+                  <input
+                    type="date"
+                    value={requestForm.startDate}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      const end = requestForm.endDate || newStart;
+                      let days = 1;
+                      if (newStart && end && end >= newStart) {
+                        const diffMs = new Date(end).getTime() - new Date(newStart).getTime();
+                        days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+                      }
+                      setRequestForm({
+                        ...requestForm,
+                        startDate: newStart,
+                        endDate: end < newStart ? newStart : end,
+                        hours: days * 8,
+                      });
+                    }}
+                    className="input"
+                    required
+                  />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label className="form-label">End Date *</label>
+                  <input
+                    type="date"
+                    value={requestForm.endDate}
+                    onChange={(e) => {
+                      const newEnd = e.target.value;
+                      const start = requestForm.startDate || newEnd;
+                      let days = 1;
+                      if (start && newEnd && newEnd >= start) {
+                        const diffMs = new Date(newEnd).getTime() - new Date(start).getTime();
+                        days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+                      }
+                      setRequestForm({
+                        ...requestForm,
+                        endDate: newEnd,
+                        hours: days * 8,
+                      });
+                    }}
+                    className="input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label className="form-label">Total Requested Hours *</label>
+                <input
+                  type="number"
+                  min={0.5}
+                  step={0.5}
+                  value={requestForm.hours}
+                  onChange={(e) =>
+                    setRequestForm({ ...requestForm, hours: parseFloat(e.target.value) || 0 })
+                  }
+                  className="input"
+                  required
+                />
+                <small style={{ color: "var(--text-4, #9CA3AF)", fontSize: 11.5 }}>
+                  Standard calculation: {(requestForm.hours / 8).toFixed(1)} day(s) × 8 hrs/day = {requestForm.hours} hours.
+                </small>
+              </div>
+            </>
+          )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label className="form-label">Reason / Notes</label>

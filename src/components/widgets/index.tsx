@@ -108,6 +108,9 @@ export function CompulsoryMyTimeWidget() {
   const [timeEntryModal, setTimeEntryModal] = useState(false);
 
   const [punches, setPunches] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [payrollConfig, setPayrollConfig] = useState<any>(null);
+  const [activePayPeriod, setActivePayPeriod] = useState<any>(null);
   const [manualDate, setManualDate] = useState('');
   const [manualStartTime, setManualStartTime] = useState('09:00');
   const [manualEndTime, setManualEndTime] = useState('17:00');
@@ -159,7 +162,7 @@ export function CompulsoryMyTimeWidget() {
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await fetch(`${API_BASE_URL}/api/v1/attendance/punches?limit=100`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/attendance/punches?limit=250`, {
         headers: getAuthHeaders(token),
       });
       if (res.ok) {
@@ -204,7 +207,7 @@ export function CompulsoryMyTimeWidget() {
     }
   }, [isSignedIn, getToken]);
 
-  // Fetch dynamic activities & initial punches once on sign-in
+  // Fetch dynamic activities, holidays, payroll settings & initial punches once on sign-in
   useEffect(() => {
     if (!isSignedIn || hasInitializedRef.current) return;
     hasInitializedRef.current = true;
@@ -213,14 +216,19 @@ export function CompulsoryMyTimeWidget() {
       try {
         const token = await getToken();
         if (!token) return;
-        const res = await fetch(`${API_BASE_URL}/api/v1/attendance/activities`, {
-          headers: getAuthHeaders(token),
-        });
-        if (res.ok) {
-          const data = await res.json();
+        const headers = getAuthHeaders(token);
+
+        const [actRes, holRes, cfgRes, periodRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/v1/attendance/activities`, { headers }),
+          fetch(`${API_BASE_URL}/api/v1/holidays`, { headers }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, { headers }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/v1/payroll/periods`, { headers }).catch(() => null),
+        ]);
+
+        if (actRes.ok) {
+          const data = await actRes.json();
           const list = Array.isArray(data) ? data : data?.data;
           if (Array.isArray(list) && list.length > 0) {
-            // Ensure default activities like Lunch, Break, Meeting are always present even if backend has fewer
             const existingNames = new Set(list.map((a: ActivityItem) => a.name.toLowerCase()));
             const merged = [
               ...list,
@@ -238,6 +246,24 @@ export function CompulsoryMyTimeWidget() {
               if (match) setSelectedActivity(match);
             }
           }
+        }
+
+        if (holRes && holRes.ok) {
+          const hData = await holRes.json();
+          setHolidays(Array.isArray(hData) ? hData : hData?.data || []);
+        }
+
+        if (cfgRes && cfgRes.ok) {
+          const cData = await cfgRes.json();
+          const cList = Array.isArray(cData) ? cData : [];
+          if (cList[0]) setPayrollConfig(cList[0]);
+        }
+
+        if (periodRes && periodRes.ok) {
+          const pData = await periodRes.json();
+          const pList = Array.isArray(pData) ? pData : [];
+          const active = pList.find((p: any) => p.status === 'draft' || p.status === 'processing') || pList[0];
+          if (active) setActivePayPeriod(active);
         }
       } catch {
         // Fall back gracefully to DEFAULT_ACTIVITIES
@@ -261,72 +287,138 @@ export function CompulsoryMyTimeWidget() {
     return () => clearInterval(interval);
   }, [isClocked, clockStartTime]);
 
+  const overtimeMultiplier = payrollConfig?.overtimeMultiplier || 1.5;
+  const holidayMultiplier = payrollConfig?.holidayMultiplier || 2.0;
+  const standardDailyHours = payrollConfig?.standardMonthlyMinutes ? payrollConfig.standardMonthlyMinutes / (60 * 21.67) : 8.0;
+
   // Dynamic calculations for Today, This Week, Pay Period from live punches
   const dynamicTimeSummary = useMemo(() => {
-    const todayIso = new Date().toISOString().slice(0, 10);
     const now = new Date();
+    const todayIso = now.toISOString().slice(0, 10);
     const dayOfWeek = now.getDay();
+    const isSunday = dayOfWeek === 0;
+
+    // Detect public holiday
+    const todayHoliday = holidays.find((h: any) => h.holidayDate === todayIso);
+    const isHoliday = Boolean(todayHoliday || isSunday);
+
+    // Week boundaries (Monday 00:00:00 to now)
     const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const mondayDate = new Date(now);
     mondayDate.setDate(now.getDate() + diffToMonday);
     mondayDate.setHours(0, 0, 0, 0);
 
+    // Pay period boundaries
+    let periodStartMs: number;
+    let periodEndMs: number;
+    let periodLabel = 'Current Month';
+
+    if (activePayPeriod?.startDate) {
+      periodStartMs = new Date(activePayPeriod.startDate).getTime();
+      periodEndMs = activePayPeriod.endDate ? new Date(activePayPeriod.endDate + 'T23:59:59').getTime() : Date.now();
+      periodLabel = `${activePayPeriod.startDate.slice(5)} to ${activePayPeriod.endDate.slice(5)}`;
+    } else {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      periodStartMs = startOfMonth.getTime();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      periodEndMs = endOfMonth.getTime();
+      periodLabel = `${now.toLocaleString('default', { month: 'short' })} Cycle`;
+    }
+
+    // Pair punches into sessions in chronological order
+    const sorted = [...punches].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+    const sessions: Array<{ startMs: number; endMs: number; dateIso: string; isHolidaySession: boolean; minutes: number }> = [];
+
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      if (p.kind === 'clock_in' || p.kind === 'in') {
+        const inTime = new Date(p.occurredAt).getTime();
+        const dateIso = new Date(p.occurredAt).toISOString().slice(0, 10);
+        const pDayOfWeek = new Date(p.occurredAt).getDay();
+        const isHol = Boolean(holidays.some((h: any) => h.holidayDate === dateIso) || pDayOfWeek === 0);
+
+        const next = sorted[i + 1];
+        if (next && (next.kind === 'clock_out' || next.kind === 'out')) {
+          const outTime = new Date(next.occurredAt).getTime();
+          const mins = Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
+          sessions.push({ startMs: inTime, endMs: outTime, dateIso, isHolidaySession: isHol, minutes: mins });
+          i++;
+        } else {
+          // Open session from punch
+          const mins = Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
+          sessions.push({ startMs: inTime, endMs: Date.now(), dateIso, isHolidaySession: isHol, minutes: mins });
+        }
+      }
+    }
+
+    // If currently clocked in locally, incorporate the active ongoing session
+    if (isClocked && clockStartTime) {
+      const alreadyIncluded = sessions.some(s => Math.abs(s.startMs - clockStartTime) < 5000);
+      if (!alreadyIncluded) {
+        const activeMins = Math.max(0, Math.round((Date.now() - clockStartTime) / (1000 * 60)));
+        sessions.push({
+          startMs: clockStartTime,
+          endMs: Date.now(),
+          dateIso: todayIso,
+          isHolidaySession: isHoliday,
+          minutes: activeMins,
+        });
+      }
+    }
+
     let todayMinutes = 0;
     let weekMinutes = 0;
+    let periodMinutes = 0;
+    let todayHolidayMinutes = 0;
+    let weekHolidayMinutes = 0;
+    let periodHolidayMinutes = 0;
 
-    // Filter today's punches in chronological order
-    const todayPunches = punches
-      .filter((p) => new Date(p.occurredAt).toISOString().slice(0, 10) === todayIso)
-      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
-
-    for (let i = 0; i < todayPunches.length; i++) {
-      const p = todayPunches[i];
-      if (p.kind === 'clock_in' || p.kind === 'in') {
-        const inTime = new Date(p.occurredAt).getTime();
-        const next = todayPunches[i + 1];
-        if (next && (next.kind === 'clock_out' || next.kind === 'out')) {
-          const outTime = new Date(next.occurredAt).getTime();
-          todayMinutes += Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
-          i++;
-        } else {
-          // Open session
-          todayMinutes += Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
-        }
+    for (const s of sessions) {
+      if (s.dateIso === todayIso) {
+        todayMinutes += s.minutes;
+        if (s.isHolidaySession) todayHolidayMinutes += s.minutes;
+      }
+      if (s.startMs >= mondayDate.getTime()) {
+        weekMinutes += s.minutes;
+        if (s.isHolidaySession) weekHolidayMinutes += s.minutes;
+      }
+      if (s.startMs >= periodStartMs && s.startMs <= periodEndMs) {
+        periodMinutes += s.minutes;
+        if (s.isHolidaySession) periodHolidayMinutes += s.minutes;
       }
     }
 
-    // Filter week punches
-    const weekPunches = punches
-      .filter((p) => new Date(p.occurredAt).getTime() >= mondayDate.getTime())
-      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
-
-    for (let i = 0; i < weekPunches.length; i++) {
-      const p = weekPunches[i];
-      if (p.kind === 'clock_in' || p.kind === 'in') {
-        const inTime = new Date(p.occurredAt).getTime();
-        const next = weekPunches[i + 1];
-        if (next && (next.kind === 'clock_out' || next.kind === 'out')) {
-          const outTime = new Date(next.occurredAt).getTime();
-          weekMinutes += Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
-          i++;
-        } else {
-          weekMinutes += Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
-        }
-      }
-    }
+    // Overtime calculations
+    const dailyStandardMins = Math.round(standardDailyHours * 60);
+    const todayOtMinutes = !isHoliday && todayMinutes > dailyStandardMins ? todayMinutes - dailyStandardMins : 0;
+    const weekNonHolMinutes = Math.max(0, weekMinutes - weekHolidayMinutes);
+    const weekOtMinutes = weekNonHolMinutes > 2400 ? weekNonHolMinutes - 2400 : todayOtMinutes;
 
     const todayH = Math.floor(todayMinutes / 60);
     const todayM = todayMinutes % 60;
     const weekH = Math.floor(weekMinutes / 60);
     const weekM = weekMinutes % 60;
-    const payPeriodH = weekH + Math.round(weekH * 0.95);
+    const periodH = Math.floor(periodMinutes / 60);
+    const periodM = periodMinutes % 60;
 
     return {
-      today: todayMinutes > 0 ? `${todayH}h ${String(todayM).padStart(2, '0')}m` : elapsedDuration !== '0h 00m' ? elapsedDuration : '0h 00m',
-      thisWeek: weekMinutes > 0 ? `${weekH}h ${String(weekM).padStart(2, '0')}m` : `${todayH}h ${String(todayM).padStart(2, '0')}m`,
-      payPeriod: `${payPeriodH}h ${String(weekM).padStart(2, '0')}m`,
+      today: `${todayH}h ${String(todayM).padStart(2, '0')}m`,
+      thisWeek: `${weekH}h ${String(weekM).padStart(2, '0')}m`,
+      payPeriod: `${periodH}h ${String(periodM).padStart(2, '0')}m`,
+      periodLabel,
+      todayMinutes,
+      weekMinutes,
+      periodMinutes,
+      todayOtMinutes,
+      weekOtMinutes,
+      todayHolidayMinutes,
+      weekHolidayMinutes,
+      periodHolidayMinutes,
+      isHoliday,
+      todayHoliday,
+      isOvertimeActive: todayOtMinutes > 0,
     };
-  }, [punches, elapsedDuration]);
+  }, [punches, holidays, activePayPeriod, isClocked, clockStartTime, elapsedDuration, standardDailyHours]);
 
   // Handle punch toggle
   const handleToggleClock = async () => {
@@ -694,10 +786,66 @@ export function CompulsoryMyTimeWidget() {
             )}
           </div>
 
-          <div className="row mt-16 mb-6" style={{ justifyContent: 'center' }}>
+          {/* Dynamic Holiday / Overtime Rate Badges */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 12 }}>
+            {dynamicTimeSummary.isHoliday && (
+              <div
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: 'var(--primary-tint, #EFF6FF)',
+                  border: '1px solid var(--primary, #2563EB)',
+                  color: 'var(--primary, #2563EB)',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                <Sparkles size={13} />
+                <span>
+                  Holiday Rate Active ({holidayMultiplier}×)
+                  {dynamicTimeSummary.todayHoliday ? ` · ${dynamicTimeSummary.todayHoliday.name}` : ' · Sunday Rest Day'}
+                </span>
+              </div>
+            )}
+
+            {dynamicTimeSummary.isOvertimeActive && (
+              <div
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: '#FFFBEB',
+                  border: '1px solid #F59E0B',
+                  color: '#B45309',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                <Clock size={13} />
+                <span>
+                  Overtime Rate Active ({overtimeMultiplier}×) · {Math.floor(dynamicTimeSummary.todayOtMinutes / 60)}h {dynamicTimeSummary.todayOtMinutes % 60}m OT today
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="row mt-14 mb-6" style={{ justifyContent: 'center' }}>
             <span className="text-5 text-xs">
               Today &rarr; {dynamicTimeSummary.today}
-              {isClocked ? ` · ${selectedActivity.name} in progress` : ''}
+              {dynamicTimeSummary.isHoliday
+                ? ` · Holiday Work (${holidayMultiplier}×)`
+                : dynamicTimeSummary.isOvertimeActive
+                ? ` · Overtime (${overtimeMultiplier}×)`
+                : isClocked
+                ? ` · ${selectedActivity.name} in progress`
+                : ''}
             </span>
           </div>
 
@@ -715,11 +863,23 @@ export function CompulsoryMyTimeWidget() {
         <div className="row-between">
           <div>
             <p className="text-xs text-5 mb-4">This Week</p>
-            <p className="text-sm text-1">{dynamicTimeSummary.thisWeek}</p>
+            <p className="text-sm text-1 fw-700">{dynamicTimeSummary.thisWeek}</p>
+            {dynamicTimeSummary.weekOtMinutes > 0 ? (
+              <span style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, display: 'block' }}>
+                +{Math.floor(dynamicTimeSummary.weekOtMinutes / 60)}h {dynamicTimeSummary.weekOtMinutes % 60}m OT ({overtimeMultiplier}×)
+              </span>
+            ) : (
+              <span style={{ fontSize: 10.5, color: 'var(--text-4, #9CA3AF)', display: 'block' }}>
+                Standard Hours
+              </span>
+            )}
           </div>
           <div>
             <p className="text-xs text-5 mb-4">Pay Period</p>
-            <p className="text-sm text-1">{dynamicTimeSummary.payPeriod}</p>
+            <p className="text-sm text-1 fw-700">{dynamicTimeSummary.payPeriod}</p>
+            <span style={{ fontSize: 10.5, color: 'var(--primary, #2563EB)', fontWeight: 600, display: 'block' }}>
+              {dynamicTimeSummary.periodLabel}
+            </span>
           </div>
           <Link href="/time" className="btn-neutral btn-sm" style={{ textDecoration: 'none' }}>
             My Timesheet
@@ -947,39 +1107,135 @@ export function CompulsoryMyTimeWidget() {
 /* -------------------------------------------------------------------------- */
 
 export function CompulsoryTimeOffWidget() {
+  const { isSignedIn, getToken } = useAuth();
   const [modal, setModal] = useState(false);
+  const [requestMode, setRequestMode] = useState<'days' | 'hours'>('days');
+  const [balances, setBalances] = useState<any[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const balances = [
-    { type: 'Vacation', hoursUsed: 0 },
-    { type: 'Sick Leave', hoursUsed: 0 },
+  const [formType, setFormType] = useState('');
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
+  const [formHours, setFormHours] = useState(8);
+  const [formReason, setFormReason] = useState('');
+
+  const loadLeaveData = useCallback(async () => {
+    if (!isSignedIn) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const headers = getAuthHeaders(token);
+
+      const [balRes, typesRes, meRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/leave/balances`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/leave/types`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/people/me`, { headers }).catch(() => null),
+      ]);
+
+      if (balRes && balRes.ok) {
+        const bData = await balRes.json();
+        setBalances(Array.isArray(bData) ? bData : bData?.data || []);
+      }
+      if (typesRes && typesRes.ok) {
+        const tData = await typesRes.json();
+        const list = Array.isArray(tData) ? tData : tData?.data || [];
+        setLeaveTypes(list);
+        if (list.length > 0 && !formType) {
+          setFormType(list[0].id);
+        }
+      }
+      if (meRes && meRes.ok) {
+        const me = await meRes.json();
+        if (me?.id) setCurrentEmployeeId(me.id);
+      }
+    } catch {
+      // Graceful fallback
+    }
+  }, [isSignedIn, getToken, formType]);
+
+  useEffect(() => {
+    loadLeaveData();
+  }, [loadLeaveData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formType || !formStartDate) {
+      toast.error('Missing fields', 'Please select a leave type and date.');
+      return;
+    }
+    const end = requestMode === 'hours' ? formStartDate : (formEndDate || formStartDate);
+
+    setIsSubmitting(true);
+    try {
+      const token = await getToken();
+      const headers = getAuthHeaders(token);
+      const res = await fetch(`${API_BASE_URL}/api/v1/leave/requests`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          employeeId: currentEmployeeId,
+          leaveTypeId: formType,
+          startDate: formStartDate,
+          endDate: end,
+          requestedMinutes: Math.round(formHours * 60),
+          reason: formReason,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || err.message || 'Failed to submit request');
+      }
+
+      toast.success('Time-off requested', `${formHours}h request submitted to your manager.`);
+      setModal(false);
+      setFormReason('');
+      await loadLeaveData();
+    } catch (err: any) {
+      toast.error('Submission failed', err?.message || 'Could not submit time-off request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const displayBalances = balances.length > 0 ? balances : [
+    { leaveTypeName: 'Vacation', availableHours: 120, usedHours: 16 },
+    { leaveTypeName: 'Sick Leave', availableHours: 40, usedHours: 8 },
   ];
 
   return (
     <Card>
       <CardHeader title="Time Off" icon={<CalendarDays size={16} strokeWidth={2.5} />} />
       <CardBody>
-        <div className="row gap-16 mb-20">
-          {balances.map((b) => (
-            <div key={b.type} style={{ flex: 1, textAlign: 'center' }}>
-              {b.type === 'Vacation' ? (
-                <Palmtree size={28} strokeWidth={1.5} style={{ color: 'var(--primary)', margin: '0 auto' }} />
+        <div className="row gap-16 mb-20" style={{ overflowX: 'auto', paddingBottom: 4 }}>
+          {displayBalances.slice(0, 3).map((b) => (
+            <div key={b.leaveTypeId || b.leaveTypeName} style={{ flex: 1, minWidth: 100, textAlign: 'center' }}>
+              {(b.leaveTypeName || '').toLowerCase().includes('sick') ? (
+                <CalendarHeart size={26} strokeWidth={1.5} style={{ color: 'var(--primary, #2563EB)', margin: '0 auto' }} />
               ) : (
-                <CalendarHeart size={28} strokeWidth={1.5} style={{ color: 'var(--primary)', margin: '0 auto' }} />
+                <Palmtree size={26} strokeWidth={1.5} style={{ color: 'var(--primary, #2563EB)', margin: '0 auto' }} />
               )}
-              <p className="text-xs text-2 mt-8">{b.type}</p>
-              <p className="text-xs text-5 mt-4">{b.hoursUsed}h used (YTD)</p>
+              <p className="text-xs text-2 mt-8 fw-700">{b.leaveTypeName}</p>
+              <p className="text-xs text-1 fw-800 mt-2">{b.availableHours ?? 0}h <span className="text-5 fw-normal">left</span></p>
+              <p className="text-xs text-5 mt-2">{b.usedHours ?? 0}h used</p>
             </div>
           ))}
-          <button className="btn-circle"><ChevronRight size={15} strokeWidth={2} /></button>
         </div>
 
         <button
           className="btn-secondary w-full"
-          style={{ padding: '12px 24px', fontSize: 14 }}
-          onClick={() => setModal(true)}
+          style={{ padding: '12px 24px', fontSize: 13.5, fontWeight: 700 }}
+          onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            setFormStartDate(today);
+            setFormEndDate(today);
+            setModal(true);
+          }}
         >
           <CalendarPlus size={16} strokeWidth={2.5} />
-          Request Time Off
+          Request Time Off (Hours or Days)
         </button>
       </CardBody>
 
@@ -987,33 +1243,202 @@ export function CompulsoryTimeOffWidget() {
         isOpen={modal}
         onClose={() => setModal(false)}
         title="Request Time Off"
+        subtitle="Submit a full-day or partial-day (hours) leave request."
         footer={
           <>
-            <button className="btn-neutral" onClick={() => setModal(false)}>Cancel</button>
-            <button className="btn-primary" onClick={() => { setModal(false); toast.success("Time-off requested", "Request sent to your manager for review."); }}>Submit Request</button>
+            <button className="btn-neutral" onClick={() => setModal(false)} disabled={isSubmitting}>
+              Cancel
+            </button>
+            <button className="btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : `Submit Request (${formHours}h)`}
+            </button>
           </>
         }
       >
-        <div>
-          <label className="form-label">Leave Type*</label>
-          <Select>
-            {timeOffBalances.map((b) => <option key={b.type}>{b.type}</option>)}
-          </Select>
-        </div>
-        <div className="grid-2">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label className="form-label">Start Date*</label>
-            <Input type="date" />
+            <label className="form-label">Leave Type *</label>
+            <select
+              className="select w-full"
+              value={formType}
+              onChange={(e) => setFormType(e.target.value)}
+              required
+            >
+              {leaveTypes.length === 0 && <option value="">General Time Off</option>}
+              {leaveTypes.map((t) => {
+                const bal = balances.find((b) => b.leaveTypeId === t.id);
+                return (
+                  <option key={t.id} value={t.id}>
+                    {t.name} {bal ? `(${bal.availableHours}h available)` : ''}
+                  </option>
+                );
+              })}
+            </select>
           </div>
+
           <div>
-            <label className="form-label">End Date*</label>
-            <Input type="date" />
+            <label className="form-label">Request Type *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setRequestMode('days');
+                  setFormHours(8);
+                }}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${requestMode === 'days' ? 'var(--primary, #2563EB)' : 'var(--card-border, #E8ECE8)'}`,
+                  background: requestMode === 'days' ? 'var(--primary-tint, #EFF6FF)' : '#FFFFFF',
+                  color: requestMode === 'days' ? 'var(--primary, #2563EB)' : 'var(--text-2, #374151)',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                }}
+              >
+                📅 Full Day(s)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRequestMode('hours');
+                  setFormHours(2);
+                }}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${requestMode === 'hours' ? 'var(--primary, #2563EB)' : 'var(--card-border, #E8ECE8)'}`,
+                  background: requestMode === 'hours' ? 'var(--primary-tint, #EFF6FF)' : '#FFFFFF',
+                  color: requestMode === 'hours' ? 'var(--primary, #2563EB)' : 'var(--text-2, #374151)',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                }}
+              >
+                ⏱️ Hours / Partial Day
+              </button>
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="form-label">Note to Manager</label>
-          <Textarea rows={3} placeholder="Reason for leave..." />
-        </div>
+
+          {requestMode === 'hours' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label className="form-label">Date *</label>
+                <Input
+                  type="date"
+                  value={formStartDate}
+                  onChange={(e) => {
+                    setFormStartDate(e.target.value);
+                    setFormEndDate(e.target.value);
+                  }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Duration in Hours *</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {[1, 2, 3, 4, 6, 8].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setFormHours(h)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: `1px solid ${formHours === h ? 'var(--primary, #2563EB)' : 'var(--card-border, #E8ECE8)'}`,
+                        background: formHours === h ? 'var(--primary, #2563EB)' : '#FFFFFF',
+                        color: formHours === h ? '#FFFFFF' : 'var(--text-2, #374151)',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {h} {h === 1 ? 'hr' : h === 4 ? 'hrs (Half Day)' : 'hrs'}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  min={0.5}
+                  max={24}
+                  step={0.5}
+                  value={formHours}
+                  onChange={(e) => setFormHours(parseFloat(e.target.value) || 0)}
+                  required
+                />
+                <small style={{ color: 'var(--text-4, #9CA3AF)', fontSize: 11, display: 'block', marginTop: 4 }}>
+                  Requesting partial day time off. Deducts exactly {formHours} hours from your balance.
+                </small>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="grid-2">
+                <div>
+                  <label className="form-label">Start Date *</label>
+                  <Input
+                    type="date"
+                    value={formStartDate}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      const end = formEndDate || newStart;
+                      let days = 1;
+                      if (newStart && end && end >= newStart) {
+                        const diffMs = new Date(end).getTime() - new Date(newStart).getTime();
+                        days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+                      }
+                      setFormStartDate(newStart);
+                      if (end < newStart) setFormEndDate(newStart);
+                      setFormHours(days * 8);
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label">End Date *</label>
+                  <Input
+                    type="date"
+                    value={formEndDate}
+                    onChange={(e) => {
+                      const newEnd = e.target.value;
+                      const start = formStartDate || newEnd;
+                      let days = 1;
+                      if (start && newEnd && newEnd >= start) {
+                        const diffMs = new Date(newEnd).getTime() - new Date(start).getTime();
+                        days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+                      }
+                      setFormEndDate(newEnd);
+                      setFormHours(days * 8);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Total Hours ({formHours / 8} day(s))</label>
+                <Input
+                  type="number"
+                  min={0.5}
+                  step={0.5}
+                  value={formHours}
+                  onChange={(e) => setFormHours(parseFloat(e.target.value) || 0)}
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="form-label">Reason / Note to Manager</label>
+            <Textarea
+              rows={3}
+              placeholder="e.g. Doctor's appointment, family commitment, personal errand..."
+              value={formReason}
+              onChange={(e) => setFormReason(e.target.value)}
+            />
+          </div>
+        </form>
       </Modal>
     </Card>
   );

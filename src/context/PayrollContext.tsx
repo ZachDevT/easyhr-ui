@@ -22,6 +22,10 @@ export interface PayrollSettings {
   standardMonthlyHours: number;
   requireApprovalForOvertime: boolean;
   requireApprovalForBonuses: boolean;
+  overtimeRateMultiplier: number;
+  holidayRateMultiplier: number;
+  weekendRateMultiplier: number;
+  dailyStandardHours: number;
 }
 
 interface PayrollContextType {
@@ -69,6 +73,10 @@ const DEFAULT_SETTINGS: PayrollSettings = {
   standardMonthlyHours: 173.33,
   requireApprovalForOvertime: true,
   requireApprovalForBonuses: true,
+  overtimeRateMultiplier: 1.5,
+  holidayRateMultiplier: 2.0,
+  weekendRateMultiplier: 2.0,
+  dailyStandardHours: 8.0,
 };
 
 const SEED_BONUSES_PENALTIES: BonusPenaltyRecord[] = [

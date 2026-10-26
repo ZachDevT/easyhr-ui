@@ -24,9 +24,13 @@ interface PaystubStatementModalProps {
     insuranceMinor?: number;
     payModel?: "hourly" | "monthly_salary";
     hourlyRateMinor?: number;
+    overtimeMultiplier?: number;
+    holidayMultiplier?: number;
   } | null;
   currency: string;
   companyName?: string;
+  overtimeMultiplier?: number;
+  holidayMultiplier?: number;
 }
 
 export function PaystubStatementModal({
@@ -35,6 +39,8 @@ export function PaystubStatementModal({
   payslip,
   currency,
   companyName = "EasyHR",
+  overtimeMultiplier = 1.5,
+  holidayMultiplier = 2.0,
 }: PaystubStatementModalProps) {
   if (!payslip) return null;
 
@@ -42,6 +48,8 @@ export function PaystubStatementModal({
   const pStart = payslip.periodStart || "";
   const pEnd = payslip.periodEnd || "";
   const pPayDate = payslip.payDate || "";
+  const activeOtMult = payslip.overtimeMultiplier || overtimeMultiplier || 1.5;
+  const activeHolMult = payslip.holidayMultiplier || holidayMultiplier || 2.0;
 
   const isHourly = payslip.payModel === "hourly";
   const productiveHours = payslip.productiveHours || 173.33;
@@ -173,7 +181,7 @@ export function PaystubStatementModal({
               {higherRatesMinor > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: "var(--text-2)" }}>
-                    Higher Rates (OT 1.5×, Holidays 2.0×)
+                    Higher Rates (OT {activeOtMult}×, Holidays {activeHolMult}×)
                   </span>
                   <span style={{ fontWeight: 600, color: "var(--primary)" }}>
                     +{formatMoney(higherRatesMinor, cur)}

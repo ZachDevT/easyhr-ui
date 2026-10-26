@@ -131,6 +131,8 @@ export default function PayrollPage() {
         bonusesMinor: number;
         penaltiesMinor: number;
         insuranceMinor: number;
+        isSyncedFromClockIn?: boolean;
+        clockInTotalHours?: number;
       }
     >
   >({});
@@ -157,7 +159,12 @@ export default function PayrollPage() {
   const [configCountry, setConfigCountry] = useState(settings.defaultCountry || "UG");
   const [configCurrency, setConfigCurrency] = useState(settings.defaultCurrency || "UGX");
   const [configHours, setConfigHours] = useState(String(settings.standardMonthlyHours || 173.33));
+  const [configOvertimeRate, setConfigOvertimeRate] = useState(String(settings.overtimeRateMultiplier || 1.5));
+  const [configHolidayRate, setConfigHolidayRate] = useState(String(settings.holidayRateMultiplier || 2.0));
+  const [configDailyHours, setConfigDailyHours] = useState(String(settings.dailyStandardHours || 8.0));
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [timesheets, setTimesheets] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
 
   // --------------------------------------------------------------------------
   // Fetch All Live Payroll Data from Backend
@@ -178,6 +185,8 @@ export default function PayrollPage() {
         compRes,
         employeesRes,
         deptsRes,
+        timesheetsRes,
+        holidaysRes,
       ] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/payroll/tax-rules`, { headers }),
@@ -186,6 +195,8 @@ export default function PayrollPage() {
         fetch(`${API_BASE_URL}/api/v1/payroll/compensation`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/employees?limit=200`, { headers }),
         fetch(`${API_BASE_URL}/api/v1/departments`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/timesheets`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/holidays`, { headers }).catch(() => null),
       ]);
 
       if (configsRes.ok) {
@@ -196,7 +207,23 @@ export default function PayrollPage() {
           setConfigCountry(confs[0].country);
           setConfigCurrency(confs[0].currency);
           setConfigHours(String((confs[0].standardMonthlyMinutes / 60).toFixed(2)));
+          if (confs[0].overtimeMultiplier) {
+            setConfigOvertimeRate(String(confs[0].overtimeMultiplier));
+          }
+          if (confs[0].holidayMultiplier) {
+            setConfigHolidayRate(String(confs[0].holidayMultiplier));
+          }
         }
+      }
+
+      if (timesheetsRes && timesheetsRes.ok) {
+        const tsData = await timesheetsRes.json();
+        setTimesheets(Array.isArray(tsData) ? tsData : tsData?.data || []);
+      }
+
+      if (holidaysRes && holidaysRes.ok) {
+        const hData = await holidaysRes.json();
+        setHolidays(Array.isArray(hData) ? hData : hData?.data || []);
       }
 
       if (rulesRes.ok) {
@@ -329,6 +356,84 @@ export default function PayrollPage() {
   const activeConfig = configurations[0] || null;
   const currentCurrency = activeConfig?.currency || settings.defaultCurrency || "UGX";
   const currentCountry = activeConfig?.country || settings.defaultCountry || "UG";
+  const activeOvertimeMultiplier = useMemo(() => {
+    return activeConfig?.overtimeMultiplier || settings.overtimeRateMultiplier || 1.5;
+  }, [activeConfig, settings]);
+  const activeHolidayMultiplier = useMemo(() => {
+    return activeConfig?.holidayMultiplier || settings.holidayRateMultiplier || 2.0;
+  }, [activeConfig, settings]);
+
+  // Synchronize dynamic hours from Clock-in and Timesheet submissions into active payroll run
+  const syncClockInHours = useCallback(
+    (periodId?: string) => {
+      const pId = periodId || selectedPeriodId;
+      const p = periods.find((x) => x.id === pId);
+      if (!p) {
+        toast.info("Select pay period", "Please select a pay period first.");
+        return;
+      }
+
+      const pStart = new Date(p.startDate).getTime();
+      const pEnd = new Date(p.endDate + "T23:59:59").getTime();
+      const stdMonthlyHours = activeConfig ? activeConfig.standardMonthlyMinutes / 60 : 173.33;
+
+      let syncedCount = 0;
+      setEmployeeAdjustments((prev) => {
+        const next = { ...prev };
+
+        for (const emp of employees) {
+          // Find timesheets for this employee that overlap with the period
+          const empTimesheets = timesheets.filter((t) => {
+            const matchesEmp = t.employeeId === emp.id || t.employee_id === emp.id;
+            if (!matchesEmp) return false;
+            const wStart = new Date(t.weekStart || t.week_start).getTime();
+            const wEnd = new Date((t.weekEnd || t.week_end) + "T23:59:59").getTime();
+            return (wStart >= pStart && wStart <= pEnd) || (wEnd >= pStart && wEnd <= pEnd);
+          });
+
+          if (empTimesheets.length > 0) {
+            const totalMinutes = empTimesheets.reduce(
+              (sum, t) => sum + (Number(t.totalMinutes || t.total_minutes) || 0),
+              0
+            );
+            const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+            const comp = compensationList.find((c) => c.employeeId === emp.id);
+            const parsed = parseCompensationDetails(comp);
+            const targetStd = parsed.standardHours || stdMonthlyHours;
+
+            const productiveHours = Math.min(totalHours, targetStd);
+            const overtimeHours = Math.max(0, Math.round((totalHours - targetStd) * 10) / 10);
+
+            next[emp.id] = {
+              productiveHours,
+              overtimeHours,
+              holidayHours: next[emp.id]?.holidayHours || 0,
+              bonusesMinor: next[emp.id]?.bonusesMinor || 0,
+              penaltiesMinor: next[emp.id]?.penaltiesMinor || 0,
+              insuranceMinor: next[emp.id]?.insuranceMinor || 0,
+              isSyncedFromClockIn: true,
+              clockInTotalHours: totalHours,
+            };
+            syncedCount++;
+          }
+        }
+        return next;
+      });
+
+      if (syncedCount > 0) {
+        toast.success(
+          "Clock-in synced",
+          `Auto-synced hours from clock-in & timesheets for ${syncedCount} employee(s).`
+        );
+      } else {
+        toast.info(
+          "Standard hours applied",
+          "No clock-in timesheet records found for this period range. Standard hours applied."
+        );
+      }
+    },
+    [selectedPeriodId, periods, activeConfig, employees, timesheets, compensationList]
+  );
 
   // Map each employee to their most recent compensation record
   const employeeSalaryMap = useMemo(() => {
@@ -411,6 +516,8 @@ export default function PayrollPage() {
     try {
       const token = await getToken();
       const minutes = Math.round((parseFloat(configHours) || 173.33) * 60);
+      const otMultiplier = parseFloat(configOvertimeRate) || 1.5;
+      const holMultiplier = parseFloat(configHolidayRate) || 2.0;
 
       const res = await fetch(`${API_BASE_URL}/api/v1/payroll/configurations`, {
         method: "POST",
@@ -419,6 +526,8 @@ export default function PayrollPage() {
           country: configCountry.toUpperCase(),
           currency: configCurrency.toUpperCase(),
           standardMonthlyMinutes: minutes,
+          overtimeMultiplier: otMultiplier,
+          holidayMultiplier: holMultiplier,
         }),
       });
 
@@ -431,9 +540,12 @@ export default function PayrollPage() {
         defaultCountry: configCountry,
         defaultCurrency: configCurrency,
         standardMonthlyHours: parseFloat(configHours) || 173.33,
+        overtimeRateMultiplier: otMultiplier,
+        holidayRateMultiplier: holMultiplier,
+        dailyStandardHours: parseFloat(configDailyHours) || 8.0,
       });
 
-      toast.success("Settings saved", `Payroll set to ${configCountry} (${configCurrency}).`);
+      toast.success("Settings saved", `Payroll set to ${configCountry} (${configCurrency}) with ${otMultiplier}× OT and ${holMultiplier}× Holiday rates.`);
       await fetchPayrollData(true);
     } catch (err: any) {
       toast.error("Save failed", err?.message || "Could not save configuration.");
@@ -582,6 +694,7 @@ export default function PayrollPage() {
         if (activeOne) {
           setActiveRun(activeOne);
           await loadRunItems(activeOne.id);
+          syncClockInHours(targetPeriod.id);
           setWizardStep(1);
           setIsProcessingRun(false);
           return;
@@ -635,9 +748,10 @@ export default function PayrollPage() {
       const createdRun = await res.json();
       setActiveRun(createdRun);
       await loadRunItems(createdRun.id);
+      syncClockInHours(selectedPeriodId);
       await fetchPayrollData(true);
       setWizardStep(2); // Go to review
-      toast.success("Payroll calculated", "Calculated earnings and statutory deductions for all eligible staff.");
+      toast.success("Payroll calculated", "Calculated earnings and statutory deductions with clock-in hours sync.");
     } catch (err: any) {
       toast.error("Calculation failed", err?.message);
     } finally {
@@ -1210,6 +1324,8 @@ export default function PayrollPage() {
               bonusesMinor: adj.bonusesMinor,
               insuranceMinor: adj.insuranceMinor,
               penaltiesMinor: adj.penaltiesMinor,
+              overtimeMultiplier: activeOvertimeMultiplier,
+              holidayMultiplier: activeHolidayMultiplier,
             });
 
             const paye = currentCountry === "UG" ? calculateUgandaPAYE(calc.chargeableGrossMinor) : Math.round(item.deductions * 0.8);
@@ -1239,16 +1355,27 @@ export default function PayrollPage() {
                 <CardHeader
                   title="Step 3: Review Calculated Payroll & Approve"
                   action={
-                    activeRun && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <button
                         type="button"
                         className="btn-neutral btn-sm"
-                        style={{ color: "#DC2626" }}
-                        onClick={() => handleDiscardRun(activeRun.id)}
+                        onClick={() => syncClockInHours()}
+                        title="Auto-sync productive and overtime hours from employee clock-in punches and submitted timesheets"
                       >
-                        <Trash2 size={12} className="mr-4" /> Discard &amp; Recompute
+                        <Clock size={12} className="mr-4" style={{ color: "var(--primary)" }} />
+                        Auto-Sync Clock-in
                       </button>
-                    )
+                      {activeRun && (
+                        <button
+                          type="button"
+                          className="btn-neutral btn-sm"
+                          style={{ color: "#DC2626" }}
+                          onClick={() => handleDiscardRun(activeRun.id)}
+                        >
+                          <Trash2 size={12} className="mr-4" /> Discard &amp; Recompute
+                        </button>
+                      )}
+                    </div>
                   }
                 />
                 <CardBody style={{ padding: 0 }}>
@@ -1274,7 +1401,7 @@ export default function PayrollPage() {
                         <strong>Chargeable Income Gross Total</strong> = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
                       </div>
                       <div style={{ color: "var(--text-4)", fontSize: 11.5 }}>
-                        • Total Higher rates = (Overtime hours × Pay rate × 1.5) + (Public Holiday &amp; Sunday hours × Pay rate × 2.0).
+                        • Total Higher rates = (Overtime hours × Pay rate × {activeOvertimeMultiplier}) + (Public Holiday &amp; Sunday hours × Pay rate × {activeHolidayMultiplier}).
                         <br />
                         • Statutory Deductions = PAYE (Progressive Tax on Chargeable Gross) + NSSF (5% Employee Pension). Net Pay = Gross Total - Deductions.
                       </div>
@@ -1355,7 +1482,24 @@ export default function PayrollPage() {
                               </div>
                             </td>
                             <td style={{ padding: "12px 16px", color: "var(--text-2)", fontWeight: 600 }}>
-                              {adj.productiveHours} hrs
+                              <div>{adj.productiveHours} hrs</div>
+                              {adj.isSyncedFromClockIn && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    color: "var(--primary)",
+                                    background: "rgba(37, 99, 235, 0.08)",
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    display: "inline-block",
+                                    marginTop: 2,
+                                    fontWeight: 500,
+                                  }}
+                                  title="Hours automatically synchronized from employee clock-in & timesheet records"
+                                >
+                                  ⏱️ Synced
+                                </span>
+                              )}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               {calc.totalHigherRatesMinor > 0 ? (
@@ -1364,9 +1508,9 @@ export default function PayrollPage() {
                                     +{formatMoney(calc.totalHigherRatesMinor, currentCurrency)}
                                   </span>
                                   <div style={{ fontSize: 10.5, color: "var(--text-4)" }}>
-                                    {adj.overtimeHours > 0 && `${adj.overtimeHours}h OT (1.5×)`}
+                                    {adj.overtimeHours > 0 && `${adj.overtimeHours}h OT (${activeOvertimeMultiplier}×)`}
                                     {adj.overtimeHours > 0 && adj.holidayHours > 0 && " · "}
-                                    {adj.holidayHours > 0 && `${adj.holidayHours}h Hol (2.0×)`}
+                                    {adj.holidayHours > 0 && `${adj.holidayHours}h Hol (${activeHolidayMultiplier}×)`}
                                   </div>
                                 </div>
                               ) : (
@@ -1429,6 +1573,8 @@ export default function PayrollPage() {
                                       bonusesMinor: calc.totalBonusesMinor,
                                       penaltiesMinor: calc.totalPenaltiesMinor,
                                       insuranceMinor: calc.totalInsuranceMinor,
+                                      overtimeMultiplier: activeOvertimeMultiplier,
+                                      holidayMultiplier: activeHolidayMultiplier,
                                       payModel: parsed.model,
                                       hourlyRateMinor: parsed.hourlyRateMinor,
                                       basePay: calc.baseMonthlyCompensationMinor,
@@ -2189,6 +2335,76 @@ export default function PayrollPage() {
                 </small>
               </div>
 
+              {/* Overtime & Public Holiday Multipliers */}
+              <div style={{ paddingTop: 16, borderTop: "1px solid var(--card-border, #E8ECE8)", marginTop: 4 }}>
+                <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 4px 0", color: "var(--text-1)" }}>
+                  Dynamic Overtime &amp; Public Holiday Multipliers
+                </h4>
+                <p style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 14px 0" }}>
+                  Configure company policy multipliers for hourly and salaried overtime and public holiday work. These rates dynamically power the clock-in module and the pay engine.
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                      Overtime Rate Multiplier (e.g. 1.5×)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="1.0"
+                      max="5.0"
+                      className="input"
+                      value={configOvertimeRate}
+                      onChange={(e) => setConfigOvertimeRate(e.target.value)}
+                      required
+                    />
+                    <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
+                      Multiplier applied to standard hourly rate when working overtime (default: 1.5×).
+                    </small>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                      Public Holiday &amp; Sunday Multiplier (e.g. 2.0×)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="1.0"
+                      max="5.0"
+                      className="input"
+                      value={configHolidayRate}
+                      onChange={(e) => setConfigHolidayRate(e.target.value)}
+                      required
+                    />
+                    <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
+                      Multiplier applied for shifts on gazetted public holidays or Sunday rest days (default: 2.0×).
+                    </small>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 14 }}>
+                  <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
+                    Standard Daily Threshold (Hours/Day)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    max="24"
+                    className="input"
+                    style={{ maxWidth: 280 }}
+                    value={configDailyHours}
+                    onChange={(e) => setConfigDailyHours(e.target.value)}
+                    required
+                  />
+                  <small style={{ color: "var(--text-4)", fontSize: 11.5, marginTop: 4, display: "block" }}>
+                    Daily working hours threshold after which overtime starts accumulating in the dashboard clock-in widget (standard: 8.0 hrs/day).
+                  </small>
+                </div>
+              </div>
+
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                 <button type="submit" className="btn-primary" disabled={isSavingSettings}>
                   {isSavingSettings ? <Loader2 size={14} className="animate-spin mr-6" /> : <Save size={14} className="mr-6" />}
@@ -2287,6 +2503,8 @@ export default function PayrollPage() {
         currency={currentCurrency}
         country={currentCountry}
         defaultEmployeeId={selectedCompEmployeeId}
+        overtimeMultiplier={activeOvertimeMultiplier}
+        holidayMultiplier={activeHolidayMultiplier}
         onSave={handleSaveCompensation}
       />
 
@@ -2307,6 +2525,8 @@ export default function PayrollPage() {
         onClose={() => setStatementPayslip(null)}
         payslip={statementPayslip}
         currency={currentCurrency}
+        overtimeMultiplier={activeOvertimeMultiplier}
+        holidayMultiplier={activeHolidayMultiplier}
       />
 
       {/* ADJUST EMPLOYEE HOURS & RATES MODAL */}
@@ -2316,7 +2536,7 @@ export default function PayrollPage() {
         title="Adjust Hours & Higher Rates"
         subtitle={
           editingAdjItem
-            ? `Configure productive hours, overtime (1.5×), holiday rates (2.0×), and bonuses for ${editingAdjItem.employeeName}`
+            ? `Configure productive hours, overtime (${activeOvertimeMultiplier}×), holiday rates (${activeHolidayMultiplier}×), and bonuses for ${editingAdjItem.employeeName}`
             : ""
         }
         width={540}
@@ -2342,6 +2562,8 @@ export default function PayrollPage() {
               bonusesMinor: bonMinor,
               insuranceMinor: insMinor,
               penaltiesMinor: penMinor,
+              overtimeMultiplier: activeOvertimeMultiplier,
+              holidayMultiplier: activeHolidayMultiplier,
             });
 
             const livePaye =
@@ -2355,6 +2577,14 @@ export default function PayrollPage() {
             const liveTotalDeductions = livePaye + liveNssf;
             const liveNet = Math.max(0, liveCalc.chargeableGrossMinor - liveTotalDeductions);
 
+            const empTimesheets = timesheets.filter(
+              (t) => t.employeeId === editingAdjItem.employeeId || t.employee_id === editingAdjItem.employeeId
+            );
+            const totalTsMinutes = empTimesheets.reduce(
+              (s, t) => s + (Number(t.totalMinutes || t.total_minutes) || 0),
+              0
+            );
+
             const handleSaveAdj = (e: React.FormEvent) => {
               e.preventDefault();
               setEmployeeAdjustments((prev) => ({
@@ -2366,6 +2596,7 @@ export default function PayrollPage() {
                   bonusesMinor: bonMinor,
                   penaltiesMinor: penMinor,
                   insuranceMinor: insMinor,
+                  isSyncedFromClockIn: prev[editingAdjItem.employeeId]?.isSyncedFromClockIn,
                 },
               }));
               setEditingAdjItem(null);
@@ -2401,6 +2632,39 @@ export default function PayrollPage() {
                   </div>
                 </div>
 
+                {totalTsMinutes > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      background: "rgba(37, 99, 235, 0.06)",
+                      borderRadius: 8,
+                      border: "1px solid rgba(37, 99, 235, 0.16)",
+                      fontSize: 11.5,
+                      color: "var(--text-2)",
+                    }}
+                  >
+                    <span>
+                      ⏱️ <strong>Clock-in &amp; Timesheets:</strong> {(totalTsMinutes / 60).toFixed(1)} hrs recorded for this staff.
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 11, padding: "2px 8px", height: 26 }}
+                      onClick={() => {
+                        const tsHours = Math.round((totalTsMinutes / 60) * 10) / 10;
+                        const std = parsed.standardHours || (activeConfig ? activeConfig.standardMonthlyMinutes / 60 : 173.33);
+                        setFormProductiveHours(String(Math.min(tsHours, std)));
+                        setFormOvertimeHours(String(Math.max(0, Math.round((tsHours - std) * 10) / 10)));
+                      }}
+                    >
+                      Apply Clock-in Hours
+                    </button>
+                  </div>
+                )}
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
                     <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
@@ -2420,7 +2684,7 @@ export default function PayrollPage() {
 
                   <div>
                     <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
-                      Overtime Hours (1.5× rate)
+                      Overtime Hours ({activeOvertimeMultiplier}× rate)
                     </label>
                     <input
                       type="number"
@@ -2439,7 +2703,7 @@ export default function PayrollPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
                     <label className="form-label" style={{ display: "block", marginBottom: 5 }}>
-                      Public Holiday &amp; Sunday Hours (2.0×)
+                      Public Holiday &amp; Sunday Hours ({activeHolidayMultiplier}×)
                     </label>
                     <input
                       type="number"

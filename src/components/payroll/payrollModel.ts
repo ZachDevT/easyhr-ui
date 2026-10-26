@@ -6,6 +6,8 @@ export interface PayrollConfig {
   country: string;
   currency: string;
   standardMonthlyMinutes: number;
+  overtimeMultiplier?: number;
+  holidayMultiplier?: number;
 }
 
 export interface CompensationRecord {
@@ -379,12 +381,14 @@ export function parseCompensationDetails(comp?: CompensationRecord | null): Pars
 }
 
 export interface GrossCalculationParams {
-  payRateMinor: number; // Hourly rate (or monthly equivalent / 173.33)
+  payRateMinor: number; // Hourly rate (or monthly equivalent / standardMonthlyHours)
   isHourly: boolean;
   monthlyBaseMinor: number;
   productiveHours: number; // e.g. 173.33, 160
-  overtimeHours?: number; // 1.5x regular pay
-  holidayHours?: number; // 2.0x regular pay (Public holidays & Sundays)
+  overtimeHours?: number; // Overtime hours
+  holidayHours?: number; // Public holidays & Sundays
+  overtimeMultiplier?: number; // Dynamic overtime multiplier (e.g. 1.5x)
+  holidayMultiplier?: number; // Dynamic public holiday & rest day multiplier (e.g. 2.0x)
   bonusesMinor?: number; // One-time bonuses
   insuranceMinor?: number; // Insurance / Allowances
   penaltiesMinor?: number; // Tardiness, absence penalties
@@ -395,6 +399,8 @@ export interface GrossCalculationResult {
   totalHigherRatesMinor: number;
   overtimeMinor: number;
   holidayMinor: number;
+  overtimeMultiplier: number;
+  holidayMultiplier: number;
   totalBonusesMinor: number;
   totalInsuranceMinor: number;
   totalPenaltiesMinor: number;
@@ -404,7 +410,7 @@ export interface GrossCalculationResult {
 /**
  * Basic Uganda & Enterprise Chargeable Income formula:
  * HOURLY compensation: Total monthly compensation = Pay rate * Productive hours
- * Higher rates = Overtime (1.5x) + Public Holidays / Sundays (2.0x)
+ * Higher rates = Overtime (dynamic multiplier, default 1.5x) + Public Holidays / Sundays (dynamic multiplier, default 2.0x)
  * Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
  */
 export function calculateChargeableGross(params: GrossCalculationParams): GrossCalculationResult {
@@ -415,6 +421,8 @@ export function calculateChargeableGross(params: GrossCalculationParams): GrossC
     productiveHours,
     overtimeHours = 0,
     holidayHours = 0,
+    overtimeMultiplier = 1.5,
+    holidayMultiplier = 2.0,
     bonusesMinor = 0,
     insuranceMinor = 0,
     penaltiesMinor = 0,
@@ -431,10 +439,13 @@ export function calculateChargeableGross(params: GrossCalculationParams): GrossC
     ? payRateMinor
     : Math.round(monthlyBaseMinor / 173.33);
 
-  // Overtime = 1.5x regular pay rate
-  const overtimeMinor = Math.round(Math.max(0, overtimeHours) * effectiveHourlyRateMinor * 1.5);
-  // Public Holidays & Sundays = 2.0x regular pay rate
-  const holidayMinor = Math.round(Math.max(0, holidayHours) * effectiveHourlyRateMinor * 2.0);
+  const otMultiplier = overtimeMultiplier > 0 ? overtimeMultiplier : 1.5;
+  const holMultiplier = holidayMultiplier > 0 ? holidayMultiplier : 2.0;
+
+  // Overtime = dynamic multiplier x regular pay rate
+  const overtimeMinor = Math.round(Math.max(0, overtimeHours) * effectiveHourlyRateMinor * otMultiplier);
+  // Public Holidays & Sundays = dynamic multiplier x regular pay rate
+  const holidayMinor = Math.round(Math.max(0, holidayHours) * effectiveHourlyRateMinor * holMultiplier);
   const totalHigherRatesMinor = overtimeMinor + holidayMinor;
 
   const totalBonusesMinor = Math.max(0, bonusesMinor);
@@ -456,6 +467,8 @@ export function calculateChargeableGross(params: GrossCalculationParams): GrossC
     totalHigherRatesMinor,
     overtimeMinor,
     holidayMinor,
+    overtimeMultiplier: otMultiplier,
+    holidayMultiplier: holMultiplier,
     totalBonusesMinor,
     totalInsuranceMinor,
     totalPenaltiesMinor,

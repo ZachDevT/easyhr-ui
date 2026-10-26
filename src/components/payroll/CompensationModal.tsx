@@ -12,6 +12,8 @@ interface CompensationModalProps {
   currency: string;
   country: string;
   defaultEmployeeId?: string;
+  overtimeMultiplier?: number;
+  holidayMultiplier?: number;
   onSave: (payload: {
     employeeId: string;
     baseAmountMinor: number;
@@ -29,6 +31,8 @@ export function CompensationModal({
   currency,
   country,
   defaultEmployeeId,
+  overtimeMultiplier = 1.5,
+  holidayMultiplier = 2.0,
   onSave,
 }: CompensationModalProps) {
   const [employeeId, setEmployeeId] = useState(defaultEmployeeId || (employees[0]?.id || ""));
@@ -288,9 +292,9 @@ export function CompensationModal({
             )}
           </div>
           <div style={{ color: "var(--text-3)", fontSize: 11 }}>
-            • Overtime Hours: calculated at 1.5× regular pay rate during payroll review.
+            • Overtime Hours: calculated dynamically at {overtimeMultiplier}× regular pay rate during payroll review.
             <br />
-            • Public Holidays &amp; Sundays: calculated at 2.0× regular pay rate.
+            • Public Holidays &amp; Sundays: calculated dynamically at {holidayMultiplier}× regular pay rate.
             <br />
             • Chargeable Gross = [Total monthly compensation] + [Bonuses] + [Higher rates] + [Insurance] - [Penalties].
           </div>
