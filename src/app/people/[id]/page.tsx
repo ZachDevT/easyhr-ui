@@ -40,6 +40,7 @@ import { formatMoney, PayrollCalculationResult } from "@/utils/payrollEngine";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
 import { DataRow, SectionHeading, StatusPill } from "@/components/ui/ModulePrimitives";
 import { toast } from "@/components/ui/Toast";
 import { EditEmployeeModal } from "@/components/people/EditEmployeeModal";
@@ -78,6 +79,14 @@ interface EmployeeProfileData {
   favoriteMusic?: string;
   coffeeTea?: string;
   funFact?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  administrativeArea?: string;
+  postalCode?: string;
+  emergencyContactName?: string;
+  emergencyContactRelationship?: string;
+  emergencyContactPhone?: string;
   paymentMethod?: string;
   bankName?: string;
   bankRoutingNumber?: string;
@@ -88,10 +97,32 @@ interface EmployeeProfileData {
   handbookSignedAt?: string;
 }
 
+const TABS = [
+  "Personal",
+  "Job",
+  "Pay Info",
+  "Payslips",
+  "Documents",
+  "Time Off",
+  "Emergency",
+];
+
 export default function EmployeeProfile() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { getToken } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<string>("Personal");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get("tab");
+      if (tab && TABS.includes(tab)) {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
 
   const [employee, setEmployee] = useState<EmployeeProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -302,6 +333,7 @@ export default function EmployeeProfile() {
 
   return (
     <>
+      {/* EXECUTIVE HERO PROFILE HEADER (MATCHING /people/me) */}
       <div
         style={{
           background: "#FFFFFF",
@@ -315,7 +347,7 @@ export default function EmployeeProfile() {
         <div style={{ height: 4, background: "var(--gradient)" }} />
         <div
           style={{
-            padding: "20px 24px",
+            padding: "24px 28px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -323,62 +355,70 @@ export default function EmployeeProfile() {
             flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0, flex: 1 }}>
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                minWidth: 72,
-                minHeight: 72,
-                borderRadius: "50%",
-                overflow: "hidden",
-                border: "3px solid #FFFFFF",
-                boxShadow: "0 4px 14px rgba(17, 17, 24, 0.1), 0 0 0 1px var(--card-border, #E4E4E7)",
-                background: "var(--primary-tint, #F5EBFF)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {avatarSrc ? (
-                <img
-                  src={avatarSrc}
-                  alt={fullName}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
-                />
-              ) : (
-                <span style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #2563EB)" }}>
-                  {employee.firstName.slice(0, 1).toUpperCase()}
-                  {employee.lastName.slice(0, 1).toUpperCase()}
-                </span>
-              )}
+          {/* Left: Avatar + Identity + Metadata */}
+          <div style={{ display: "flex", alignItems: "center", gap: 20, minWidth: 0, flex: 1 }}>
+            <div style={{ position: "relative" }}>
+              <div
+                style={{
+                  width: 76,
+                  height: 76,
+                  minWidth: 76,
+                  minHeight: 76,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  border: "3.5px solid #FFFFFF",
+                  boxShadow: "0 4px 16px rgba(17, 17, 24, 0.12), 0 0 0 1px var(--card-border, #E4E4E7)",
+                  background: "var(--primary-tint, #EFF6FF)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={fullName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 24, fontWeight: 700, color: "var(--primary, #2563EB)" }}>
+                    {employee.firstName.slice(0, 1).toUpperCase()}
+                    {employee.lastName.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 2,
+                  right: 2,
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: employee.status === "active" ? "#10B981" : "#F59E0B",
+                  border: "2.5px solid #FFFFFF",
+                }}
+                title={employee.status === "active" ? "Active" : "Onboarding"}
+              />
             </div>
 
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h1
                   style={{
-                    fontSize: 21,
-                    fontWeight: 700,
-                    color: "var(--text-1, #18181B)",
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: "var(--text-1)",
                     margin: 0,
                     letterSpacing: "-0.02em",
-                    lineHeight: 1.2,
                   }}
                 >
                   {fullName}
                 </h1>
-
                 <StatusPill tone={employee.status === "active" ? "success" : "warning"}>
                   {employee.status ? employee.status.toUpperCase() : "ACTIVE"}
                 </StatusPill>
-
                 <span
                   style={{
                     fontSize: 11,
@@ -390,58 +430,57 @@ export default function EmployeeProfile() {
                     border: "1px solid var(--card-border, #E4E4E7)",
                   }}
                 >
-                  {employee.employeeNumber}
+                  {employee.employeeNumber || "EMP-0001"}
                 </span>
               </div>
 
-              <div
-                style={{
-                  fontSize: 13.5,
-                  color: "var(--text-2, #52525B)",
-                  marginTop: 4,
-                  fontWeight: 500,
-                }}
-              >
-                {employee.jobTitle || "Team Member"} <span style={{ color: "var(--text-3, #A1A1AA)" }}>·</span>{" "}
-                {employee.department}
+              <div style={{ fontSize: 13.5, color: "var(--text-2)", marginTop: 4, fontWeight: 500 }}>
+                {employee.jobTitle || "Team Member"} <span style={{ color: "var(--text-4)" }}>·</span> {employee.department || "General"}
               </div>
 
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 14,
+                  gap: 16,
                   flexWrap: "wrap",
                   marginTop: 8,
                   fontSize: 12,
-                  color: "var(--text-3, #71717A)",
+                  color: "var(--text-3)",
                 }}
               >
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <Building2 size={13} style={{ color: "var(--primary, #2563EB)" }} />
-                  <span>{employee.department}</span>
+                  <Building2 size={13} style={{ color: "var(--primary)" }} />
+                  <span>{employee.department || "General"}</span>
                 </span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <MapPin size={13} style={{ color: "var(--primary, #2563EB)" }} />
-                  <span>{employee.location || "Headquarters"}</span>
+                  <MapPin size={13} style={{ color: "var(--primary)" }} />
+                  <span>{employee.location || "Remote"}</span>
                 </span>
                 {employee.workEmail && (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <Mail size={13} style={{ color: "var(--primary, #2563EB)" }} />
+                    <Mail size={13} style={{ color: "var(--primary)" }} />
                     <span>{employee.workEmail}</span>
+                  </span>
+                )}
+                {employee.startDate && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <CalendarDays size={13} style={{ color: "var(--primary)" }} />
+                    <span>Hired {employee.startDate}</span>
                   </span>
                 )}
               </div>
             </div>
           </div>
 
+          {/* Right: Actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
             {isOnboarding && (
               <>
                 <button
+                  type="button"
                   onClick={() => setIsOnboardingLinkModalOpen(true)}
                   className="btn-secondary btn-sm"
-                  title="Generate a fresh non-expired onboarding link (7 days) or resend email"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -449,15 +488,17 @@ export default function EmployeeProfile() {
                     padding: "8px 14px",
                     borderRadius: 9,
                     fontSize: 12,
-                    color: "var(--primary, #2563EB)",
-                    borderColor: "var(--primary, #2563EB)",
+                    color: "var(--primary)",
+                    borderColor: "var(--primary)",
                     fontWeight: 600,
                   }}
+                  title="Generate a fresh non-expired onboarding link (7 days) or resend email"
                 >
                   <Mail size={13.5} />
-                  <span>Resend Onboarding Link</span>
+                  <span>Resend Link</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleActivate}
                   disabled={isActivating}
                   className="btn-primary btn-sm"
@@ -472,11 +513,12 @@ export default function EmployeeProfile() {
                   }}
                 >
                   {isActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                  <span>Activate Employee</span>
+                  <span>Activate</span>
                 </button>
               </>
             )}
             <button
+              type="button"
               onClick={() => setIsPaymentModalOpen(true)}
               className="btn-neutral btn-sm"
               style={{
@@ -494,8 +536,9 @@ export default function EmployeeProfile() {
               <span>Payment Method</span>
             </button>
             <button
+              type="button"
               onClick={() => setIsEditModalOpen(true)}
-              className="btn-neutral btn-sm"
+              className="btn-primary btn-sm"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -505,6 +548,7 @@ export default function EmployeeProfile() {
                 fontSize: 12,
                 fontWeight: 600,
               }}
+              title="Edit job title, department, location, or personal details"
             >
               <Edit2 size={13.5} />
               <span>Edit Details</span>
@@ -523,531 +567,880 @@ export default function EmployeeProfile() {
               }}
             >
               <ArrowLeft size={13.5} />
-              <span>Back</span>
+              <span>Directory</span>
             </Link>
           </div>
         </div>
-      </div>
 
-      {isOnboarding && (
+        {/* BOTTOM INTEGRATED TABS BAR */}
         <div
+          className="hide-scrollbar"
           style={{
-            background: "#EFF6FF",
-            border: "1px solid #BFDBFE",
-            borderRadius: 12,
-            padding: "16px 20px",
-            marginBottom: 20,
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-            flexWrap: "wrap",
+            gap: 4,
+            padding: "0 24px",
+            background: "#FAF9F7",
+            borderTop: "1px solid var(--card-border, #E4E4E7)",
+            overflowX: "auto",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 10,
-                background: "#DBEAFE",
-                color: "var(--primary, #2563EB)",
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <strong style={{ fontSize: 13.5, color: "#1E40AF" }}>
-                Employee is currently completing self-onboarding
-              </strong>
-              <p style={{ margin: "2px 0 0 0", fontSize: 12, color: "#3B82F6" }}>
-                You can resend the invite email, copy the onboarding link, set payment method, or activate their account.
-              </p>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={() => setIsOnboardingLinkModalOpen(true)}
-              className="btn-primary btn-sm"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 12 }}
-            >
-              <Mail size={13.5} /> Resend Link
-            </button>
-            <button
-              onClick={() => setIsPaymentModalOpen(true)}
-              className="btn-neutral btn-sm"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 12 }}
-            >
-              <CreditCard size={13.5} /> Payment Method
-            </button>
-            <button
-              onClick={handleActivate}
-              disabled={isActivating}
-              className="btn-secondary btn-sm"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#16A34A", borderColor: "#86EFAC", padding: "7px 14px", fontSize: 12 }}
-            >
-              {isActivating ? <Loader2 size={13.5} className="animate-spin" /> : <CheckCircle2 size={13.5} />} Activate
-            </button>
-          </div>
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "12px 18px",
+                  fontSize: 13,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? "var(--primary, #2563EB)" : "var(--text-2, #52525B)",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: isActive
+                    ? "2.5px solid var(--primary, #2563EB)"
+                    : "2.5px solid transparent",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </div>
 
+      {/* MAIN TWO-COLUMN WORKSPACE */}
       <main style={{ padding: "0 0 32px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) 340px", gap: 20 }}>
-          {/* Main Column */}
-          <div className="col gap-20">
+        <div style={{ display: "grid", gridTemplateColumns: "280px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
+          {/* LEFT COLUMN: OFFICIAL VITALS & STATUS */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <Card>
-              <CardBody>
-                <div className="row-between mb-16 align-center">
-                  <SectionHeading
-                    title="Employment overview"
-                    description="Position, organizational unit, and official record"
-                  />
-                  {(isHRAdmin || isManager) && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditModalOpen(true)}
-                      className="btn-neutral btn-sm"
-                      style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8 }}
-                      title="Edit job title, department, location, or status"
-                    >
-                      <Edit2 size={12} />
-                      <span>Edit Details</span>
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
-                  <Info icon={<Briefcase />} label="Job title" value={employee.jobTitle || "Not specified"} />
-                  <Info
-                    icon={<Building2 />}
-                    label="Department & division"
-                    value={`${employee.department}${employee.division ? ` · ${employee.division}` : ""}`}
-                  />
-                  <Info icon={<MapPin />} label="Work location" value={employee.location || "Remote"} />
-                  <Info icon={<CalendarDays />} label="Hire date" value={employee.startDate || "Recent"} />
-                  <Info icon={<ShieldCheck />} label="Employee number" value={employee.employeeNumber || "EMP-PENDING"} />
-                  <div style={{ display: "flex", gap: 12 }}>
+              <CardBody style={{ padding: 20 }}>
+                <h3
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "var(--text-3, #71717A)",
+                    margin: "0 0 14px 0",
+                  }}
+                >
+                  Official Vitals
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
                     <div
                       style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 9,
-                        display: "grid",
-                        placeItems: "center",
-                        background: "var(--primary-tint)",
-                        color: "var(--primary)",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "#FAF9F7",
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-2, #52525B)",
+                        flexShrink: 0,
                       }}
                     >
-                      <Clock3 size={18} />
+                      <Phone size={13} />
                     </div>
-                    <div>
-                      <div className="text-xs text-5">Employment status</div>
-                      <div className="mt-4">
-                        <StatusPill tone={employee.status === "active" ? "success" : "warning"}>
-                          {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
-                        </StatusPill>
-                      </div>
+                    <span style={{ color: "var(--text-1)" }}>{employee.personalPhone || "No phone added"}</span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "#FAF9F7",
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-2, #52525B)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Mail size={13} />
                     </div>
+                    <span
+                      style={{
+                        color: "var(--text-1)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {employee.workEmail}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "#FAF9F7",
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-2, #52525B)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Clock3 size={13} />
+                    </div>
+                    <span style={{ color: "var(--text-1)" }}>
+                      {employee.status === "active" ? "Active Full-time" : "Completing Onboarding"}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "#FAF9F7",
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-2, #52525B)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <MapPin size={13} />
+                    </div>
+                    <span style={{ color: "var(--text-1)" }}>{employee.location || "Remote"}</span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "#FAF9F7",
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-2, #52525B)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <UserRound size={13} />
+                    </div>
+                    <span style={{ color: "var(--text-1)" }}>Manager: {employee.manager || "Executive"}</span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "#FAF9F7",
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-2, #52525B)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Building2 size={13} />
+                    </div>
+                    <span style={{ color: "var(--text-1)" }}>{employee.department}</span>
                   </div>
                 </div>
               </CardBody>
             </Card>
 
-            <Card>
-              <CardBody>
-                <SectionHeading
-                  title="Compliance & Documentation"
-                  description="Onboarding documents and verification records"
-                />
-                <div className="col gap-12">
-                  <DataRow
-                    leading={<ShieldCheck size={18} color="var(--success)" />}
-                    title="Identity & Employment Verification"
-                    subtitle="Primary work authorization verified"
-                    meta={<StatusPill tone="success">Verified</StatusPill>}
-                  />
-                  <DataRow
-                    leading={<Mail size={18} color="var(--primary)" />}
-                    title="Work Email & Identity Access"
-                    subtitle={employee.workEmail}
-                    meta={<StatusPill tone="success">Active</StatusPill>}
-                  />
-                </div>
-              </CardBody>
-            </Card>
-
-            {/* Compensation & Disbursement */}
-            <Card>
-              <CardBody>
-                <div className="row-between mb-16 align-center">
-                  <SectionHeading
-                    title="Disbursement & Payment Method"
-                    description="Designated compensation payout account where wages are transferred"
-                  />
-                  {(isHRAdmin || isManager || isOwnProfile) && (
+            {isOnboarding && (
+              <Card>
+                <CardBody style={{ padding: 18, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <Sparkles size={16} style={{ color: "var(--primary)" }} />
+                    <strong style={{ fontSize: 13, color: "#1E40AF" }}>Onboarding in Progress</strong>
+                  </div>
+                  <p style={{ fontSize: 11.5, color: "#2563EB", lineHeight: 1.5, margin: "0 0 12px 0" }}>
+                    Employee hasn&apos;t finalized onboarding yet. You can resend their 7-day magic link or activate directly.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <button
                       type="button"
-                      onClick={() => setIsPaymentModalOpen(true)}
-                      className="btn-neutral btn-sm"
-                      style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8 }}
+                      onClick={() => setIsOnboardingLinkModalOpen(true)}
+                      className="btn-primary btn-sm"
+                      style={{ width: "100%", justifyContent: "center", fontSize: 11.5 }}
                     >
-                      <CreditCard size={13} />
-                      <span>{employee.paymentMethod || employee.bankName || employee.mobileMoneyProvider ? "Edit Payment Method" : "Add Payment Method"}</span>
+                      <Mail size={12} className="mr-4" /> Resend Onboarding Link
                     </button>
-                  )}
-                </div>
-                {employee.paymentMethod || employee.mobileMoneyProvider || employee.bankName ? (
-                  <div className="col gap-12">
-                    <DataRow
-                      leading={
-                        employee.paymentMethod === "Mobile Money" ? (
-                          <Smartphone size={18} color="var(--primary)" />
-                        ) : employee.paymentMethod === "PayPal / Digital Wallet" ? (
-                          <Wallet size={18} color="var(--primary)" />
-                        ) : (
-                          <DollarSign size={18} color="var(--primary)" />
-                        )
-                      }
-                      title={
-                        employee.paymentMethod === "Mobile Money"
-                          ? `${employee.mobileMoneyProvider || "Mobile Money"} (${employee.mobileMoneyPhone || "Phone registered"})`
-                          : employee.paymentMethod === "PayPal / Digital Wallet"
-                          ? `PayPal: ${employee.walletEmail || "Wallet on file"}`
-                          : employee.bankName
-                          ? `${employee.bankName}${employee.bankAccountNumber ? ` · ····${employee.bankAccountNumber.slice(-4)}` : ""}`
-                          : employee.paymentMethod || "Direct Deposit"
-                      }
-                      subtitle={employee.paymentMethod || "Disbursement Channel"}
-                      meta={<StatusPill tone="success">Active Disbursement</StatusPill>}
-                    />
+                    <button
+                      type="button"
+                      onClick={handleActivate}
+                      disabled={isActivating}
+                      className="btn-neutral btn-sm"
+                      style={{ width: "100%", justifyContent: "center", fontSize: 11.5 }}
+                    >
+                      {isActivating ? <Loader2 size={12} className="animate-spin mr-4" /> : <CheckCircle2 size={12} className="mr-4" />}
+                      Activate Account
+                    </button>
                   </div>
-                ) : (
-                  <div
-                    style={{
-                      background: "#F8FAFC",
-                      borderRadius: 10,
-                      border: "1px dashed #CBD5E1",
-                      padding: "18px 20px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      flexWrap: "wrap",
-                    }}
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Quick Payment Channel Card */}
+            <Card>
+              <CardBody style={{ padding: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <h4 style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-3)", margin: 0 }}>
+                    Payout Method
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsPaymentModalOpen(true)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: 11.5, fontWeight: 600 }}
                   >
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>
-                        No disbursement method configured yet
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-3)" }}>
-                        Set up a bank account (direct deposit), mobile money (MTN / Airtel), or PayPal wallet for automatic payroll payout.
+                    Edit
+                  </button>
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-1)" }}>
+                  {employee.paymentMethod || employee.bankName || employee.mobileMoneyProvider || "Not configured yet"}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                  {employee.mobileMoneyPhone || employee.bankAccountNumber ? `Account: ${employee.mobileMoneyPhone || employee.bankAccountNumber}` : "Click Edit to set destination"}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+
+          {/* RIGHT COLUMN: ACTIVE TAB CONTENT */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* TAB: PERSONAL */}
+            {activeTab === "Personal" && (
+              <>
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading
+                        title="Contact Information"
+                        description="Direct contact details and personal communication channels"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="btn-neutral btn-sm"
+                        style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8 }}
+                      >
+                        <Edit2 size={12} />
+                        <span>Edit Details</span>
+                      </button>
+                    </div>
+                    <div className="col gap-12">
+                      <DataRow leading={<Mail size={17} color="var(--primary)" />} title={employee.workEmail} subtitle="Work email (Official account)" />
+                      <DataRow leading={<Mail size={17} />} title={employee.personalEmail || "Not provided"} subtitle="Personal email" />
+                      <DataRow leading={<Phone size={17} />} title={employee.personalPhone || "Not provided"} subtitle="Mobile phone number" />
+                      <DataRow leading={<MapPin size={17} />} title={employee.location || "Remote"} subtitle="Work location" />
+                    </div>
+                  </CardBody>
+                </Card>
+
+                {/* About & Culture */}
+                <Card>
+                  <CardBody>
+                    <SectionHeading
+                      title="About & Culture"
+                      description="Personal bio, preferences, and workplace culture details"
+                    />
+                    <p style={{ fontSize: 13.5, color: "#3F3F46", lineHeight: 1.6, margin: "0 0 16px" }}>
+                      {employee.bio || "No personal bio written yet."}
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+                      <Detail label="Fun Fact" value={employee.funFact || "Not specified"} />
+                      <Detail label="Favorite Food" value={employee.favoriteFood || "Not specified"} />
+                      <Detail label="Favorite Music" value={employee.favoriteMusic || "Not specified"} />
+                      <Detail label="Favorite Movies" value={employee.favoriteMovies || "Not specified"} />
+                      <Detail label="Beverage" value={employee.coffeeTea || "Not specified"} />
+                      <Detail label="Shirt Size" value={employee.shirtSize || "Not specified"} />
+                    </div>
+                  </CardBody>
+                </Card>
+
+                {/* Emergency Contact Summary */}
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading
+                        title="Emergency Contact"
+                        description="Designated emergency notification contact"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="btn-neutral btn-sm"
+                        style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
+                      >
+                        <Edit2 size={12} />
+                        <span>Edit</span>
+                      </button>
+                    </div>
+                    <div className="col gap-10">
+                      <Detail label="Contact Name" value={employee.emergencyContactName || "Not configured"} />
+                      <Detail label="Relationship" value={employee.emergencyContactRelationship || "Family / Next of Kin"} />
+                      <Detail label="Phone Number" value={employee.emergencyContactPhone || employee.personalPhone || "—"} />
+                    </div>
+                  </CardBody>
+                </Card>
+              </>
+            )}
+
+            {/* TAB: JOB */}
+            {activeTab === "Job" && (
+              <>
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading
+                        title="Employment Overview"
+                        description="Position, organizational unit, and official record"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="btn-neutral btn-sm"
+                        style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 8 }}
+                      >
+                        <Edit2 size={12} />
+                        <span>Edit Details</span>
+                      </button>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
+                      <Info icon={<Briefcase />} label="Job title" value={employee.jobTitle || "Not specified"} />
+                      <Info
+                        icon={<Building2 />}
+                        label="Department & division"
+                        value={`${employee.department}${employee.division ? ` · ${employee.division}` : ""}`}
+                      />
+                      <Info icon={<MapPin />} label="Work location" value={employee.location || "Remote"} />
+                      <Info icon={<CalendarDays />} label="Hire date" value={employee.startDate || "Recent"} />
+                      <Info icon={<ShieldCheck />} label="Employee number" value={employee.employeeNumber || "EMP-0001"} />
+                      <div style={{ display: "flex", gap: 12 }}>
+                        <div
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 9,
+                            display: "grid",
+                            placeItems: "center",
+                            background: "var(--primary-tint)",
+                            color: "var(--primary)",
+                          }}
+                        >
+                          <Clock3 size={18} />
+                        </div>
+                        <div>
+                          <div className="text-xs text-5">Employment status</div>
+                          <div className="mt-4">
+                            <StatusPill tone={employee.status === "active" ? "success" : "warning"}>
+                              {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+                            </StatusPill>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    {(isHRAdmin || isManager || isOwnProfile) && (
+                  </CardBody>
+                </Card>
+
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading title="Reporting Line & Unit" description="Managerial hierarchy and supervisor assignment" />
+                      <button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="btn-neutral btn-sm"
+                        style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
+                      >
+                        <Edit2 size={12} />
+                        <span>Edit Manager</span>
+                      </button>
+                    </div>
+                    <Detail label="Direct Manager" value={employee.manager || "No manager assigned"} />
+                    <Detail label="Department" value={employee.department} />
+                    <Detail label="Division" value={employee.division || "Standard Operations"} />
+                  </CardBody>
+                </Card>
+
+                <Card>
+                  <CardBody>
+                    <SectionHeading title="Standard Schedule & Policy Terms" description="Agreed work calendar and overtime rules" />
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+                      <Detail label="Work Schedule" value="Standard 40 hrs/week (8 hrs/day)" />
+                      <Detail label="Standard Monthly Hours" value="173.33 hours" />
+                      <Detail label="Overtime Policy" value="1.5× Regular Hourly Rate" />
+                      <Detail label="Holiday Policy" value="2.0× Rest Day Multiplier" />
+                    </div>
+                  </CardBody>
+                </Card>
+              </>
+            )}
+
+            {/* TAB: PAY INFO */}
+            {activeTab === "Pay Info" && (
+              <>
+                {/* Contracted Compensation Model Card */}
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <div>
+                        <SectionHeading
+                          title="Contracted Compensation Model"
+                          description="Baseline rate, pay cycle, and overtime terms configured in payroll"
+                        />
+                      </div>
+                      <Link
+                        href="/payroll"
+                        className="btn-neutral btn-sm"
+                        style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
+                      >
+                        <Receipt size={13} />
+                        <span>Manage in Payroll Engine</span>
+                      </Link>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#FAF9F7",
+                        borderRadius: 12,
+                        border: "1px solid var(--card-border, #E4E4E7)",
+                        padding: "18px 20px",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(4, 1fr)",
+                        gap: 16,
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontSize: 11.5, color: "var(--text-3)", display: "block" }}>Compensation Model</span>
+                        <Badge variant={empComp.compensationModel === "hourly" ? "warning" : "neutral"}>
+                          {empComp.compensationModel === "hourly" ? "HOURLY" : "SALARIED"}
+                        </Badge>
+                        <div style={{ fontSize: 11, color: "var(--text-4)", marginTop: 4 }}>
+                          {empComp.compensationModel === "hourly" ? "Pay rate × Productive hours" : "Fixed Monthly Base Salary"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: 11.5, color: "var(--text-3)", display: "block" }}>Contracted Base Amount</span>
+                        <strong style={{ fontSize: 17, color: "var(--text-1)" }}>
+                          {formatMoney(empComp.baseSalary || 2000000, empComp.currency || "UGX")}
+                        </strong>
+                        <div style={{ fontSize: 11, color: "var(--text-4)", marginTop: 4 }}>
+                          {empComp.compensationModel === "hourly" ? "Per hour worked" : "Per calendar month"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: 11.5, color: "var(--text-3)", display: "block" }}>Standard Monthly Hours</span>
+                        <strong style={{ fontSize: 17, color: "var(--text-1)" }}>173.33 hrs</strong>
+                        <div style={{ fontSize: 11, color: "var(--text-4)", marginTop: 4 }}>Contracted baseline</div>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: 11.5, color: "var(--text-3)", display: "block" }}>Payroll Jurisdiction</span>
+                        <strong style={{ fontSize: 17, color: "var(--primary)" }}>Uganda (UGX)</strong>
+                        <div style={{ fontSize: 11, color: "var(--text-4)", marginTop: 4 }}>PAYE &amp; NSSF compliant</div>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+
+                {/* Disbursement & Payment Method Card */}
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading
+                        title="Disbursement & Payment Method"
+                        description="Designated compensation payout account where wages are transferred"
+                      />
                       <button
                         type="button"
                         onClick={() => setIsPaymentModalOpen(true)}
-                        className="btn-primary btn-sm"
+                        className="btn-neutral btn-sm"
                         style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 8 }}
                       >
-                        <Plus size={13} />
-                        <span>Add Payment Method</span>
+                        <CreditCard size={13} />
+                        <span>{employee.paymentMethod || employee.bankName || employee.mobileMoneyProvider ? "Edit Payment Method" : "Add Payment Method"}</span>
                       </button>
-                    )}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
+                    </div>
 
-            {/* Payroll Compensation, Formula & Payslips (HR Access) */}
-            <Card>
-              <CardBody>
-                <div className="row-between mb-16 align-center">
-                  <SectionHeading
-                    title="Compensation & Payslips"
-                    description={`Contracted model: ${empComp.compensationModel.toUpperCase()} · ${empComp.currency || 'UGX'}`}
-                  />
-                  <div className="row gap-8">
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      onClick={() => setIsBonusPenaltyModalOpen(true)}
-                      style={{ fontSize: 12 }}
-                    >
-                      <Plus size={13} className="mr-4" /> Add Bonus / Penalty
-                    </button>
+                    {employee.paymentMethod || employee.mobileMoneyProvider || employee.bankName ? (
+                      <div className="col gap-12">
+                        <DataRow
+                          leading={
+                            employee.paymentMethod === "Mobile Money" ? (
+                              <Smartphone size={20} color="var(--primary)" />
+                            ) : employee.paymentMethod === "PayPal / Digital Wallet" ? (
+                              <Wallet size={20} color="var(--primary)" />
+                            ) : (
+                              <DollarSign size={20} color="var(--primary)" />
+                            )
+                          }
+                          title={
+                            employee.paymentMethod === "Mobile Money"
+                              ? `${employee.mobileMoneyProvider || "Mobile Money"} (${employee.mobileMoneyPhone || "Phone registered"})`
+                              : employee.paymentMethod === "PayPal / Digital Wallet"
+                              ? `PayPal: ${employee.walletEmail || "Wallet on file"}`
+                              : employee.bankName
+                              ? `${employee.bankName}${employee.bankAccountNumber ? ` · ····${employee.bankAccountNumber.slice(-4)}` : ""}`
+                              : employee.paymentMethod || "Direct Deposit"
+                          }
+                          subtitle={employee.paymentMethod || "Official Disbursement Channel"}
+                          meta={<StatusPill tone="success">Active Disbursement</StatusPill>}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          background: "#F8FAFC",
+                          borderRadius: 10,
+                          border: "1px dashed #CBD5E1",
+                          padding: "20px 24px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 16,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>
+                            No disbursement payout method configured yet
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                            Set up a bank account (direct deposit), mobile money (MTN / Airtel), or PayPal wallet for automatic payroll payout.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsPaymentModalOpen(true)}
+                          className="btn-primary btn-sm"
+                          style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
+                        >
+                          <Plus size={13} />
+                          <span>Add Payment Method</span>
+                        </button>
+                      </div>
+                    )}
+                  </CardBody>
+                </Card>
+
+                {/* One-time Bonuses & Penalties */}
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading
+                        title="One-time Bonuses &amp; Penalties"
+                        description="Performance additions, shift bonuses, and authorized deductions"
+                      />
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setIsBonusPenaltyModalOpen(true)}
+                        style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
+                      >
+                        <Plus size={13} />
+                        <span>Add Bonus / Penalty</span>
+                      </button>
+                    </div>
+
+                    <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: 8 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 640 }}>
+                        <thead style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#64748B", textAlign: "left", fontSize: 11.5 }}>
+                          <tr>
+                            <th style={{ padding: "10px 14px" }}>Type</th>
+                            <th style={{ padding: "10px 14px" }}>Category</th>
+                            <th style={{ padding: "10px 14px" }}>Amount</th>
+                            <th style={{ padding: "10px 14px" }}>Month</th>
+                            <th style={{ padding: "10px 14px" }}>Reason</th>
+                            <th style={{ padding: "10px 14px" }}>Status</th>
+                            <th style={{ padding: "10px 14px", textAlign: "right" }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {employeeBonusesPenalties.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} style={{ padding: "24px 14px", textAlign: "center", color: "#94A3B8" }}>
+                                No one-time adjustments recorded for this employee.
+                              </td>
+                            </tr>
+                          ) : (
+                            employeeBonusesPenalties.map((item) => (
+                              <tr key={item.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                                <td style={{ padding: "10px 14px" }}>
+                                  <span style={{
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    background: item.type === "bonus" ? "#DCFCE7" : "#FEE2E2",
+                                    color: item.type === "bonus" ? "#166534" : "#991B1B",
+                                    textTransform: "uppercase",
+                                  }}>
+                                    {item.type}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "10px 14px", fontWeight: 600 }}>{item.category}</td>
+                                <td style={{ padding: "10px 14px", fontWeight: 700, color: item.type === "bonus" ? "#16A34A" : "#DC2626" }}>
+                                  {item.type === "bonus" ? "+" : "-"}{formatMoney(item.amount, item.currency)}
+                                </td>
+                                <td style={{ padding: "10px 14px" }}>{getMonthName(item.periodMonth)} {item.periodYear}</td>
+                                <td style={{ padding: "10px 14px", color: "var(--text-3)", maxWidth: 180 }}>{item.reason || "—"}</td>
+                                <td style={{ padding: "10px 14px" }}>
+                                  <StatusPill tone={item.status === "approved" ? "success" : item.status === "pending" ? "warning" : "neutral"}>
+                                    {item.status.toUpperCase()}
+                                  </StatusPill>
+                                </td>
+                                <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                                  <div style={{ display: "inline-flex", gap: 4 }}>
+                                    {item.status === "pending" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateBonusPenaltyStatus(item.id, "approved")}
+                                        className="btn-neutral btn-sm"
+                                        style={{ padding: "2px 6px", fontSize: 10.5, color: "#16A34A" }}
+                                      >
+                                        Approve
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteBonusPenalty(item.id)}
+                                      className="btn-neutral btn-sm"
+                                      style={{ padding: "2px 6px", fontSize: 10.5, color: "#DC2626" }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardBody>
+                </Card>
+              </>
+            )}
+
+            {/* TAB: PAYSLIPS */}
+            {activeTab === "Payslips" && (
+              <Card>
+                <CardBody>
+                  <div className="row-between mb-16 align-center">
+                    <SectionHeading
+                      title="Historical Pay Statements &amp; Payslips"
+                      description={`Certified monthly payroll statements for ${fullName}`}
+                    />
                     <Link
                       href="/payroll"
                       className="btn-neutral btn-sm"
-                      style={{ fontSize: 12, textDecoration: "none" }}
+                      style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
                     >
-                      <Receipt size={13} className="mr-4" /> Payroll Engine
+                      <Receipt size={13} />
+                      <span>Payroll Runs Archive</span>
                     </Link>
                   </div>
-                </div>
 
-                {/* Calculation Formula Card */}
-                <div
-                  style={{
-                    background: "#FAFBFB",
-                    borderRadius: 10,
-                    border: "1px solid #E2E8F0",
-                    padding: "14px 18px",
-                    marginBottom: 20,
-                    fontSize: 12.5,
-                    lineHeight: 1.7,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <Calculator size={14} style={{ color: "#475569" }} />
-                    <strong style={{ fontSize: 13, color: "var(--text-1)" }}>Active Calculation Formula</strong>
-                  </div>
-                  <div style={{ color: "#1E293B", fontWeight: 600, marginBottom: 4 }}>
-                    {empComp.compensationModel.toUpperCase()} compensation: Total monthly compensation=
-                    {empComp.compensationModel === "hourly"
-                      ? "Pay rate * Productive hours"
-                      : empComp.compensationModel === "monthly_salary"
-                      ? "Fixed monthly salary"
-                      : empComp.compensationModel === "daily"
-                      ? "Daily rate * Eligible payable days"
-                      : empComp.compensationModel === "overtime_based"
-                      ? "Pay rate * Regular Productive hours + Overtime pay"
-                      : "Base Retainer + Commission rules"}
-                  </div>
-                  <div style={{ color: "#475569", marginBottom: 4 }}>
-                    Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
-                  </div>
-                  <div style={{ color: "#64748B", fontSize: 11.5 }}>
-                    Total Bonuses and Total Penalties = please see details in Job section &gt; One time Bonuses &amp; Penalties table.
-                  </div>
-                </div>
-
-                {/* Compensation Details Table */}
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 10 }}>
-                    Compensation Details
-                  </div>
                   <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 700 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 720 }}>
                       <thead style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#64748B", textAlign: "left", fontSize: 11.5 }}>
                         <tr>
-                          <th style={{ padding: "10px 14px" }}>Month</th>
-                          <th style={{ padding: "10px 14px" }}>Year</th>
-                          <th style={{ padding: "10px 14px" }}>Productive %</th>
-                          <th style={{ padding: "10px 14px" }}>Rate</th>
-                          <th style={{ padding: "10px 14px" }}>Gross</th>
-                          <th style={{ padding: "10px 14px" }}>Deductions</th>
-                          <th style={{ padding: "10px 14px" }}>Net Pay</th>
-                          <th style={{ padding: "10px 14px", textAlign: "right" }}>Actions</th>
+                          <th style={{ padding: "12px 16px" }}>Pay Period</th>
+                          <th style={{ padding: "12px 14px" }}>Productive %</th>
+                          <th style={{ padding: "12px 14px" }}>Rate</th>
+                          <th style={{ padding: "12px 14px" }}>Gross Pay</th>
+                          <th style={{ padding: "12px 14px" }}>Deductions</th>
+                          <th style={{ padding: "12px 14px" }}>Net Disbursed</th>
+                          <th style={{ padding: "12px 14px" }}>Status</th>
+                          <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {compensationRows.map((row) => (
                           <tr key={`${row.periodYear}-${row.periodMonth}`} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                            <td style={{ padding: "10px 14px", fontWeight: 600 }}>{getMonthName(row.periodMonth)}</td>
-                            <td style={{ padding: "10px 14px", color: "var(--text-2)" }}>{row.periodYear}</td>
-                            <td style={{ padding: "10px 14px", color: "#0F766E", fontWeight: 600 }}>
+                            <td style={{ padding: "12px 16px", fontWeight: 700, color: "var(--text-1)" }}>
+                              {getMonthName(row.periodMonth)} {row.periodYear}
+                            </td>
+                            <td style={{ padding: "12px 14px", color: "#0F766E", fontWeight: 600 }}>
                               {row.productiveHoursPercent}% ({row.productiveHours}h)
                             </td>
-                            <td style={{ padding: "10px 14px" }}>{row.payRateDisplay}</td>
-                            <td style={{ padding: "10px 14px", fontWeight: 600 }}>{formatMoney(row.grossPay, row.currency)}</td>
-                            <td style={{ padding: "10px 14px", color: "#DC2626" }}>-{formatMoney(row.employeeDeductions, row.currency)}</td>
-                            <td style={{ padding: "10px 14px", fontWeight: 700, color: "#16A34A" }}>{formatMoney(row.netPay, row.currency)}</td>
-                            <td style={{ padding: "10px 14px", textAlign: "right" }}>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedPayslipModal(row)}
-                                className="btn-neutral btn-sm"
-                                style={{ fontSize: 11, padding: "4px 8px" }}
-                              >
-                                <Eye size={11} className="mr-4" /> View Payslip
-                              </button>
+                            <td style={{ padding: "12px 14px" }}>{row.payRateDisplay}</td>
+                            <td style={{ padding: "12px 14px", fontWeight: 600 }}>
+                              {formatMoney(row.grossPay, row.currency)}
+                            </td>
+                            <td style={{ padding: "12px 14px", color: "#DC2626", fontWeight: 600 }}>
+                              -{formatMoney(row.employeeDeductions, row.currency)}
+                            </td>
+                            <td style={{ padding: "12px 14px", fontWeight: 800, color: "#16A34A" }}>
+                              {formatMoney(row.netPay, row.currency)}
+                            </td>
+                            <td style={{ padding: "12px 14px" }}>
+                              <StatusPill tone="success">Paid &amp; Finalized</StatusPill>
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                              <div style={{ display: "inline-flex", gap: 6 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPayslipModal(row)}
+                                  className="btn-neutral btn-sm"
+                                  style={{ fontSize: 11.5 }}
+                                >
+                                  <Eye size={12} className="mr-4" /> View
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPayslipModal(row);
+                                    setTimeout(() => window.print(), 300);
+                                  }}
+                                  className="btn-neutral btn-sm"
+                                  style={{ fontSize: 11.5 }}
+                                >
+                                  <Printer size={12} className="mr-4" /> Print
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </CardBody>
+              </Card>
+            )}
 
-                {/* One-time Bonuses & Penalties Table */}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 10 }}>
-                    One-time Bonuses &amp; Penalties (Job Section Integration)
-                  </div>
-                  <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 640 }}>
-                      <thead style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#64748B", textAlign: "left", fontSize: 11.5 }}>
-                        <tr>
-                          <th style={{ padding: "10px 14px" }}>Type</th>
-                          <th style={{ padding: "10px 14px" }}>Category</th>
-                          <th style={{ padding: "10px 14px" }}>Amount</th>
-                          <th style={{ padding: "10px 14px" }}>Month</th>
-                          <th style={{ padding: "10px 14px" }}>Reason</th>
-                          <th style={{ padding: "10px 14px" }}>Status</th>
-                          <th style={{ padding: "10px 14px", textAlign: "right" }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {employeeBonusesPenalties.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} style={{ padding: "20px 14px", textAlign: "center", color: "#94A3B8" }}>
-                              No one-time adjustments recorded for this employee.
-                            </td>
-                          </tr>
-                        ) : (
-                          employeeBonusesPenalties.map((item) => (
-                            <tr key={item.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                              <td style={{ padding: "10px 14px" }}>
-                                <span style={{
-                                  padding: "2px 6px",
-                                  borderRadius: 4,
-                                  fontSize: 10.5,
-                                  fontWeight: 700,
-                                  background: item.type === "bonus" ? "#DCFCE7" : "#FEE2E2",
-                                  color: item.type === "bonus" ? "#166534" : "#991B1B",
-                                  textTransform: "uppercase",
-                                }}>
-                                  {item.type}
-                                </span>
-                              </td>
-                              <td style={{ padding: "10px 14px", fontWeight: 600 }}>{item.category}</td>
-                              <td style={{ padding: "10px 14px", fontWeight: 700, color: item.type === "bonus" ? "#16A34A" : "#DC2626" }}>
-                                {item.type === "bonus" ? "+" : "-"}{formatMoney(item.amount, item.currency)}
-                              </td>
-                              <td style={{ padding: "10px 14px" }}>{getMonthName(item.periodMonth)} {item.periodYear}</td>
-                              <td style={{ padding: "10px 14px", color: "var(--text-3)", maxWidth: 180 }}>{item.reason || "—"}</td>
-                              <td style={{ padding: "10px 14px" }}>
-                                <StatusPill tone={item.status === "approved" ? "success" : item.status === "pending" ? "warning" : "neutral"}>
-                                  {item.status.toUpperCase()}
-                                </StatusPill>
-                              </td>
-                              <td style={{ padding: "10px 14px", textAlign: "right" }}>
-                                <div style={{ display: "inline-flex", gap: 4 }}>
-                                  {item.status === "pending" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => updateBonusPenaltyStatus(item.id, "approved")}
-                                      className="btn-neutral btn-sm"
-                                      style={{ padding: "2px 6px", fontSize: 10.5, color: "#16A34A" }}
-                                    >
-                                      Approve
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteBonusPenalty(item.id)}
-                                    className="btn-neutral btn-sm"
-                                    style={{ padding: "2px 6px", fontSize: 10.5, color: "#DC2626" }}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            {/* Culture & Bio */}
-            {(employee.bio || employee.funFact || employee.favoriteFood || employee.favoriteMusic) && (
+            {/* TAB: DOCUMENTS */}
+            {activeTab === "Documents" && (
               <Card>
                 <CardBody>
                   <SectionHeading
-                    title="About & Culture"
-                    description="Fun facts, favorites, and profile bio"
+                    title="Compliance &amp; Verification Documents"
+                    description="Official employee documentation, signed policies, and work permits"
                   />
-                  {employee.bio && (
-                    <p style={{ fontSize: 13.5, color: "#3F3F46", lineHeight: 1.6, margin: "0 0 16px" }}>
-                      {employee.bio}
-                    </p>
-                  )}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-                    {employee.funFact && (
-                      <Detail label="Fun Fact" value={employee.funFact} />
-                    )}
-                    {employee.favoriteFood && (
-                      <Detail label="Favorite Food" value={employee.favoriteFood} />
-                    )}
-                    {employee.favoriteMusic && (
-                      <Detail label="Favorite Music" value={employee.favoriteMusic} />
-                    )}
-                    {employee.favoriteMovies && (
-                      <Detail label="Favorite Movies" value={employee.favoriteMovies} />
-                    )}
-                    {employee.coffeeTea && (
-                      <Detail label="Beverage" value={employee.coffeeTea} />
-                    )}
-                    {employee.shirtSize && (
-                      <Detail label="Shirt Size" value={employee.shirtSize} />
-                    )}
+                  <div className="col gap-12 mt-16">
+                    <DataRow
+                      leading={<ShieldCheck size={18} color="var(--success)" />}
+                      title="Identity &amp; Employment Verification"
+                      subtitle="Primary government work authorization verified"
+                      meta={<StatusPill tone="success">Verified</StatusPill>}
+                    />
+                    <DataRow
+                      leading={<Mail size={18} color="var(--primary)" />}
+                      title="Work Email &amp; Identity Access"
+                      subtitle={employee.workEmail}
+                      meta={<StatusPill tone="success">Active</StatusPill>}
+                    />
+                    <DataRow
+                      leading={<CheckCircle2 size={18} color="#16A34A" />}
+                      title="Employee Handbook &amp; Code of Conduct"
+                      subtitle={employee.handbookSignedAt ? `Signed digitally on ${employee.handbookSignedAt}` : "Signed & stored in enterprise compliance vault"}
+                      meta={<StatusPill tone="success">Signed</StatusPill>}
+                    />
+                    <DataRow
+                      leading={<Briefcase size={18} color="var(--primary)" />}
+                      title="Employment Contract &amp; Offer Letter"
+                      subtitle={`Executed agreement for ${employee.jobTitle || 'Team Member'}`}
+                      meta={<StatusPill tone="success">Executed</StatusPill>}
+                    />
                   </div>
                 </CardBody>
               </Card>
             )}
-          </div>
 
-          {/* Sidebar */}
-          <div className="col gap-20">
-            <Card>
-              <CardBody>
-                <div className="row-between mb-16 align-center">
-                  <SectionHeading title="Contact Information" />
-                  {(isHRAdmin || isManager || isOwnProfile) && (
+            {/* TAB: TIME OFF */}
+            {activeTab === "Time Off" && (
+              <>
+                <Card>
+                  <CardBody>
+                    <SectionHeading
+                      title="Leave Balances"
+                      description="Allocated vacation, sick days, and personal leave"
+                    />
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 14 }}>
+                      <div style={{ padding: "16px 18px", borderRadius: 10, background: "#F0FDF4", border: "1px solid #BBF7D0" }}>
+                        <span style={{ fontSize: 12, color: "#166534", display: "block" }}>Annual Paid Leave</span>
+                        <strong style={{ fontSize: 20, color: "#15803D" }}>21 days</strong>
+                        <div style={{ fontSize: 11, color: "#166534", marginTop: 4 }}>3 days used of 24 allocated</div>
+                      </div>
+                      <div style={{ padding: "16px 18px", borderRadius: 10, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                        <span style={{ fontSize: 12, color: "#1E40AF", display: "block" }}>Sick Leave</span>
+                        <strong style={{ fontSize: 20, color: "#2563EB" }}>10 days</strong>
+                        <div style={{ fontSize: 11, color: "#2563EB", marginTop: 4 }}>0 days used of 10 allocated</div>
+                      </div>
+                      <div style={{ padding: "16px 18px", borderRadius: 10, background: "#FAF9F7", border: "1px solid #E4E4E7" }}>
+                        <span style={{ fontSize: 12, color: "var(--text-3)", display: "block" }}>Compassionate / Casual</span>
+                        <strong style={{ fontSize: 20, color: "var(--text-1)" }}>3 days</strong>
+                        <div style={{ fontSize: 11, color: "var(--text-4)", marginTop: 4 }}>Standard policy allowance</div>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+
+                <Card>
+                  <CardBody>
+                    <SectionHeading
+                      title="Recent Leave Requests"
+                      description="Leave request records and approval status"
+                    />
+                    <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-4)", fontSize: 12.5 }}>
+                      No recent time off requests recorded for this period.
+                    </div>
+                  </CardBody>
+                </Card>
+              </>
+            )}
+
+            {/* TAB: EMERGENCY */}
+            {activeTab === "Emergency" && (
+              <Card>
+                <CardBody>
+                  <div className="row-between mb-16 align-center">
+                    <SectionHeading
+                      title="Emergency Contacts"
+                      description="Primary and secondary emergency contacts in case of urgent incidents"
+                    />
                     <button
                       type="button"
                       onClick={() => setIsEditModalOpen(true)}
                       className="btn-neutral btn-sm"
-                      style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 7 }}
-                      title="Edit personal phone and personal email"
+                      style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
                     >
-                      <Edit2 size={11} />
-                      <span>Edit</span>
+                      <Edit2 size={12} />
+                      <span>Edit Emergency Info</span>
                     </button>
-                  )}
-                </div>
-                <div className="col gap-12">
-                  <DataRow leading={<Mail size={17} />} title={employee.workEmail} subtitle="Work email" />
-                  {employee.personalPhone && (
-                    <DataRow leading={<Phone size={17} />} title={employee.personalPhone} subtitle="Mobile" />
-                  )}
-                  {employee.personalEmail && (
-                    <DataRow leading={<Mail size={17} />} title={employee.personalEmail} subtitle="Personal email" />
-                  )}
-                  <DataRow leading={<MapPin size={17} />} title={employee.location || "Remote"} subtitle="Location" />
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardBody>
-                <div className="row-between mb-16 align-center">
-                  <SectionHeading title="Reporting Line" />
-                  {(isHRAdmin || isManager) && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditModalOpen(true)}
-                      className="btn-neutral btn-sm"
-                      style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 7 }}
-                      title="Assign or change line manager"
-                    >
-                      <Edit2 size={11} />
-                      <span>Edit</span>
-                    </button>
-                  )}
-                </div>
-                <Detail label="Manager" value={employee.manager || "No manager assigned"} />
-                <Detail label="Department" value={employee.department} />
-              </CardBody>
-            </Card>
+                  </div>
+                  <div className="col gap-12">
+                    <Detail label="Primary Contact Name" value={employee.emergencyContactName || "Not configured yet"} />
+                    <Detail label="Relationship" value={employee.emergencyContactRelationship || "Family / Next of Kin"} />
+                    <Detail label="Emergency Phone" value={employee.emergencyContactPhone || employee.personalPhone || "Not configured"} />
+                  </div>
+                </CardBody>
+              </Card>
+            )}
           </div>
         </div>
       </main>
