@@ -80,6 +80,8 @@ import { PayrollHelpModal } from "@/components/payroll/PayrollHelpModal";
 import { CompensationModal } from "@/components/payroll/CompensationModal";
 import { TaxRuleModal } from "@/components/payroll/TaxRuleModal";
 import { PaystubStatementModal } from "@/components/payroll/PaystubStatementModal";
+import { SearchableSelect, SelectOption } from "@/components/ui/SearchableSelect";
+import { CurrencySelect } from "@/components/ui/CurrencySelect";
 
 const TABS = ["Overview", "Run Payroll", "Salaries", "Deductions & Rules", "Paystubs", "Settings"];
 
@@ -362,6 +364,22 @@ export default function PayrollPage() {
   const activeHolidayMultiplier = useMemo(() => {
     return activeConfig?.holidayMultiplier || settings.holidayRateMultiplier || 2.0;
   }, [activeConfig, settings]);
+
+  const countrySelectOptions: SelectOption[] = useMemo(() => {
+    return COUNTRY_OPTIONS.map((c) => ({
+      value: c.code,
+      label: `${c.name} (${c.code})`,
+      description: `Default currency: ${c.currency}`,
+      rightBadge: c.currency,
+    }));
+  }, []);
+
+  const deptFilterOptions: SelectOption[] = useMemo(() => {
+    return [
+      { value: "all", label: "All Departments" },
+      ...departments.map((d) => ({ value: d.id, label: d.name })),
+    ];
+  }, [departments]);
 
   // Synchronize dynamic hours from Clock-in and Timesheet submissions into active payroll run
   const syncClockInHours = useCallback(
@@ -1780,19 +1798,15 @@ export default function PayrollPage() {
             />
           </div>
 
-          <select
-            className="select"
-            style={{ width: 180, fontSize: 12.5 }}
+          <SearchableSelect
+            size="sm"
+            style={{ width: 190 }}
+            options={deptFilterOptions}
             value={salaryDeptFilter}
-            onChange={(e) => setSalaryDeptFilter(e.target.value)}
-          >
-            <option value="all">All Departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setSalaryDeptFilter(val)}
+            placeholder="All Departments"
+            searchPlaceholder="Filter department..."
+          />
         </div>
 
         {/* Roster Table */}
@@ -2125,18 +2139,19 @@ export default function PayrollPage() {
             <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-4)", textTransform: "uppercase" }}>
               Pay Run:
             </label>
-            <select
-              className="select"
-              style={{ width: 220, fontSize: 12.5 }}
+            <SearchableSelect
+              size="sm"
+              style={{ width: 230 }}
+              options={runs.map((r) => ({
+                value: r.id,
+                label: `${monthLabel(r.periodStart)} (${r.status.toUpperCase()})`,
+                description: `${shortDate(r.periodStart)} to ${shortDate(r.periodEnd)}`,
+              }))}
               value={selectedRunIdForPayslips}
-              onChange={(e) => setSelectedRunIdForPayslips(e.target.value)}
-            >
-              {runs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {monthLabel(r.periodStart)} ({r.status.toUpperCase()})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedRunIdForPayslips(val)}
+              placeholder="Select pay run..."
+              searchPlaceholder="Search pay run..."
+            />
           </div>
 
           <div style={{ position: "relative", minWidth: 260 }}>
@@ -2284,36 +2299,27 @@ export default function PayrollPage() {
                   <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
                     Primary Country
                   </label>
-                  <select
-                    className="select"
+                  <SearchableSelect
+                    options={countrySelectOptions}
                     value={configCountry}
-                    onChange={(e) => {
-                      const code = e.target.value;
+                    onChange={(code) => {
                       setConfigCountry(code);
                       if (COUNTRY_CURRENCIES[code]) {
                         setConfigCurrency(COUNTRY_CURRENCIES[code]);
                       }
                     }}
-                  >
-                    {COUNTRY_OPTIONS.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name} ({c.code}) · {c.currency}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select primary country..."
+                    searchPlaceholder="Search country name or code..."
+                  />
                 </div>
 
                 <div>
                   <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
-                    Disbursement Currency (3 Letters)
+                    Disbursement Currency
                   </label>
-                  <input
-                    type="text"
-                    maxLength={3}
-                    className="input"
+                  <CurrencySelect
                     value={configCurrency}
-                    onChange={(e) => setConfigCurrency(e.target.value.toUpperCase())}
-                    required
+                    onChange={(val) => setConfigCurrency(val)}
                   />
                 </div>
               </div>

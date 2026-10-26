@@ -154,14 +154,25 @@ export const CURRENCIES = [
 interface CurrencySelectProps {
   value: string;
   onChange: (val: string) => void;
+  style?: React.CSSProperties;
+  className?: string;
+  disabled?: boolean;
+  size?: 'sm' | 'md';
 }
 
-export function CurrencySelect({ value, onChange }: CurrencySelectProps) {
+export function CurrencySelect({ 
+  value, 
+  onChange,
+  style,
+  className = '',
+  disabled = false,
+  size = 'md',
+}: CurrencySelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedCurrency = CURRENCIES.find(c => c.code === value) || CURRENCIES[0];
+  const selectedCurrency = CURRENCIES.find(c => c.code === value) || CURRENCIES.find(c => c.code === 'UGX') || CURRENCIES[0];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -178,90 +189,107 @@ export function CurrencySelect({ value, onChange }: CurrencySelectProps) {
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const isSmall = size === 'sm';
+
   return (
-    <div className="relative" ref={containerRef} style={{ width: '100%', position: 'relative' }}>
+    <div className={`relative ${className}`} ref={containerRef} style={{ width: '100%', position: 'relative', ...style }}>
       {/* Trigger Button */}
       <button 
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         style={{ 
-          width: '100%', cursor: 'pointer', background: 'white', 
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8
+          width: '100%', 
+          cursor: disabled ? 'not-allowed' : 'pointer', 
+          background: disabled ? '#F9FAFB' : 'white', 
+          opacity: disabled ? 0.6 : 1,
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          padding: isSmall ? '6px 10px' : '9px 12px', 
+          border: isOpen ? '1px solid var(--primary, #2563EB)' : '1px solid var(--border, #E5E7EB)', 
+          boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.12)' : 'none',
+          borderRadius: 8,
+          transition: 'border-color 0.15s, box-shadow 0.15s',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>{selectedCurrency.flag}</span>
-          <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{selectedCurrency.code}</span>
-          <span style={{ fontSize: 14, color: 'var(--text-4)' }}>({selectedCurrency.symbol})</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: isSmall ? 15 : 18 }}>{selectedCurrency.flag}</span>
+          <span style={{ fontWeight: 650, color: 'var(--text-1, #111827)', fontSize: isSmall ? 13 : 14 }}>{selectedCurrency.code}</span>
+          <span style={{ fontSize: isSmall ? 12 : 13, color: 'var(--text-4, #9CA3AF)' }}>({selectedCurrency.symbol})</span>
         </div>
-        <ChevronDown size={16} color="var(--text-4)" />
+        <ChevronDown size={isSmall ? 14 : 16} color="var(--text-4, #9CA3AF)" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
       </button>
 
       {/* Dropdown Popup */}
       {isOpen && (
         <div 
           style={{ 
-            position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 9999, 
-            background: 'white', borderRadius: 12, 
-            boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-            border: '1px solid var(--border)',
-            display: 'flex', flexDirection: 'column'
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 9999, 
+            background: 'white', borderRadius: 10, 
+            boxShadow: '0 12px 36px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.04)',
+            border: '1px solid var(--border, #E5E7EB)',
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 240,
           }}
         >
           {/* Search Input */}
-          <div style={{ padding: 12, borderBottom: '1px solid var(--border)', background: '#F9FAFB', display: 'flex', alignItems: 'center', gap: 8, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-            <Search size={16} color="var(--text-4)" />
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border, #E5E7EB)', background: '#F9FAFB', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Search size={14} color="var(--text-4, #9CA3AF)" />
             <input 
               autoFocus
               type="text" 
-              placeholder="Search currency..." 
+              placeholder="Search currency code or country..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: 14 }}
+              style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: 13, color: 'var(--text-1, #111827)' }}
             />
           </div>
 
           {/* List */}
-          <div style={{ maxHeight: 240, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ maxHeight: 220, overflowY: 'auto', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-4)', fontSize: 14 }}>No currencies found.</div>
+              <div style={{ padding: 14, textAlign: 'center', color: 'var(--text-4, #9CA3AF)', fontSize: 13 }}>No currencies found.</div>
             ) : (
-              filtered.map(c => (
-                <button
-                  key={c.code}
-                  type="button"
-                  onClick={() => {
-                    onChange(c.code);
-                    setIsOpen(false);
-                    setSearch('');
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: 12, textAlign: 'left',
-                    border: 'none',
-                    background: value === c.code ? 'var(--primary-light, #F3E8FD)' : 'transparent',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (value !== c.code) e.currentTarget.style.background = '#F3F4F6';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (value !== c.code) e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: 20, minWidth: 24, textAlign: 'center' }}>{c.flag}</span>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text-1)', fontSize: 14 }}>{c.code}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{c.symbol}</span>
+              filtered.map(c => {
+                const isSelected = value === c.code;
+                return (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => {
+                      onChange(c.code);
+                      setIsOpen(false);
+                      setSearch('');
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', textAlign: 'left',
+                      border: 'none',
+                      background: isSelected ? 'var(--primary-light, #EFF6FF)' : 'transparent',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <span style={{ fontSize: 18, minWidth: 22, textAlign: 'center' }}>{c.flag}</span>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontWeight: 650, color: isSelected ? 'var(--primary, #2563EB)' : 'var(--text-1, #111827)', fontSize: 13 }}>{c.code}</span>
+                        <span style={{ fontSize: 11.5, color: 'var(--text-4, #9CA3AF)' }}>{c.symbol}</span>
+                      </div>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-3, #6B7280)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
                     </div>
-                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.name}</span>
-                  </div>
-                  {value === c.code && <Check size={16} color="var(--primary, #9334E6)" />}
-                </button>
-              ))
+                    {isSelected && <Check size={15} color="var(--primary, #2563EB)" />}
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

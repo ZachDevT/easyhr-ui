@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { DollarSign, Clock, Calendar, Info, Loader2 } from "lucide-react";
+import { SearchableSelect, SelectOption } from "@/components/ui/SearchableSelect";
 import { PayrollEmployee, toMinor, formatMoney } from "./payrollModel";
 
 interface CompensationModalProps {
@@ -46,6 +47,16 @@ export function CompensationModal({
   const [reason, setReason] = useState("Regular base compensation");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const employeeOptions = useMemo<SelectOption[]>(() => {
+    return employees.map((emp) => ({
+      value: emp.id,
+      label: `${emp.firstName} ${emp.lastName}`.trim(),
+      description: [emp.jobTitle, emp.department].filter(Boolean).join(" · "),
+      avatar: true,
+      rightBadge: (emp as any).employeeNumber || emp.jobTitle || undefined,
+    }));
+  }, [employees]);
 
   // Live calculation of estimated monthly base
   const calculatedMonthlyTotalMinor = useMemo(() => {
@@ -139,21 +150,13 @@ export function CompensationModal({
           <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
             Employee <span style={{ color: "#DC2626" }}>*</span>
           </label>
-          <select
-            className="select"
+          <SearchableSelect
+            options={employeeOptions}
             value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Select employee...
-            </option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.firstName} {emp.lastName} {emp.jobTitle ? `(${emp.jobTitle})` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setEmployeeId(val)}
+            placeholder="Select an employee..."
+            searchPlaceholder="Search employee by name, department, or job title..."
+          />
         </div>
 
         {/* Pay Model Selection */}

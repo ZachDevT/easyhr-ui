@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { SearchableSelect, SelectOption } from "@/components/ui/SearchableSelect";
 import { Plus, Trash2, Sparkles, Loader2, Info, TrendingUp, ShieldCheck, HeartPulse, Percent, DollarSign, Layers } from "lucide-react";
 import { TaxBand, toMinor, toMajor, formatMoney, Department, Position } from "./payrollModel";
 
@@ -43,6 +44,28 @@ export function TaxRuleModal({
   const [appliesToId, setAppliesToId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const appliesToOptions: SelectOption[] = useMemo(() => [
+    { value: "all_employees", label: "All Employees in Company", description: "Rule applies company-wide across all staff" },
+    { value: "department", label: "Specific Department", description: "Rule restricted to employees within a designated department" },
+    { value: "position", label: "Specific Position", description: "Rule restricted to employees holding a specific job title" },
+  ], []);
+
+  const departmentOptions: SelectOption[] = useMemo(() => {
+    return departments.map((d) => ({
+      value: d.id,
+      label: d.name,
+      description: (d as any).description || "Department",
+    }));
+  }, [departments]);
+
+  const positionOptions: SelectOption[] = useMemo(() => {
+    return positions.map((p) => ({
+      value: p.id,
+      label: p.title,
+      description: p.departmentName ? `Department: ${p.departmentName}` : undefined,
+    }));
+  }, [positions]);
 
   // Progressive tax bands
   const [bands, setBands] = useState<Array<{ upTo: string; rate: string }>>([
@@ -470,18 +493,15 @@ export function TaxRuleModal({
             <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
               Applies To
             </label>
-            <select
-              className="select"
+            <SearchableSelect
+              options={appliesToOptions}
               value={appliesTo}
-              onChange={(e) => {
-                setAppliesTo(e.target.value as any);
+              onChange={(val) => {
+                setAppliesTo(val as any);
                 setAppliesToId("");
               }}
-            >
-              <option value="all_employees">All Employees in Company</option>
-              <option value="department">Specific Department</option>
-              <option value="position">Specific Position</option>
-            </select>
+              placeholder="Select scope..."
+            />
           </div>
 
           {appliesTo === "department" && (
@@ -489,19 +509,13 @@ export function TaxRuleModal({
               <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
                 Select Department <span style={{ color: "#DC2626" }}>*</span>
               </label>
-              <select
-                className="select"
+              <SearchableSelect
+                options={departmentOptions}
                 value={appliesToId}
-                onChange={(e) => setAppliesToId(e.target.value)}
-                required
-              >
-                <option value="">Choose department...</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setAppliesToId(val)}
+                placeholder="Choose department..."
+                searchPlaceholder="Search department..."
+              />
             </div>
           )}
 
@@ -510,19 +524,13 @@ export function TaxRuleModal({
               <label className="form-label" style={{ display: "block", marginBottom: 6 }}>
                 Select Position <span style={{ color: "#DC2626" }}>*</span>
               </label>
-              <select
-                className="select"
+              <SearchableSelect
+                options={positionOptions}
                 value={appliesToId}
-                onChange={(e) => setAppliesToId(e.target.value)}
-                required
-              >
-                <option value="">Choose position...</option>
-                {positions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} ({p.departmentName})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setAppliesToId(val)}
+                placeholder="Choose position..."
+                searchPlaceholder="Search position..."
+              />
             </div>
           )}
         </div>

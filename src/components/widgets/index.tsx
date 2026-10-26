@@ -38,6 +38,7 @@ import {
   Mail,
   User,
   Calendar,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
@@ -48,6 +49,7 @@ import { Badge } from '../ui/Badge';
 import { Card, CardHeader, CardBody } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { SearchableSelect, SelectOption } from '../ui/SearchableSelect';
 import { toast } from '../ui/Toast';
 import { Textarea } from '../ui/Textarea';
 import { DatePicker } from '../ui/DatePicker';
@@ -100,6 +102,7 @@ export function CompulsoryMyTimeWidget() {
   const [activities, setActivities] = useState<ActivityItem[]>(DEFAULT_ACTIVITIES);
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem>(DEFAULT_ACTIVITIES[0]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activitySearch, setActivitySearch] = useState('');
   const [manageActivitiesOpen, setManageActivitiesOpen] = useState(false);
   const [newActivityName, setNewActivityName] = useState('');
   const [newActivityBillable, setNewActivityBillable] = useState(true);
@@ -634,15 +637,34 @@ export function CompulsoryMyTimeWidget() {
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
                     color: 'var(--text-5)',
-                    background: 'var(--primary-tint, #f8f7ff)',
+                    background: '#F9FAFB',
                     borderBottom: '1px solid var(--card-border)',
                   }}
                 >
                   Select Punch Activity
                 </div>
 
+                {/* Search Bar */}
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--card-border)', background: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Search size={14} color="var(--text-4, #9CA3AF)" />
+                  <input
+                    type="text"
+                    placeholder="Search activity..."
+                    value={activitySearch}
+                    onChange={(e) => setActivitySearch(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: 13, color: 'var(--text-1)' }}
+                  />
+                  {activitySearch && (
+                    <button type="button" onClick={() => setActivitySearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      <X size={13} color="var(--text-4)" />
+                    </button>
+                  )}
+                </div>
+
                 <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                  {activities.map((act) => {
+                  {activities
+                    .filter((act) => act.name.toLowerCase().includes(activitySearch.toLowerCase()))
+                    .map((act) => {
                     const isSelected =
                       selectedActivity.name.toLowerCase() === act.name.toLowerCase();
                     return (
@@ -991,17 +1013,19 @@ export function CompulsoryMyTimeWidget() {
             </div>
           </div>
           <div>
-            <label className="form-label">Activity</label>
-            <Select
+            <label className="form-label" style={{ display: 'block', marginBottom: 6 }}>Activity</label>
+            <SearchableSelect
+              options={activities.map((a) => ({
+                value: a.name,
+                label: a.name,
+                description: a.isBillable ? 'Billable work' : 'Non-billable time',
+                rightBadge: a.isBillable ? 'Billable' : 'Non-billable',
+              }))}
               value={manualActivityName}
-              onChange={(e) => setManualActivityName(e.target.value)}
-            >
-              {activities.map((a) => (
-                <option key={a.name} value={a.name}>
-                  {a.name} ({a.isBillable ? 'Billable' : 'Non-billable'})
-                </option>
-              ))}
-            </Select>
+              onChange={(val) => setManualActivityName(val)}
+              placeholder="Select activity..."
+              searchPlaceholder="Search activity..."
+            />
           </div>
           <div>
             <label className="form-label">Note (Optional)</label>
@@ -1131,6 +1155,23 @@ export function CompulsoryTimeOffWidget() {
   const [formEndDate, setFormEndDate] = useState('');
   const [formHours, setFormHours] = useState(8);
   const [formReason, setFormReason] = useState('');
+
+  const leaveTypeOptions: SelectOption[] = useMemo(() => {
+    if (leaveTypes.length === 0) {
+      return [{ value: "", label: "General Time Off", description: "Standard allowance" }];
+    }
+    return leaveTypes.map((t) => {
+      const bal = balances.find((b) => b.leaveTypeId === t.id);
+      return {
+        value: t.id,
+        label: t.name,
+        description: bal
+          ? `${bal.availableHours}h (${Math.round((bal.availableHours / 8) * 10) / 10} day(s)) available`
+          : "Standard allowance",
+        rightBadge: bal ? `${bal.availableHours}h` : undefined,
+      };
+    });
+  }, [leaveTypes, balances]);
 
   const loadLeaveData = useCallback(async () => {
     if (!isSignedIn) return;
@@ -1268,23 +1309,14 @@ export function CompulsoryTimeOffWidget() {
       >
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label className="form-label">Leave Type *</label>
-            <select
-              className="select w-full"
+            <label className="form-label" style={{ display: 'block', marginBottom: 6 }}>Leave Type *</label>
+            <SearchableSelect
+              options={leaveTypeOptions}
               value={formType}
-              onChange={(e) => setFormType(e.target.value)}
-              required
-            >
-              {leaveTypes.length === 0 && <option value="">General Time Off</option>}
-              {leaveTypes.map((t) => {
-                const bal = balances.find((b) => b.leaveTypeId === t.id);
-                return (
-                  <option key={t.id} value={t.id}>
-                    {t.name} {bal ? `(${bal.availableHours}h available)` : ''}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={(val) => setFormType(val)}
+              placeholder="Select leave type..."
+              searchPlaceholder="Search leave type..."
+            />
           </div>
 
           <div>

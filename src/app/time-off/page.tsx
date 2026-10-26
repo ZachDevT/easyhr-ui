@@ -33,6 +33,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { SearchableSelect, SelectOption } from "@/components/ui/SearchableSelect";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -1794,24 +1795,21 @@ export default function TimeOffPage() {
         <form onSubmit={handleSubmitRequest} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label className="form-label">Leave Type *</label>
-            <select
-              value={requestForm.leaveTypeId}
-              onChange={(e) => setRequestForm({ ...requestForm, leaveTypeId: e.target.value })}
-              className="select"
-              required
-            >
-              {leaveTypes.length === 0 && (
-                <option value="">No leave types available</option>
-              )}
-              {leaveTypes.map((t) => {
+            <SearchableSelect
+              options={leaveTypes.map((t) => {
                 const bal = balances.find((b) => b.leaveTypeId === t.id);
-                return (
-                  <option key={t.id} value={t.id}>
-                    {t.name} {bal ? `— ${bal.availableHours}h available` : ""}
-                  </option>
-                );
+                return {
+                  value: t.id,
+                  label: t.name,
+                  description: bal ? `${bal.availableHours}h (${Math.round((bal.availableHours / 8) * 10) / 10} day(s)) available` : "Standard allowance",
+                  rightBadge: bal ? `${bal.availableHours}h` : undefined,
+                };
               })}
-            </select>
+              value={requestForm.leaveTypeId}
+              onChange={(val) => setRequestForm({ ...requestForm, leaveTypeId: val })}
+              placeholder="Select leave type..."
+              searchPlaceholder="Search leave type..."
+            />
           </div>
 
           {/* Mode Toggle: Full Days vs Hours */}
@@ -2225,19 +2223,18 @@ export default function TimeOffPage() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label className="form-label">Associated Leave Type *</label>
-            <select
+            <SearchableSelect
+              options={leaveTypes.map((t) => ({
+                value: t.id,
+                label: `${t.name} (${t.code})`,
+                description: t.isPaid ? 'Paid leave benefit' : 'Unpaid leave allocation',
+                rightBadge: t.unit,
+              }))}
               value={policyForm.leaveTypeId}
-              onChange={(e) => setPolicyForm({ ...policyForm, leaveTypeId: e.target.value })}
-              className="select"
-              required
-            >
-              <option value="">— Select a leave type —</option>
-              {leaveTypes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.code})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setPolicyForm({ ...policyForm, leaveTypeId: val })}
+              placeholder="Select a leave type..."
+              searchPlaceholder="Search leave type..."
+            />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -2398,37 +2395,35 @@ export default function TimeOffPage() {
         <form onSubmit={handleManualAdjustment} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label className="form-label">Employee *</label>
-            <select
+            <SearchableSelect
+              options={allEmployees.map((emp) => ({
+                value: emp.id,
+                label: `${emp.firstName} ${emp.lastName}`.trim(),
+                description: [emp.jobTitle, emp.department].filter(Boolean).join(" · ") || emp.workEmail,
+                avatar: true,
+                rightBadge: (emp as any).employeeNumber || emp.jobTitle || undefined,
+              }))}
               value={adjustForm.employeeId}
-              onChange={(e) => setAdjustForm({ ...adjustForm, employeeId: e.target.value })}
-              className="select"
-              required
-            >
-              <option value="">— Select an employee —</option>
-              {allEmployees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.firstName} {emp.lastName}{" "}
-                  {emp.jobTitle ? `— ${emp.jobTitle}` : `(${emp.workEmail})`}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setAdjustForm({ ...adjustForm, employeeId: val })}
+              placeholder="Select an employee..."
+              searchPlaceholder="Search employee by name, department, or title..."
+            />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label className="form-label">Leave Type *</label>
-            <select
+            <SearchableSelect
+              options={leaveTypes.map((t) => ({
+                value: t.id,
+                label: `${t.name} (${t.code})`,
+                description: t.isPaid ? 'Paid leave benefit' : 'Unpaid leave allocation',
+                rightBadge: t.unit,
+              }))}
               value={adjustForm.leaveTypeId}
-              onChange={(e) => setAdjustForm({ ...adjustForm, leaveTypeId: e.target.value })}
-              className="select"
-              required
-            >
-              <option value="">— Select leave type —</option>
-              {leaveTypes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.code})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setAdjustForm({ ...adjustForm, leaveTypeId: val })}
+              placeholder="Select leave type..."
+              searchPlaceholder="Search leave type..."
+            />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
