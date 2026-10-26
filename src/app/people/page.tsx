@@ -336,14 +336,14 @@ export default function PeopleDirectory() {
                             tone={
                               e.status === "active"
                                 ? "success"
-                                : e.status === "onboarding"
+                                : (e.status?.toLowerCase().includes("onboard") || e.status?.toLowerCase() === "new")
                                 ? "warning"
                                 : "neutral"
                             }
                           >
                             {e.status}
                           </StatusPill>
-                          {e.status === "onboarding" && (canViewDetails || isHRAdmin || isManager) && (
+                          {(e.status?.toLowerCase().includes("onboard") || e.status?.toLowerCase() === "new" || e.status?.toLowerCase() === "pending") && (canViewDetails || isHRAdmin || isManager) && (
                             <button
                               type="button"
                               onClick={(ev) => {

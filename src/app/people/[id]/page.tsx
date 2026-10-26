@@ -292,6 +292,13 @@ export default function EmployeeProfile() {
 
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const avatarSrc = employee.avatarUrl || employee.avatar;
+  const isOnboarding = Boolean(
+    employee && (
+      employee.status?.toLowerCase().includes("onboard") ||
+      employee.status?.toLowerCase() === "new" ||
+      employee.status?.toLowerCase() === "pending"
+    )
+  );
 
   return (
     <>
@@ -429,7 +436,7 @@ export default function EmployeeProfile() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
-            {employee.status === "onboarding" && (
+            {isOnboarding && (
               <>
                 <button
                   onClick={() => setIsOnboardingLinkModalOpen(true)}
@@ -522,16 +529,96 @@ export default function EmployeeProfile() {
         </div>
       </div>
 
+      {isOnboarding && (
+        <div
+          style={{
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: "#DBEAFE",
+                color: "var(--primary, #2563EB)",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <strong style={{ fontSize: 13.5, color: "#1E40AF" }}>
+                Employee is currently completing self-onboarding
+              </strong>
+              <p style={{ margin: "2px 0 0 0", fontSize: 12, color: "#3B82F6" }}>
+                You can resend the invite email, copy the onboarding link, set payment method, or activate their account.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={() => setIsOnboardingLinkModalOpen(true)}
+              className="btn-primary btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 12 }}
+            >
+              <Mail size={13.5} /> Resend Link
+            </button>
+            <button
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="btn-neutral btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 12 }}
+            >
+              <CreditCard size={13.5} /> Payment Method
+            </button>
+            <button
+              onClick={handleActivate}
+              disabled={isActivating}
+              className="btn-secondary btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#16A34A", borderColor: "#86EFAC", padding: "7px 14px", fontSize: 12 }}
+            >
+              {isActivating ? <Loader2 size={13.5} className="animate-spin" /> : <CheckCircle2 size={13.5} />} Activate
+            </button>
+          </div>
+        </div>
+      )}
+
       <main style={{ padding: "0 0 32px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) 340px", gap: 20 }}>
           {/* Main Column */}
           <div className="col gap-20">
             <Card>
               <CardBody>
-                <SectionHeading
-                  title="Employment overview"
-                  description="Position, organizational unit, and official record"
-                />
+                <div className="row-between mb-16 align-center">
+                  <SectionHeading
+                    title="Employment overview"
+                    description="Position, organizational unit, and official record"
+                  />
+                  {(isHRAdmin || isManager) && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(true)}
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8 }}
+                      title="Edit job title, department, location, or status"
+                    >
+                      <Edit2 size={12} />
+                      <span>Edit Details</span>
+                    </button>
+                  )}
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
                   <Info icon={<Briefcase />} label="Job title" value={employee.jobTitle || "Not specified"} />
                   <Info
@@ -912,7 +999,21 @@ export default function EmployeeProfile() {
           <div className="col gap-20">
             <Card>
               <CardBody>
-                <SectionHeading title="Contact Information" />
+                <div className="row-between mb-16 align-center">
+                  <SectionHeading title="Contact Information" />
+                  {(isHRAdmin || isManager || isOwnProfile) && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(true)}
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 7 }}
+                      title="Edit personal phone and personal email"
+                    >
+                      <Edit2 size={11} />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                </div>
                 <div className="col gap-12">
                   <DataRow leading={<Mail size={17} />} title={employee.workEmail} subtitle="Work email" />
                   {employee.personalPhone && (
@@ -928,7 +1029,21 @@ export default function EmployeeProfile() {
 
             <Card>
               <CardBody>
-                <SectionHeading title="Reporting Line" />
+                <div className="row-between mb-16 align-center">
+                  <SectionHeading title="Reporting Line" />
+                  {(isHRAdmin || isManager) && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(true)}
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 7 }}
+                      title="Assign or change line manager"
+                    >
+                      <Edit2 size={11} />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                </div>
                 <Detail label="Manager" value={employee.manager || "No manager assigned"} />
                 <Detail label="Department" value={employee.department} />
               </CardBody>

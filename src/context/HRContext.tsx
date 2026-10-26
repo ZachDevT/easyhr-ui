@@ -161,6 +161,12 @@ export function HRProvider({ children }: { children: ReactNode }) {
   }, [fetchCandidates]);
 
   const updateCandidateStage = async (id: string, stage: string) => {
+    const current = candidates.find((c) => c.id === id);
+    if (current && current.stage.toLowerCase() === "hired" && stage.toLowerCase() !== "hired") {
+      toast.warning("Action not allowed", "Candidate is already hired and cannot be moved back in the pipeline.");
+      return;
+    }
+
     setCandidates((prev) =>
       prev.map((c) => (c.id === id ? { ...c, stage } : c))
     );

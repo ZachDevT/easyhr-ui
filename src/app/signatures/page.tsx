@@ -119,6 +119,28 @@ export default function SignaturesAdminPage() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dismissedDeclinedIds, setDismissedDeclinedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('easyhr_dismissed_declined_signatures');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setDismissedDeclinedIds(parsed);
+      }
+    } catch {}
+  }, []);
+
+  const handleDismissDeclined = (id: string) => {
+    setDismissedDeclinedIds((prev) => {
+      const next = [...prev, id];
+      try {
+        localStorage.setItem('easyhr_dismissed_declined_signatures', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    toast.success('Resolved', 'Declined signature alert marked as resolved.');
+  };
 
   // New Request Form State
   const [selectedDocumentId, setSelectedDocumentId] = useState('');
@@ -325,7 +347,36 @@ export default function SignaturesAdminPage() {
   // Aggregate stats
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
   const completedCount = requests.filter((r) => r.status === 'completed').length;
-  const declinedRequests = requests.filter((r) => r.status === 'declined' || r.recipients?.some((rec) => rec.status === 'declined'));
+  
+  // Intelligent declined/action-required requests:
+  // Automatically filters out declined requests if a completed/signed version already exists for the same recipient!
+  const declinedRequests = useMemo(() => {
+    return requests.filter((r) => {
+      const isDeclined = r.status === 'declined' || r.recipients?.some((rec) => rec.status === 'declined');
+      if (!isDeclined) return false;
+      if (dismissedDeclinedIds.includes(r.id)) return false;
+
+      // Extract recipient identifiers
+      const recipientEmails = r.recipients?.map((rec) => rec.email?.toLowerCase().trim()).filter(Boolean) || [];
+      const recipientNames = r.recipients?.map((rec) => rec.name?.toLowerCase().trim()).filter(Boolean) || [];
+
+      // Check if another request for this recipient has already been completed/signed
+      const hasResolvedOrSignedVersion = requests.some((other) => {
+        if (other.id === r.id) return false;
+        if (other.status !== 'completed') return false;
+        
+        const sameRecipient = other.recipients?.some((rec) => {
+          const email = rec.email?.toLowerCase().trim();
+          const name = rec.name?.toLowerCase().trim();
+          return (email && recipientEmails.includes(email)) || (name && recipientNames.includes(name));
+        });
+
+        return sameRecipient;
+      });
+
+      return !hasResolvedOrSignedVersion;
+    });
+  }, [requests, dismissedDeclinedIds]);
 
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
@@ -418,15 +469,30 @@ export default function SignaturesAdminPage() {
                               </div>
                             </div>
                           </div>
-                          <button
-                            className="btn-neutral btn-sm"
-                            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                            onClick={() => {
-                              setShowSendModal(true);
-                            }}
-                          >
-                            <FileText size={14} /> Send Revised Version
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <button
+                              className="btn-neutral btn-sm"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                              onClick={() => {
+                                setShowSendModal(true);
+                              }}
+                            >
+                              <FileText size={14} /> Send Revised Version
+                            </button>
+                            <button
+                              className="btn-neutral btn-sm"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                color: 'var(--text-3)',
+                              }}
+                              onClick={() => handleDismissDeclined(req.id)}
+                              title="Mark this declined notice as resolved"
+                            >
+                              <CheckCircle2 size={14} style={{ color: 'var(--success)' }} /> Dismiss
+                            </button>
+                          </div>
                         </div>
                       </Card>
                     );

@@ -343,6 +343,14 @@ export default function HiringPage() {
     e.currentTarget.classList.remove("drag-over");
     const candidateId = e.dataTransfer.getData("candidateId");
     if (candidateId) {
+      const candidate = candidates.find((c) => c.id === candidateId);
+      if (candidate && candidate.stage.toLowerCase() === "hired" && targetStage.toLowerCase() !== "hired") {
+        toast.warning(
+          "Action not allowed",
+          "Hired employees cannot be moved back in the pipeline."
+        );
+        return;
+      }
       updateCandidateStage(candidateId, targetStage);
     }
   };
@@ -915,20 +923,28 @@ export default function HiringPage() {
                         </div>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 400 }}>
-                          {stageCandidates.map((candidate) => (
-                            <Card
-                              key={candidate.id}
-                              style={{ cursor: "grab", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "0 8px 24px rgba(0,0,0,0.04)", borderRadius: 12, background: "white" }}
-                              className="hover-scale"
-                              draggable
-                              onDragStart={(e: React.DragEvent) => handleDragStart(e, candidate.id)}
-                              onClick={() => router.push(`/hiring/candidates/${candidate.id}`)}
-                            >
-                              <CardBody style={{ padding: 24 }}>
-                                <div className="row-between mb-20 align-start">
-                                  <Badge variant="neutral" style={{ fontSize: 12, background: "#F3F4F6", color: "var(--text-3)", fontWeight: 700 }}>
-                                    {candidate.source}
-                                  </Badge>
+                          {stageCandidates.map((candidate) => {
+                            const isHired = candidate.stage.toLowerCase() === "hired";
+                            return (
+                              <Card
+                                key={candidate.id}
+                                style={{
+                                  cursor: isHired ? "pointer" : "grab",
+                                  border: isHired ? "1px solid #BBF7D0" : "1px solid rgba(0,0,0,0.08)",
+                                  boxShadow: "0 8px 24px rgba(0,0,0,0.04)",
+                                  borderRadius: 12,
+                                  background: "white",
+                                }}
+                                className="hover-scale"
+                                draggable={!isHired}
+                                onDragStart={(e: React.DragEvent) => !isHired && handleDragStart(e, candidate.id)}
+                                onClick={() => router.push(`/hiring/candidates/${candidate.id}`)}
+                              >
+                                <CardBody style={{ padding: 24 }}>
+                                  <div className="row-between mb-20 align-start">
+                                    <Badge variant={isHired ? "success" : "neutral"} style={{ fontSize: 12, background: isHired ? "#ECFDF5" : "#F3F4F6", color: isHired ? "#065F46" : "var(--text-3)", fontWeight: 700 }}>
+                                      {isHired ? "Hired (Locked)" : candidate.source}
+                                    </Badge>
                                   {candidate.rating && (
                                     <div className="row gap-4 align-center text-warning fw-800 text-sm bg-warning-tint px-8 py-4" style={{ borderRadius: 12 }}>
                                       <Star size={14} fill="currentColor" /> {candidate.rating}.0
@@ -978,7 +994,8 @@ export default function HiringPage() {
                                 </div>
                               </CardBody>
                             </Card>
-                          ))}
+                          );
+                        })}
 
                           {stageCandidates.length === 0 && (
                             <div style={{ border: "2px dashed var(--border)", borderRadius: 12, height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-4)", fontSize: 14, fontWeight: 700 }}>

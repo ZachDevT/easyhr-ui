@@ -278,18 +278,39 @@ export default function CandidateProfilePage() {
               <span>Onboarding Link</span>
             </button>
 
-            <div style={{ width: 170 }}>
-              <SearchableSelect
-                options={STAGE_OPTIONS}
-                value={candidate.stage}
-                onChange={async (val) => {
-                  await updateCandidateStage(candidate.id, val);
-                  setCandidate((prev: any) => prev ? { ...prev, stage: val } : prev);
+            {candidate.stage.toLowerCase() === "hired" ? (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  borderRadius: 8,
+                  background: "#ECFDF5",
+                  border: "1px solid #A7F3D0",
+                  color: "#065F46",
+                  fontSize: 13,
+                  fontWeight: 700,
                 }}
-                size="sm"
-                placeholder="Stage"
-              />
-            </div>
+                title="Candidate is hired. Stage is locked."
+              >
+                <CheckCircle2 size={15} />
+                <span>Hired (Locked)</span>
+              </div>
+            ) : (
+              <div style={{ width: 170 }}>
+                <SearchableSelect
+                  options={STAGE_OPTIONS}
+                  value={candidate.stage}
+                  onChange={async (val) => {
+                    await updateCandidateStage(candidate.id, val);
+                    setCandidate((prev: any) => prev ? { ...prev, stage: val } : prev);
+                  }}
+                  size="sm"
+                  placeholder="Stage"
+                />
+              </div>
+            )}
 
             {candidate.stage.toLowerCase() !== "hired" ? (
               <button

@@ -39,6 +39,8 @@ import {
   User,
   Calendar,
   Search,
+  Inbox,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
@@ -66,6 +68,7 @@ export interface WidgetDef {
 }
 
 export const OPTIONAL_WIDGETS: WidgetDef[] = [
+  { id: 'approvals',   label: 'HR Approvals',          desc: 'Leave requests awaiting decision', icon: <Inbox size={18} strokeWidth={2} />, default: true },
   { id: 'feed',        label: 'Company Feed',          desc: 'News and announcements',     icon: <Megaphone size={18} strokeWidth={2} />,     default: true  },
   { id: 'birthdays',   label: 'Celebrations',          desc: 'Birthdays & work milestones', icon: <Gift size={18} strokeWidth={2} />,          default: true  },
   { id: 'new-hires',   label: 'New Hires',             desc: 'Recently joined team',       icon: <UserPlus size={18} strokeWidth={2} />,      default: false },
@@ -2915,11 +2918,221 @@ export function SignaturesWidget({ onRemove, preview }: { onRemove?: () => void;
 }
 
 /* -------------------------------------------------------------------------- */
+/* 9. HR Approvals Widget (Dynamic Leave & Verification Queue)                */
+/* -------------------------------------------------------------------------- */
+
+export function HRApprovalsWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
+  const { getToken, isSignedIn } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const fetchPending = useCallback(async () => {
+    if (!isSignedIn) return;
+    try {
+      setIsLoading(true);
+      const token = await getToken();
+      if (!token) return;
+      const headers = getAuthHeaders(token);
+
+      const [reqRes, empsRes, typesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/leave/requests?limit=25`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/employees?limit=100`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/leave/types`, { headers }).catch(() => null),
+      ]);
+
+      let requests: any[] = [];
+      if (reqRes && reqRes.ok) {
+        const j = await reqRes.json();
+        requests = Array.isArray(j) ? j : j.data || [];
+      }
+
+      const empMap = new Map<string, any>();
+      if (empsRes && empsRes.ok) {
+        const j = await empsRes.json();
+        const emps = Array.isArray(j) ? j : j.data || [];
+        emps.forEach((e: any) => empMap.set(e.id, e));
+      }
+
+      const typeMap = new Map<string, string>();
+      if (typesRes && typesRes.ok) {
+        const j = await typesRes.json();
+        const list = Array.isArray(j) ? j : j.data || [];
+        list.forEach((t: any) => typeMap.set(t.id, t.name));
+      }
+
+      const pending = requests
+        .filter((r) => r.status === 'pending_hr' || r.status === 'pending_manager' || r.status === 'pending')
+        .map((r) => {
+          const emp = empMap.get(r.employeeId);
+          return {
+            id: r.id,
+            employeeName: emp ? `${emp.firstName} ${emp.lastName}`.trim() : 'Team Member',
+            avatar: emp?.avatarUrl || emp?.avatar,
+            leaveType: typeMap.get(r.leaveTypeId) || 'Time Off',
+            hours: Math.round(((r.requestedMinutes || 480) / 60) * 10) / 10,
+            dates: `${r.startDate} → ${r.endDate}`,
+            status: r.status,
+          };
+        });
+
+      setItems(pending);
+    } catch {
+      // Graceful error fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isSignedIn, getToken]);
+
+  useEffect(() => {
+    fetchPending();
+  }, [fetchPending]);
+
+  const handleQuickApprove = async (id: string, isManagerStage: boolean) => {
+    setActionLoadingId(id);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const headers = getAuthHeaders(token);
+      const endpoint = isManagerStage
+        ? `${API_BASE_URL}/api/v1/leave/requests/${id}/approve`
+        : `${API_BASE_URL}/api/v1/leave/requests/${id}/approve-hr`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ comment: 'Approved via HR Approvals widget' }),
+      });
+      if (res.ok) {
+        toast.success('Approved', 'Leave request verified and approved.');
+        await fetchPending();
+      } else {
+        toast.error('Failed', 'Could not approve request.');
+      }
+    } catch {
+      toast.error('Network Error', 'Unable to approve leave request.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  return (
+    <Card className={preview ? '' : 'h-full flex-1'} style={{ height: '100%' }}>
+      <div className="card-header">
+        <div className="card-header-left">
+          <div className="card-header-icon" style={{ background: '#EFF6FF', color: 'var(--primary)' }}>
+            <Inbox size={16} strokeWidth={2.5} />
+          </div>
+          <h2 className="card-header-title">HR Approvals</h2>
+          {items.length > 0 && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '1px 7px',
+                borderRadius: 999,
+                background: '#EFF6FF',
+                color: 'var(--primary)',
+              }}
+            >
+              {items.length}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Link
+            href="/inbox"
+            style={{
+              fontSize: 12,
+              fontWeight: 650,
+              color: 'var(--primary)',
+              textDecoration: 'none',
+              padding: '2px 6px',
+            }}
+          >
+            Open Inbox
+          </Link>
+          {onRemove && (
+            <button className="widget-remove-btn" onClick={onRemove}>
+              <X size={11} />
+            </button>
+          )}
+        </div>
+      </div>
+      <CardBody>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-4)' }}>
+            <Loader2 size={18} className="animate-spin" style={{ margin: '0 auto 6px', color: 'var(--primary)' }} />
+            <span style={{ fontSize: 12 }}>Loading approvals...</span>
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+            <CheckCircle2 size={24} style={{ color: 'var(--success)', margin: '0 auto 8px' }} />
+            <p className="text-sm fw-700 text-1 m-0">All caught up</p>
+            <p className="text-xs text-4 m-0" style={{ marginTop: 4 }}>
+              No leave requests awaiting HR approval.
+            </p>
+          </div>
+        ) : (
+          <div className="col gap-10">
+            {items.slice(0, 4).map((req) => (
+              <div
+                key={req.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'white',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <Avatar name={req.employeeName} size="sm" src={req.avatar} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }} className="truncate">
+                      {req.employeeName}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-4)' }}>
+                      {req.leaveType} · <strong style={{ color: 'var(--text-2)' }}>{req.hours}h</strong>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="btn-primary btn-sm"
+                    disabled={actionLoadingId === req.id}
+                    onClick={() => handleQuickApprove(req.id, req.status === 'pending_manager')}
+                    style={{ padding: '4px 10px', fontSize: 11.5 }}
+                  >
+                    {actionLoadingId === req.id ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
+                  </button>
+                  <Link
+                    href="/inbox"
+                    className="btn-neutral btn-sm"
+                    style={{ padding: '4px 8px', fontSize: 11.5, textDecoration: 'none' }}
+                  >
+                    Review
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Export Mapping                                                             */
 /* -------------------------------------------------------------------------- */
 
 export type WidgetFC = React.FC<{ onRemove?: () => void; preview?: boolean }>;
 export const WIDGET_MAP: Record<string, WidgetFC> = {
+  'approvals':   HRApprovalsWidget,
   'feed':        FeedWidget,
   'birthdays':   BirthdaysWidget,
   'new-hires':   NewHiresWidget,
