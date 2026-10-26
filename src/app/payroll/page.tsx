@@ -36,6 +36,9 @@ import {
   Receipt,
   HeartPulse,
   Percent,
+  Briefcase,
+  Layers,
+  Calculator,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
@@ -139,6 +142,7 @@ export default function PayrollPage() {
     >
   >({});
   const [editingAdjItem, setEditingAdjItem] = useState<PayrollRunItem | null>(null);
+  const [isFormulaDrawerOpen, setIsFormulaDrawerOpen] = useState(false);
   const [formProductiveHours, setFormProductiveHours] = useState("173.33");
   const [formOvertimeHours, setFormOvertimeHours] = useState("0");
   const [formHolidayHours, setFormHolidayHours] = useState("0");
@@ -381,9 +385,9 @@ export default function PayrollPage() {
     ];
   }, [departments]);
 
-  // Synchronize dynamic hours from Clock-in and Timesheet submissions into active payroll run
+  // Synchronize dynamic hours from Clock-in punches and Timesheet submissions into active payroll run
   const syncClockInHours = useCallback(
-    (periodId?: string) => {
+    async (periodId?: string) => {
       const pId = periodId || selectedPeriodId;
       const p = periods.find((x) => x.id === pId);
       if (!p) {
@@ -396,61 +400,120 @@ export default function PayrollPage() {
       const stdMonthlyHours = activeConfig ? activeConfig.standardMonthlyMinutes / 60 : 173.33;
 
       let syncedCount = 0;
-      setEmployeeAdjustments((prev) => {
-        const next = { ...prev };
+      const token = await getToken();
+      const headers = getAuthHeaders(token);
+      const nextAdjustments: Record<string, any> = {};
 
-        for (const emp of employees) {
-          // Find timesheets for this employee that overlap with the period
-          const empTimesheets = timesheets.filter((t) => {
-            const matchesEmp = t.employeeId === emp.id || t.employee_id === emp.id;
-            if (!matchesEmp) return false;
-            const wStart = new Date(t.weekStart || t.week_start).getTime();
-            const wEnd = new Date((t.weekEnd || t.week_end) + "T23:59:59").getTime();
-            return (wStart >= pStart && wStart <= pEnd) || (wEnd >= pStart && wEnd <= pEnd);
-          });
+      for (const emp of employees) {
+        // 1. Check if employee has timesheets
+        const empTimesheets = timesheets.filter((t) => {
+          const matchesEmp = t.employeeId === emp.id || t.employee_id === emp.id;
+          if (!matchesEmp) return false;
+          const wStart = new Date(t.weekStart || t.week_start).getTime();
+          const wEnd = new Date((t.weekEnd || t.week_end) + "T23:59:59").getTime();
+          return (wStart >= pStart && wStart <= pEnd) || (wEnd >= pStart && wEnd <= pEnd);
+        });
 
-          if (empTimesheets.length > 0) {
-            const totalMinutes = empTimesheets.reduce(
-              (sum, t) => sum + (Number(t.totalMinutes || t.total_minutes) || 0),
-              0
+        let totalMinutes = 0;
+        let isSynced = false;
+
+        if (empTimesheets.length > 0) {
+          totalMinutes = empTimesheets.reduce(
+            (sum, t) => sum + (Number(t.totalMinutes || t.total_minutes) || 0),
+            0
+          );
+          isSynced = true;
+        } else if (token) {
+          // 2. Fall back to raw attendance punches in the period
+          try {
+            const punchRes = await fetch(
+              `${API_BASE_URL}/api/v1/attendance/punches?employeeId=${emp.id}&from=${p.startDate}&to=${p.endDate}&limit=500`,
+              { headers }
             );
-            const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
-            const comp = compensationList.find((c) => c.employeeId === emp.id);
-            const parsed = parseCompensationDetails(comp);
-            const targetStd = parsed.standardHours || stdMonthlyHours;
-
-            const productiveHours = Math.min(totalHours, targetStd);
-            const overtimeHours = Math.max(0, Math.round((totalHours - targetStd) * 10) / 10);
-
-            next[emp.id] = {
-              productiveHours,
-              overtimeHours,
-              holidayHours: next[emp.id]?.holidayHours || 0,
-              bonusesMinor: next[emp.id]?.bonusesMinor || 0,
-              penaltiesMinor: next[emp.id]?.penaltiesMinor || 0,
-              insuranceMinor: next[emp.id]?.insuranceMinor || 0,
-              isSyncedFromClockIn: true,
-              clockInTotalHours: totalHours,
-            };
-            syncedCount++;
+            if (punchRes.ok) {
+              const punchData = await punchRes.json();
+              const punches = Array.isArray(punchData) ? punchData : punchData.data || [];
+              if (punches.length > 0) {
+                const sorted = [...punches].sort(
+                  (a, b) =>
+                    new Date(a.occurredAt || a.occurred_at).getTime() -
+                    new Date(b.occurredAt || b.occurred_at).getTime()
+                );
+                let lastClockIn: number | null = null;
+                let punchMins = 0;
+                for (const punch of sorted) {
+                  const kind = punch.kind;
+                  const time = new Date(punch.occurredAt || punch.occurred_at).getTime();
+                  if (kind === "clock_in" || kind === "break_end") {
+                    lastClockIn = time;
+                  } else if ((kind === "clock_out" || kind === "break_start") && lastClockIn !== null) {
+                    const diff = Math.round((time - lastClockIn) / 60000);
+                    if (diff > 0 && diff < 24 * 60) {
+                      punchMins += diff;
+                    }
+                    lastClockIn = null;
+                  }
+                }
+                if (punchMins > 0) {
+                  totalMinutes = punchMins;
+                  isSynced = true;
+                }
+              }
+            }
+          } catch {
+            // continue with fallback
           }
         }
-        return next;
-      });
+
+        const comp = compensationList.find((c) => c.employeeId === emp.id);
+        const parsed = parseCompensationDetails(comp);
+        const targetStd = parsed.standardHours || stdMonthlyHours;
+
+        if (isSynced && totalMinutes > 0) {
+          const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+          const productiveHours = Math.min(totalHours, targetStd);
+          const overtimeHours = Math.max(0, Math.round((totalHours - targetStd) * 10) / 10);
+
+          nextAdjustments[emp.id] = {
+            productiveHours,
+            overtimeHours,
+            holidayHours: employeeAdjustments[emp.id]?.holidayHours || 0,
+            bonusesMinor: employeeAdjustments[emp.id]?.bonusesMinor || 0,
+            penaltiesMinor: employeeAdjustments[emp.id]?.penaltiesMinor || 0,
+            insuranceMinor: employeeAdjustments[emp.id]?.insuranceMinor || 0,
+            isSyncedFromClockIn: true,
+            clockInTotalHours: totalHours,
+          };
+          syncedCount++;
+        } else {
+          nextAdjustments[emp.id] = {
+            productiveHours: targetStd,
+            overtimeHours: employeeAdjustments[emp.id]?.overtimeHours || 0,
+            holidayHours: employeeAdjustments[emp.id]?.holidayHours || 0,
+            bonusesMinor: employeeAdjustments[emp.id]?.bonusesMinor || 0,
+            penaltiesMinor: employeeAdjustments[emp.id]?.penaltiesMinor || 0,
+            insuranceMinor: employeeAdjustments[emp.id]?.insuranceMinor || 0,
+            isSyncedFromClockIn: false,
+            clockInTotalHours: targetStd,
+          };
+        }
+      }
+
+      setEmployeeAdjustments((prev) => ({ ...prev, ...nextAdjustments }));
 
       if (syncedCount > 0) {
         toast.success(
           "Clock-in synced",
-          `Auto-synced hours from clock-in & timesheets for ${syncedCount} employee(s).`
+          `Auto-synced hours worked from attendance punches & timesheets for ${syncedCount} employee(s).`
         );
       } else {
         toast.info(
           "Standard hours applied",
-          "No clock-in timesheet records found for this period range. Standard hours applied."
+          "No clock-in attendance records found for this period. Standard contracted hours applied."
         );
       }
     },
-    [selectedPeriodId, periods, activeConfig, employees, timesheets, compensationList]
+    [selectedPeriodId, periods, activeConfig, employees, timesheets, compensationList, employeeAdjustments, getToken]
   );
 
   // Map each employee to their most recent compensation record
@@ -1377,6 +1440,16 @@ export default function PayrollPage() {
                       <button
                         type="button"
                         className="btn-neutral btn-sm"
+                        onClick={() => setIsFormulaDrawerOpen(true)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                        title="View calculation formula, higher rates multipliers, and statutory tax rules"
+                      >
+                        <HelpCircle size={13} style={{ color: "var(--primary)" }} />
+                        <span>Calculation Guide</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-neutral btn-sm"
                         onClick={() => syncClockInHours()}
                         title="Auto-sync productive and overtime hours from employee clock-in punches and submitted timesheets"
                       >
@@ -1397,43 +1470,14 @@ export default function PayrollPage() {
                   }
                 />
                 <CardBody style={{ padding: 0 }}>
-                  {/* Calculation Formula Banner (Matching Reference Specification) */}
-                  <div
-                    style={{
-                      padding: "14px 20px",
-                      background: "#FAF9F7",
-                      borderBottom: "1px solid var(--card-border, #E8ECE8)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <FileText size={14} style={{ color: "var(--primary)" }} />
-                      <strong style={{ fontSize: 13, color: "var(--text-1)" }}>
-                        Calculation Formula: Chargeable Gross &amp; Statutory Deductions
-                      </strong>
-                    </div>
-                    <div style={{ fontSize: 12, lineHeight: 1.6, color: "var(--text-2)" }}>
-                      <div>
-                        <strong>HOURLY compensation:</strong> Total monthly compensation = Pay rate × Productive hours
-                      </div>
-                      <div>
-                        <strong>Chargeable Income Gross Total</strong> = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
-                      </div>
-                      <div style={{ color: "var(--text-4)", fontSize: 11.5 }}>
-                        • Total Higher rates = (Overtime hours × Pay rate × {activeOvertimeMultiplier}) + (Public Holiday &amp; Sunday hours × Pay rate × {activeHolidayMultiplier}).
-                        <br />
-                        • Statutory Deductions = PAYE (Progressive Tax on Chargeable Gross) + NSSF (5% Employee Pension). Net Pay = Gross Total - Deductions.
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Aggregate Summary Ribbon */}
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(4, 1fr)",
-                      gap: 12,
+                      gap: 16,
                       padding: "16px 20px",
-                      background: "#FFFFFF",
+                      background: "#FAF9F7",
                       borderBottom: "1px solid var(--card-border, #E8ECE8)",
                     }}
                   >
@@ -1461,154 +1505,208 @@ export default function PayrollPage() {
                     </div>
                   </div>
 
-                  {/* Run Items Table */}
+                  {/* Clean, Non-Congested Run Items Table */}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12.5 }}>
                       <thead>
-                        <tr style={{ background: "#FAF9F7", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
-                          <th style={{ padding: "12px 16px" }}>Employee</th>
-                          <th style={{ padding: "12px 16px" }}>Pay Model &amp; Rate</th>
-                          <th style={{ padding: "12px 16px" }}>Productive Hours</th>
-                          <th style={{ padding: "12px 16px" }}>Higher Rates (OT/Hol)</th>
-                          <th style={{ padding: "12px 16px" }}>Bonuses / Penalties</th>
+                        <tr style={{ background: "#FFFFFF", borderBottom: "1px solid var(--card-border)", color: "var(--text-4)" }}>
+                          <th style={{ padding: "12px 18px", position: "sticky", left: 0, background: "#FFFFFF", zIndex: 3, borderRight: "1px solid var(--card-border)" }}>Employee</th>
+                          <th style={{ padding: "12px 16px" }}>Pay Model</th>
+                          <th style={{ padding: "12px 16px" }}>Hours Worked</th>
+                          <th style={{ padding: "12px 16px" }}>Adjustments</th>
                           <th style={{ padding: "12px 16px" }}>Chargeable Gross</th>
                           <th style={{ padding: "12px 16px" }}>Deductions</th>
                           <th style={{ padding: "12px 16px" }}>Net Pay</th>
-                          <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
+                          <th style={{ padding: "12px 18px", textAlign: "right" }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {evaluatedItems.map(({ item, parsed, adj, calc, totalDeductions, netPay }) => (
-                          <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                            <td style={{ padding: "12px 16px" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <Avatar name={item.employeeName} size="sm" src={item.avatarUrl} />
-                                <div>
-                                  <strong style={{ color: "var(--text-1)" }}>{item.employeeName}</strong>
-                                  <div style={{ fontSize: 11, color: "var(--text-4)" }}>{item.department || "Staff"}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td style={{ padding: "12px 16px" }}>
-                              <Badge variant="neutral">
-                                {parsed.model === "hourly" ? "HOURLY" : "SALARIED"}
-                              </Badge>
-                              <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
-                                {parsed.model === "hourly"
-                                  ? `${formatMoney(parsed.hourlyRateMinor, currentCurrency)}/hr`
-                                  : formatMoney(item.basePay, currentCurrency)}
-                              </div>
-                            </td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-2)", fontWeight: 600 }}>
-                              <div>{adj.productiveHours} hrs</div>
-                              {adj.isSyncedFromClockIn && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    color: "var(--primary)",
-                                    background: "rgba(37, 99, 235, 0.08)",
-                                    padding: "2px 6px",
-                                    borderRadius: 4,
-                                    display: "inline-block",
-                                    marginTop: 2,
-                                    fontWeight: 500,
-                                  }}
-                                  title="Hours automatically synchronized from employee clock-in & timesheet records"
-                                >
-                                  <Clock size={10} style={{ display: "inline-block", marginRight: 3, verticalAlign: "middle" }} />
-                                  Synced
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ padding: "12px 16px" }}>
-                              {calc.totalHigherRatesMinor > 0 ? (
-                                <div>
-                                  <span style={{ color: "var(--primary)", fontWeight: 700 }}>
-                                    +{formatMoney(calc.totalHigherRatesMinor, currentCurrency)}
-                                  </span>
-                                  <div style={{ fontSize: 10.5, color: "var(--text-4)" }}>
-                                    {adj.overtimeHours > 0 && `${adj.overtimeHours}h OT (${activeOvertimeMultiplier}×)`}
-                                    {adj.overtimeHours > 0 && adj.holidayHours > 0 && " · "}
-                                    {adj.holidayHours > 0 && `${adj.holidayHours}h Hol (${activeHolidayMultiplier}×)`}
+                        {evaluatedItems.map(({ item, parsed, adj, calc, paye, nssf, totalDeductions, netPay }) => {
+                          const hasAdjustments = calc.totalHigherRatesMinor > 0 || calc.totalBonusesMinor > 0 || calc.totalPenaltiesMinor > 0;
+                          return (
+                            <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                              {/* Sticky Employee Column */}
+                              <td
+                                style={{
+                                  padding: "14px 18px",
+                                  position: "sticky",
+                                  left: 0,
+                                  background: "#FFFFFF",
+                                  zIndex: 2,
+                                  borderRight: "1px solid var(--card-border)",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <Avatar name={item.employeeName} size="sm" src={item.avatarUrl} />
+                                  <div style={{ minWidth: 0 }}>
+                                    <strong style={{ color: "var(--text-1)", display: "block", fontSize: 13, lineHeight: 1.3 }}>
+                                      {item.employeeName}
+                                    </strong>
+                                    <span style={{ fontSize: 11.5, color: "var(--text-4)" }}>
+                                      {item.department || "General Staff"}
+                                    </span>
                                   </div>
                                 </div>
-                              ) : (
-                                <span style={{ color: "var(--text-4)" }}>—</span>
-                              )}
-                            </td>
-                            <td style={{ padding: "12px 16px", fontSize: 11.5 }}>
-                              {calc.totalBonusesMinor > 0 && (
-                                <span style={{ color: "var(--primary)", fontWeight: 600, display: "block" }}>
-                                  +{formatMoney(calc.totalBonusesMinor, currentCurrency)}
-                                </span>
-                              )}
-                              {calc.totalPenaltiesMinor > 0 && (
-                                <span style={{ color: "#DC2626", fontWeight: 600, display: "block" }}>
-                                  -{formatMoney(calc.totalPenaltiesMinor, currentCurrency)}
-                                </span>
-                              )}
-                              {calc.totalBonusesMinor === 0 && calc.totalPenaltiesMinor === 0 && (
-                                <span style={{ color: "var(--text-4)" }}>—</span>
-                              )}
-                            </td>
-                            <td style={{ padding: "12px 16px", fontWeight: 700, color: "var(--text-1)" }}>
-                              {formatMoney(calc.chargeableGrossMinor, currentCurrency)}
-                            </td>
-                            <td style={{ padding: "12px 16px", color: "#DC2626", fontWeight: 600 }}>
-                              -{formatMoney(totalDeductions, currentCurrency)}
-                            </td>
-                            <td style={{ padding: "12px 16px", color: "#16A34A", fontWeight: 700 }}>
-                              {formatMoney(netPay, currentCurrency)}
-                            </td>
-                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                              <div style={{ display: "inline-flex", gap: 6 }}>
-                                <button
-                                  type="button"
-                                  className="btn-neutral btn-sm"
-                                  onClick={() => {
-                                    setEditingAdjItem(item);
-                                    setFormProductiveHours(String(adj.productiveHours));
-                                    setFormOvertimeHours(String(adj.overtimeHours));
-                                    setFormHolidayHours(String(adj.holidayHours));
-                                    setFormBonuses(String(toMajor(adj.bonusesMinor)));
-                                    setFormPenalties(String(toMajor(adj.penaltiesMinor)));
-                                    setFormInsurance(String(toMajor(adj.insuranceMinor)));
+                              </td>
+
+                              {/* Pay Model & Baseline Rate */}
+                              <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                                <Badge variant={parsed.model === "hourly" ? "warning" : "neutral"}>
+                                  {parsed.model === "hourly" ? "HOURLY" : "SALARIED"}
+                                </Badge>
+                                <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 4 }}>
+                                  {parsed.model === "hourly"
+                                    ? `${formatMoney(parsed.hourlyRateMinor, currentCurrency)}/hr`
+                                    : `${formatMoney(item.basePay, currentCurrency)}/mo`}
+                                </div>
+                              </td>
+
+                              {/* Hours Worked (Punched or Contracted) */}
+                              <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <strong style={{ color: "var(--text-1)", fontSize: 13 }}>
+                                    {adj.productiveHours} hrs
+                                  </strong>
+                                  {adj.isSyncedFromClockIn ? (
+                                    <span
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: 600,
+                                        color: "#15803D",
+                                        background: "#DCFCE7",
+                                        padding: "2px 6px",
+                                        borderRadius: 4,
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 3,
+                                      }}
+                                      title="Hours auto-synced from clock-in & attendance records"
+                                    >
+                                      <Clock size={10} /> Synced
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: 11, color: "var(--text-4)" }}>Contracted</span>
+                                  )}
+                                </div>
+                                {(adj.overtimeHours > 0 || adj.holidayHours > 0) && (
+                                  <div style={{ fontSize: 11, color: "var(--primary)", marginTop: 2, fontWeight: 500 }}>
+                                    {adj.overtimeHours > 0 && `+${adj.overtimeHours}h OT (${activeOvertimeMultiplier}×)`}
+                                    {adj.overtimeHours > 0 && adj.holidayHours > 0 && " · "}
+                                    {adj.holidayHours > 0 && `+${adj.holidayHours}h Hol (${activeHolidayMultiplier}×)`}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Consolidated Adjustments */}
+                              <td style={{ padding: "14px 16px", fontSize: 12 }}>
+                                {hasAdjustments ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    {calc.totalHigherRatesMinor > 0 && (
+                                      <span style={{ color: "var(--primary)", fontWeight: 600 }}>
+                                        +{formatMoney(calc.totalHigherRatesMinor, currentCurrency)} <span style={{ fontSize: 10.5, color: "var(--text-4)" }}>(OT/Hol)</span>
+                                      </span>
+                                    )}
+                                    {calc.totalBonusesMinor > 0 && (
+                                      <span style={{ color: "#16A34A", fontWeight: 600 }}>
+                                        +{formatMoney(calc.totalBonusesMinor, currentCurrency)} <span style={{ fontSize: 10.5, color: "var(--text-4)" }}>(Bonus)</span>
+                                      </span>
+                                    )}
+                                    {calc.totalPenaltiesMinor > 0 && (
+                                      <span style={{ color: "#DC2626", fontWeight: 600 }}>
+                                        -{formatMoney(calc.totalPenaltiesMinor, currentCurrency)} <span style={{ fontSize: 10.5, color: "var(--text-4)" }}>(Penalty)</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span style={{ color: "var(--text-4)" }}>—</span>
+                                )}
+                              </td>
+
+                              {/* Chargeable Gross */}
+                              <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                                <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>
+                                  {formatMoney(calc.chargeableGrossMinor, currentCurrency)}
+                                </strong>
+                              </td>
+
+                              {/* Deductions with Breakdown */}
+                              <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                                <strong style={{ fontSize: 13.5, color: "#DC2626" }}>
+                                  -{formatMoney(totalDeductions, currentCurrency)}
+                                </strong>
+                                <div style={{ fontSize: 10.5, color: "var(--text-4)", marginTop: 2 }}>
+                                  PAYE {formatMoney(paye, currentCurrency)} · NSSF {formatMoney(nssf, currentCurrency)}
+                                </div>
+                              </td>
+
+                              {/* Net Pay */}
+                              <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "4px 8px",
+                                    borderRadius: 6,
+                                    background: "#DCFCE7",
+                                    color: "#15803D",
+                                    fontWeight: 700,
+                                    fontSize: 13,
                                   }}
-                                  title="Adjust hours, overtime, holidays, bonuses"
                                 >
-                                  Adjust Hours
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-neutral btn-sm"
-                                  onClick={() =>
-                                    setStatementPayslip({
-                                      ...item,
-                                      currency: currentCurrency,
-                                      productiveHours: adj.productiveHours,
-                                      overtimeHours: adj.overtimeHours,
-                                      holidayHours: adj.holidayHours,
-                                      higherRatesMinor: calc.totalHigherRatesMinor,
-                                      bonusesMinor: calc.totalBonusesMinor,
-                                      penaltiesMinor: calc.totalPenaltiesMinor,
-                                      insuranceMinor: calc.totalInsuranceMinor,
-                                      overtimeMultiplier: activeOvertimeMultiplier,
-                                      holidayMultiplier: activeHolidayMultiplier,
-                                      payModel: parsed.model,
-                                      hourlyRateMinor: parsed.hourlyRateMinor,
-                                      basePay: calc.baseMonthlyCompensationMinor,
-                                      earnings: calc.totalHigherRatesMinor + calc.totalBonusesMinor + calc.totalInsuranceMinor,
-                                      deductions: totalDeductions,
-                                      netPay,
-                                    })
-                                  }
-                                >
-                                  <Eye size={12} className="mr-4" /> Statement
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                                  {formatMoney(netPay, currentCurrency)}
+                                </span>
+                              </td>
+
+                              {/* Actions */}
+                              <td style={{ padding: "14px 18px", textAlign: "right", whiteSpace: "nowrap" }}>
+                                <div style={{ display: "inline-flex", gap: 6 }}>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    onClick={() => {
+                                      setEditingAdjItem(item);
+                                      setFormProductiveHours(String(adj.productiveHours));
+                                      setFormOvertimeHours(String(adj.overtimeHours));
+                                      setFormHolidayHours(String(adj.holidayHours));
+                                      setFormBonuses(String(toMajor(adj.bonusesMinor)));
+                                      setFormPenalties(String(toMajor(adj.penaltiesMinor)));
+                                      setFormInsurance(String(toMajor(adj.insuranceMinor)));
+                                    }}
+                                    title="Adjust hours, overtime, holidays, bonuses"
+                                  >
+                                    Adjust Hours
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    onClick={() =>
+                                      setStatementPayslip({
+                                        ...item,
+                                        currency: currentCurrency,
+                                        productiveHours: adj.productiveHours,
+                                        overtimeHours: adj.overtimeHours,
+                                        holidayHours: adj.holidayHours,
+                                        higherRatesMinor: calc.totalHigherRatesMinor,
+                                        bonusesMinor: calc.totalBonusesMinor,
+                                        penaltiesMinor: calc.totalPenaltiesMinor,
+                                        insuranceMinor: calc.totalInsuranceMinor,
+                                        overtimeMultiplier: activeOvertimeMultiplier,
+                                        holidayMultiplier: activeHolidayMultiplier,
+                                        payModel: parsed.model,
+                                        hourlyRateMinor: parsed.hourlyRateMinor,
+                                        basePay: calc.baseMonthlyCompensationMinor,
+                                        earnings: calc.totalHigherRatesMinor + calc.totalBonusesMinor + calc.totalInsuranceMinor,
+                                        deductions: totalDeductions,
+                                        netPay,
+                                      })
+                                    }
+                                  >
+                                    <Eye size={12} className="mr-4" /> Statement
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1727,60 +1825,26 @@ export default function PayrollPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => {
-              setSelectedCompEmployeeId(employees[0]?.id || "");
-              setIsCompModalOpen(true);
-            }}
-          >
-            <Plus size={14} className="mr-6" /> Set Employee Compensation
-          </button>
-        </div>
-
-        {/* Calculation Formula Card (Matching Reference Specification) */}
-        <div
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid var(--card-border, #E8ECE8)",
-            borderRadius: 12,
-            padding: "16px 20px",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <div
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                background: "var(--primary-tint, #EFF6FF)",
-                color: "var(--primary, #2563EB)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn-neutral"
+              onClick={() => setIsFormulaDrawerOpen(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <HelpCircle size={14} style={{ color: "var(--primary)" }} />
+              Calculation Guide
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                setSelectedCompEmployeeId(employees[0]?.id || "");
+                setIsCompModalOpen(true);
               }}
             >
-              <FileText size={14} />
-            </div>
-            <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
-              Calculation Formula
-            </h4>
-          </div>
-
-          <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text-2)" }}>
-            <div style={{ fontWeight: 600, color: "var(--text-1)" }}>
-              HOURLY compensation: Total monthly compensation = Pay rate × Productive hours
-            </div>
-            <div>
-              Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
-            </div>
-            <div style={{ color: "var(--text-4)", fontSize: 11.5 }}>
-              • Total Higher rates = (Overtime hours × Pay rate × 1.5) + (Public Holiday &amp; Sunday hours × Pay rate × 2.0).
-              <br />
-              • Statutory Deductions = PAYE (Uganda Progressive Tax) + NSSF (5% Employee Pension). Net Pay = Gross Total - Deductions.
-            </div>
+              <Plus size={14} className="mr-6" /> Set Employee Compensation
+            </button>
           </div>
         </div>
 
@@ -2819,6 +2883,218 @@ export default function PayrollPage() {
             );
           })()}
       </Modal>
+
+      {/* RIGHT-SIDED CALCULATION FORMULA & RULES DRAWER */}
+      {isFormulaDrawerOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.45)",
+            backdropFilter: "blur(2px)",
+            zIndex: 9999,
+            display: "flex",
+            justifyContent: "flex-end",
+            animation: "fadeIn 0.2s ease-out",
+          }}
+          onClick={() => setIsFormulaDrawerOpen(false)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 540,
+              height: "100%",
+              background: "#FFFFFF",
+              boxShadow: "-10px 0 30px rgba(0, 0, 0, 0.15)",
+              display: "flex",
+              flexDirection: "column",
+              animation: "slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid var(--card-border, #E8ECE8)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                background: "#FFFFFF",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: "var(--primary-tint, #EFF6FF)",
+                      color: "var(--primary, #2563EB)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Calculator size={18} />
+                  </div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
+                    Payroll Calculation Guide
+                  </h3>
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--text-3)" }}>
+                  Standard formulas for base compensation, higher rates, and statutory taxes
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFormulaDrawerOpen(false)}
+                style={{
+                  background: "#F3F4F6",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: 6,
+                  cursor: "pointer",
+                  color: "var(--text-3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                title="Close guide"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Drawer Scrollable Body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 18,
+              }}
+            >
+              {/* Section 1: Salaried vs Hourly */}
+              <div style={{ background: "#FAF9F7", border: "1px solid var(--card-border, #E8ECE8)", borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <Briefcase size={15} style={{ color: "var(--primary)" }} />
+                  <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>1. Salaried vs. Hourly Pay Models</strong>
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.6 }}>
+                  <p style={{ margin: "0 0 8px 0" }}>
+                    • <strong>Salaried Staff:</strong> Entitled to their contracted fixed monthly salary (e.g. <code>UGX 2,000,000 / month</code>) based on standard monthly business hours (e.g. 173.33 hrs). Day-to-day clock variance does not deduct base salary unless unpaid absence or penalties are applied.
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    • <strong>Hourly Staff:</strong> Compensation is calculated directly from verified productive hours worked:
+                    <br />
+                    <code style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", padding: "4px 8px", borderRadius: 4, fontSize: 12, display: "inline-block", marginTop: 4, color: "var(--text-1)" }}>
+                      Monthly Base = Pay Rate × Productive Hours Worked
+                    </code>
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 2: Chargeable Income Gross Total */}
+              <div style={{ background: "#FAF9F7", border: "1px solid var(--card-border, #E8ECE8)", borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <Layers size={15} style={{ color: "var(--primary)" }} />
+                  <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>2. Chargeable Gross Formula</strong>
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.6 }}>
+                  <p style={{ margin: "0 0 8px 0" }}>
+                    Total chargeable gross combines base pay with all overtime additions, rest-day multipliers, bonuses, and allowances minus any penalties:
+                  </p>
+                  <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 6, padding: "10px 12px", fontSize: 12, fontWeight: 600, color: "var(--text-1)", lineHeight: 1.5 }}>
+                    Chargeable Gross = [Base Compensation] + [Higher Rates (OT/Hol)] + [Bonuses] + [Insurance] - [Penalties]
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Higher Rates Multipliers */}
+              <div style={{ background: "#FAF9F7", border: "1px solid var(--card-border, #E8ECE8)", borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <Clock size={15} style={{ color: "var(--primary)" }} />
+                  <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>3. Higher Rates (Overtime &amp; Rest Days)</strong>
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.6 }}>
+                  <p style={{ margin: "0 0 6px 0" }}>
+                    • <strong>Overtime Hours:</strong> Multiplied by {activeOvertimeMultiplier}× regular hourly rate:
+                    <br />
+                    <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>Overtime Pay = Overtime Hours × Hourly Rate × {activeOvertimeMultiplier}</span>
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    • <strong>Public Holidays &amp; Sundays:</strong> Multiplied by {activeHolidayMultiplier}× regular hourly rate:
+                    <br />
+                    <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>Holiday Pay = Holiday Hours × Hourly Rate × {activeHolidayMultiplier}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 4: Statutory Deductions */}
+              <div style={{ background: "#FAF9F7", border: "1px solid var(--card-border, #E8ECE8)", borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <Percent size={15} style={{ color: "#DC2626" }} />
+                  <strong style={{ fontSize: 13.5, color: "var(--text-1)" }}>4. Statutory Deductions (Uganda)</strong>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
+                  <p style={{ margin: "0 0 6px 0" }}>
+                    <strong>PAYE (Pay As You Earn) Progressive Tax Bands:</strong>
+                  </p>
+                  <ul style={{ margin: "0 0 10px 0", paddingLeft: 18, color: "var(--text-3)" }}>
+                    <li>0 – 235,000 UGX: Nil (0%)</li>
+                    <li>235,001 – 335,000 UGX: 10%</li>
+                    <li>335,001 – 410,000 UGX: 20%</li>
+                    <li>410,001 – 10,000,000 UGX: 30%</li>
+                    <li>Exceeding 10,000,000 UGX: Additional 10% on excess (40% marginal rate)</li>
+                  </ul>
+                  <p style={{ margin: 0 }}>
+                    <strong>NSSF (National Social Security Fund):</strong>
+                    <br />
+                    • <strong>5% Employee Contribution</strong> (deducted directly from gross)
+                    <br />
+                    • <strong>10% Employer Contribution</strong> (remitted by company)
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 5: Net Disbursed Pay */}
+              <div style={{ background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <CheckCircle2 size={15} style={{ color: "#16A34A" }} />
+                  <strong style={{ fontSize: 13.5, color: "#166534" }}>5. Net Disbursed Pay</strong>
+                </div>
+                <p style={{ margin: 0, fontSize: 12.5, color: "#166534", fontWeight: 600 }}>
+                  Net Pay = Total Chargeable Gross - Statutory Deductions (PAYE + NSSF)
+                </p>
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid var(--card-border, #E8ECE8)",
+                background: "#FAF9F7",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setIsFormulaDrawerOpen(false)}
+                style={{ width: "100%" }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
