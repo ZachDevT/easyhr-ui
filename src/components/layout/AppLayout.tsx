@@ -35,7 +35,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/pricing') ||
     pathname.startsWith('/contact');
 
-  const isStandalone = pathname === '/my-onboarding' || pathname.startsWith('/my-onboarding/');
+  const isStandalone =
+    pathname === '/my-onboarding' ||
+    pathname.startsWith('/my-onboarding/') ||
+    pathname.startsWith('/payroll/payslips/');
 
   const isPendingOnboarding =
     authLoaded &&

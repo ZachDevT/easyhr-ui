@@ -185,22 +185,30 @@ export default function PayslipPage() {
                 background: #FFFFFF !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
               }
               .no-print {
                 display: none !important;
               }
+              main {
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
               #printable-payslip {
                 box-shadow: none !important;
-                border: 1px solid #D1D5DB !important;
+                border: 1px solid #CBD5E1 !important;
                 border-radius: 0 !important;
                 max-width: 100% !important;
                 width: 100% !important;
-                margin: 0 !important;
-                padding: 24px 32px !important;
+                margin: 0 auto !important;
+                padding: 16px 24px !important;
+                page-break-inside: avoid !important;
               }
               @page {
-                size: A4;
-                margin: 12mm;
+                size: A4 portrait;
+                margin: 10mm;
               }
             }
           `,

@@ -1533,4 +1533,63 @@ tr:hover td { background: #FAFAF8; }
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
+/* ==========================================================================
+   GLOBAL PRINT STYLES (Clean A4 Document Output)
+   ========================================================================== */
+@media print {
+  /* Hide all application navigation, headers, sidebars and floating controls */
+  aside,
+  nav,
+  .app-sidebar,
+  .sidebar,
+  .topbar,
+  .top-bar,
+  .main-nav,
+  .search-bar,
+  .no-print,
+  button:not(#printable-payslip button),
+  header.no-print {
+    display: none !important;
+  }
+
+  /* Reset body and html for high-fidelity printing */
+  html, body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11pt !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .app-shell,
+  .main-content,
+  .page-body {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Print document container */
+  #printable-payslip {
+    border: 1px solid #D1D5DB !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    padding: 12mm 16mm !important;
+    page-break-inside: avoid !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+}
+
 
