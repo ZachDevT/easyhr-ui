@@ -334,6 +334,7 @@ export function CompulsoryMyTimeWidget() {
     // Pair punches into sessions in chronological order
     const sorted = [...punches].sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
     const sessions: Array<{ startMs: number; endMs: number; dateIso: string; isHolidaySession: boolean; minutes: number }> = [];
+    const standardDayMins = Math.round(standardDailyHours * 60) || 480;
 
     for (let i = 0; i < sorted.length; i++) {
       const p = sorted[i];
@@ -346,13 +347,19 @@ export function CompulsoryMyTimeWidget() {
         const next = sorted[i + 1];
         if (next && (next.kind === 'clock_out' || next.kind === 'out')) {
           const outTime = new Date(next.occurredAt).getTime();
-          const mins = Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
+          const rawMins = Math.max(0, Math.round((outTime - inTime) / (1000 * 60)));
+          // Cap abnormal single shift to max 14 hours
+          const mins = Math.min(rawMins, 14 * 60);
           sessions.push({ startMs: inTime, endMs: outTime, dateIso, isHolidaySession: isHol, minutes: mins });
           i++;
         } else {
-          // Open session from punch
-          const mins = Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
-          sessions.push({ startMs: inTime, endMs: Date.now(), dateIso, isHolidaySession: isHol, minutes: mins });
+          // Open session from punch without an explicit clock-out:
+          // If from today, calculate active duration up to 14h max.
+          // If from a past date, do NOT calculate up to Date.now() (which caused 900+ hours). Cap to standard workday (8h).
+          const isTodayPunch = dateIso === todayIso;
+          const rawMins = Math.max(0, Math.round((Date.now() - inTime) / (1000 * 60)));
+          const mins = isTodayPunch ? Math.min(rawMins, 14 * 60) : Math.min(rawMins, standardDayMins);
+          sessions.push({ startMs: inTime, endMs: inTime + mins * 60 * 1000, dateIso, isHolidaySession: isHol, minutes: mins });
         }
       }
     }
@@ -361,7 +368,7 @@ export function CompulsoryMyTimeWidget() {
     if (isClocked && clockStartTime) {
       const alreadyIncluded = sessions.some(s => Math.abs(s.startMs - clockStartTime) < 5000);
       if (!alreadyIncluded) {
-        const activeMins = Math.max(0, Math.round((Date.now() - clockStartTime) / (1000 * 60)));
+        const activeMins = Math.min(Math.max(0, Math.round((Date.now() - clockStartTime) / (1000 * 60))), 14 * 60);
         sessions.push({
           startMs: clockStartTime,
           endMs: Date.now(),
@@ -897,22 +904,15 @@ export function CompulsoryMyTimeWidget() {
           <div>
             <p className="text-xs text-5 mb-4">This Week</p>
             <p className="text-sm text-1 fw-700">{dynamicTimeSummary.thisWeek}</p>
-            {dynamicTimeSummary.weekOtMinutes > 0 ? (
+            {dynamicTimeSummary.weekOtMinutes > 0 && (
               <span style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, display: 'block' }}>
                 +{Math.floor(dynamicTimeSummary.weekOtMinutes / 60)}h {dynamicTimeSummary.weekOtMinutes % 60}m OT ({overtimeMultiplier}×)
-              </span>
-            ) : (
-              <span style={{ fontSize: 10.5, color: 'var(--text-4, #9CA3AF)', display: 'block' }}>
-                Standard Hours
               </span>
             )}
           </div>
           <div>
             <p className="text-xs text-5 mb-4">Pay Period</p>
             <p className="text-sm text-1 fw-700">{dynamicTimeSummary.payPeriod}</p>
-            <span style={{ fontSize: 10.5, color: 'var(--primary, #2563EB)', fontWeight: 600, display: 'block' }}>
-              {dynamicTimeSummary.periodLabel}
-            </span>
           </div>
           <Link href="/time" className="btn-neutral btn-sm" style={{ textDecoration: 'none' }}>
             My Timesheet

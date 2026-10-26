@@ -45,7 +45,15 @@ interface PayrollContextType {
 
   // Employee Profile & Compensation
   saveEmployeeCompensation: (profile: EmployeePayrollProfile) => void;
-  getEmployeeCompensation: (employeeId: string, employeeName?: string) => EmployeePayrollProfile;
+  getEmployeeCompensation: (
+    employeeId: string,
+    employeeName?: string,
+    jobTitle?: string,
+    department?: string,
+    email?: string,
+    employeeNumber?: string,
+    currency?: string
+  ) => EmployeePayrollProfile;
 
   // Bonuses & Penalties (Job section integration)
   addBonusPenalty: (record: Omit<BonusPenaltyRecord, 'id' | 'createdAt'>) => void;
@@ -54,8 +62,26 @@ interface PayrollContextType {
   getEmployeeBonusesPenalties: (employeeId: string) => BonusPenaltyRecord[];
 
   // Calculation & Payslips
-  calculateEmployeeCurrentPayroll: (employeeId: string, month?: number, year?: number) => PayrollCalculationResult;
-  getEmployeeCompensationDetails: (employeeId: string) => PayrollCalculationResult[];
+  calculateEmployeeCurrentPayroll: (
+    employeeId: string,
+    month?: number,
+    year?: number,
+    employeeName?: string,
+    jobTitle?: string,
+    department?: string,
+    email?: string,
+    employeeNumber?: string,
+    currency?: string
+  ) => PayrollCalculationResult;
+  getEmployeeCompensationDetails: (
+    employeeId: string,
+    employeeName?: string,
+    jobTitle?: string,
+    department?: string,
+    email?: string,
+    employeeNumber?: string,
+    currency?: string
+  ) => PayrollCalculationResult[];
   
   // Payroll Runs Execution
   runPayrollForPeriod: (title: string, periodStart: string, periodEnd: string, payDate: string) => PayrollRunRecord;
@@ -281,21 +307,29 @@ export function PayrollProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getEmployeeCompensation = useCallback(
-    (employeeId: string, employeeName?: string): EmployeePayrollProfile => {
+    (
+      employeeId: string,
+      employeeName?: string,
+      jobTitle?: string,
+      department?: string,
+      email?: string,
+      employeeNumber?: string,
+      currency?: string
+    ): EmployeePayrollProfile => {
       if (employeeProfiles[employeeId]) {
         return employeeProfiles[employeeId];
       }
 
-      // Sensible realistic default if not yet configured
+      // Dynamic fallback based on the actual employee being viewed
       return {
         employeeId,
-        employeeName: employeeName || 'Bushu Hamuli Zacharie',
-        employeeNumber: '# 10974',
-        email: 'bushu.zacharie@helpware.com',
-        department: 'Regional Staff - Africa',
-        jobTitle: 'Customer Support Representative',
+        employeeName: employeeName || 'Team Member',
+        employeeNumber: employeeNumber || '# 10001',
+        email: email || '',
+        department: department || 'General Organization',
+        jobTitle: jobTitle || 'Team Member',
         countryCode: settings.defaultCountry || 'UG',
-        currency: settings.defaultCurrency || 'UGX',
+        currency: currency || settings.defaultCurrency || 'UGX',
         compensationModel: 'hourly',
         hourlyRate: 18500, // 18,500 UGX / hr (~$5/hr)
         baseSalary: 3200000,
@@ -345,8 +379,18 @@ export function PayrollProvider({ children }: { children: React.ReactNode }) {
 
   // Single month calculation
   const calculateEmployeeCurrentPayroll = useCallback(
-    (employeeId: string, month: number = 10, year: number = 2026): PayrollCalculationResult => {
-      const profile = getEmployeeCompensation(employeeId);
+    (
+      employeeId: string,
+      month: number = 10,
+      year: number = 2026,
+      employeeName?: string,
+      jobTitle?: string,
+      department?: string,
+      email?: string,
+      employeeNumber?: string,
+      currency?: string
+    ): PayrollCalculationResult => {
+      const profile = getEmployeeCompensation(employeeId, employeeName, jobTitle, department, email, employeeNumber, currency);
 
       // Deterministic realistic attendance simulation based on month
       const attendanceVariance = month === 10 ? 168.5 : month === 9 ? 173.33 : 160.0;
@@ -378,8 +422,16 @@ export function PayrollProvider({ children }: { children: React.ReactNode }) {
 
   // Historical compensation details for the table (e.g. October, September, August 2026)
   const getEmployeeCompensationDetails = useCallback(
-    (employeeId: string): PayrollCalculationResult[] => {
-      const profile = getEmployeeCompensation(employeeId);
+    (
+      employeeId: string,
+      employeeName?: string,
+      jobTitle?: string,
+      department?: string,
+      email?: string,
+      employeeNumber?: string,
+      currency?: string
+    ): PayrollCalculationResult[] => {
+      const profile = getEmployeeCompensation(employeeId, employeeName, jobTitle, department, email, employeeNumber, currency);
       const months = [
         { month: 10, year: 2026, prodHours: 168.5, otHours: 8.5, specialHours: 8.0 },
         { month: 9, year: 2026, prodHours: 173.33, otHours: 12.0, specialHours: 0 },

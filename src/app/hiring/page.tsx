@@ -28,6 +28,7 @@ import {
   Loader2,
   Calendar,
   Eye,
+  Link2,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -38,6 +39,7 @@ import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { CurrencySelect } from "@/components/ui/CurrencySelect";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
 import { useHR, Candidate } from "@/context/HRContext";
 import { HiringSkeleton } from "@/components/ui/Skeleton";
 import { RichTextEditor, RichTextRenderer, formatEmploymentType, formatPostedDate } from "@/components/ui/RichTextEditor";
@@ -87,6 +89,7 @@ export default function HiringPage() {
   const [activeTab, setActiveTab] = useState("Pipeline");
   const [selectedJob, setSelectedJob] = useState("All Roles");
   const [searchQuery, setSearchQuery] = useState("");
+  const [setupLinkCandidate, setSetupLinkCandidate] = useState<any | null>(null);
 
   // View state: 'list' or 'create_job'
   const [viewState, setViewState] = useState<"list" | "create_job">("list");
@@ -943,9 +946,35 @@ export default function HiringPage() {
 
                                 <div className="row-between text-sm fw-600 text-5 pt-16" style={{ borderTop: "1px dashed var(--border)" }}>
                                   <span className="row gap-8 align-center"><Clock size={16} /> {candidate.date}</span>
-                                  <span style={{ color: "var(--primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                                    Profile <ChevronRight size={16} />
-                                  </span>
+                                  <div className="row gap-12 align-center">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setSetupLinkCandidate(candidate);
+                                      }}
+                                      style={{
+                                        background: "transparent",
+                                        border: "none",
+                                        color: "var(--primary, #2563EB)",
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        padding: "2px 6px",
+                                        borderRadius: 4,
+                                      }}
+                                      title="Send or copy onboarding link"
+                                    >
+                                      <Link2 size={13} /> Setup
+                                    </button>
+                                    <span style={{ color: "var(--primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                      Profile <ChevronRight size={16} />
+                                    </span>
+                                  </div>
                                 </div>
                               </CardBody>
                             </Card>
@@ -1134,6 +1163,16 @@ export default function HiringPage() {
               </div>
             )}
           </>
+        )}
+
+        {setupLinkCandidate && (
+          <OnboardingLinkModal
+            isOpen={Boolean(setupLinkCandidate)}
+            onClose={() => setSetupLinkCandidate(null)}
+            employeeId={setupLinkCandidate.id}
+            employeeName={setupLinkCandidate.name}
+            employeeEmail={setupLinkCandidate.email}
+          />
         )}
       </div>
     </div>

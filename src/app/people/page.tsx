@@ -3,7 +3,7 @@
 import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Building2, ChevronRight, Mail, MapPin, Search, Users, UserPlus } from "lucide-react";
+import { Building2, ChevronRight, Mail, MapPin, Search, Users, UserPlus, Link2 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -13,6 +13,7 @@ import { PeopleDirectorySkeleton } from "@/components/ui/Skeleton";
 import { useRole } from "@/context/RoleContext";
 
 import { AddHireModal } from "@/components/people/AddHireModal";
+import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
 
 interface Employee {
   id: string;
@@ -45,6 +46,7 @@ export default function PeopleDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isAddHireOpen, setIsAddHireOpen] = useState(false);
+  const [onboardingLinkEmployee, setOnboardingLinkEmployee] = useState<Employee | null>(null);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -151,6 +153,16 @@ export default function PeopleDirectory() {
         locations={rawLocations}
         managers={employees}
       />
+
+      {onboardingLinkEmployee && (
+        <OnboardingLinkModal
+          isOpen={Boolean(onboardingLinkEmployee)}
+          onClose={() => setOnboardingLinkEmployee(null)}
+          employeeId={onboardingLinkEmployee.id}
+          employeeName={`${onboardingLinkEmployee.firstName} ${onboardingLinkEmployee.lastName}`}
+          employeeEmail={onboardingLinkEmployee.workEmail}
+        />
+      )}
 
       <main style={{ padding: "0 24px 32px" }}>
         {isLoading ? (
@@ -319,7 +331,7 @@ export default function PeopleDirectory() {
                           </div>
                         </div>
 
-                        <div style={{ marginTop: 14 }}>
+                        <div style={{ marginTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                           <StatusPill
                             tone={
                               e.status === "active"
@@ -331,6 +343,31 @@ export default function PeopleDirectory() {
                           >
                             {e.status}
                           </StatusPill>
+                          {e.status === "onboarding" && (canViewDetails || isHRAdmin || isManager) && (
+                            <button
+                              type="button"
+                              onClick={(ev) => {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                setOnboardingLinkEmployee(e);
+                              }}
+                              className="btn-neutral btn-sm"
+                              style={{
+                                fontSize: 11.5,
+                                padding: "4px 10px",
+                                borderRadius: 8,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                color: "var(--primary, #2563EB)",
+                                fontWeight: 650,
+                              }}
+                              title="Resend or copy employee onboarding link"
+                            >
+                              <Link2 size={12} />
+                              <span>Resend Link</span>
+                            </button>
+                          )}
                         </div>
                       </>
                     );

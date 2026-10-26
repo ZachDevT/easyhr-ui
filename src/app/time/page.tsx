@@ -487,11 +487,6 @@ export default function TimeTrackingPage() {
                   />
                   <span>Live Real-Time Sync</span>
                 </div>
-                {(isHRAdmin || isManager) && (
-                  <button className="btn-primary btn-sm" onClick={submitWeek} disabled={isSubmittingTimesheet||weekOffset!==0}>
-                    {isSubmittingTimesheet ? 'Submitting…' : 'Submit Review'}
-                  </button>
-                )}
               </div>
             </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -29,16 +29,29 @@ import {
   Globe,
   ExternalLink,
   Loader2,
+  Link2,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Modal } from "@/components/ui/Modal";
+import { toast } from "@/components/ui/Toast";
 import { useHR, Candidate } from "@/context/HRContext";
 import { RichTextRenderer } from "@/components/ui/RichTextEditor";
 import { EmailComposer } from "@/components/shared/EmailComposer";
 import { ThreadView } from "@/components/shared/ThreadView";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
+
+const STAGE_OPTIONS = [
+  { value: "Applied", label: "Applied", description: "Initial application review" },
+  { value: "Screening", label: "Screening", description: "HR resume & culture screening" },
+  { value: "Interviewing", label: "Interviewing", description: "Technical & team interviews" },
+  { value: "Offer", label: "Offer", description: "Job offer extended" },
+  { value: "Hired", label: "Hired & Onboard", description: "Hired and employee profile provisioned" },
+  { value: "Rejected", label: "Rejected", description: "Archived from pipeline" },
+];
 
 export default function CandidateProfilePage() {
   const params = useParams();
@@ -51,6 +64,41 @@ export default function CandidateProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [candidateProfileTab, setCandidateProfileTab] = useState("Overview");
   const [showComposeEmailModal, setShowComposeEmailModal] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [isSendingSetupEmail, setIsSendingSetupEmail] = useState(false);
+
+  const handleSendSetupEmail = async () => {
+    if (!candidate?.email) {
+      toast.error("Missing email", "This candidate has no email address.");
+      return;
+    }
+    setIsSendingSetupEmail(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/onboarding/send-invitation`, {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: candidate.email,
+          name: candidate.name,
+          jobTitle: candidate.role,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Setup email sent", `A fresh 7-day onboarding invitation was sent to ${candidate.email}.`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not send setup invitation");
+      }
+    } catch (err: any) {
+      toast.error("Error", err.message || "Failed to send setup invitation.");
+    } finally {
+      setIsSendingSetupEmail(false);
+    }
+  };
 
   useEffect(() => {
     // 1. Check local HRContext candidates
@@ -200,39 +248,49 @@ export default function CandidateProfilePage() {
             </div>
           </div>
 
-          <div className="row gap-12 align-center">
+          <div className="row gap-12 align-center" style={{ flexWrap: "wrap" }}>
             <button
               className="btn-secondary row gap-8 fw-600"
               onClick={() => setShowComposeEmailModal(true)}
-              style={{ padding: "10px 18px", borderRadius: 8 }}
+              style={{ padding: "9px 16px", borderRadius: 8, fontSize: 13 }}
             >
-              <Mail size={16} /> Send Email
+              <Mail size={15} /> Send Email
             </button>
-            <select
-              value={candidate.stage}
-              onChange={async (e) => {
-                const nextStage = e.target.value;
-                await updateCandidateStage(candidate.id, nextStage);
-                setCandidate((prev: any) => prev ? { ...prev, stage: nextStage } : prev);
-              }}
-              style={{
-                padding: "9px 14px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--bg-card)",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-                color: "var(--text-1)",
-              }}
+
+            <button
+              className="btn-secondary row gap-8 fw-600"
+              onClick={handleSendSetupEmail}
+              disabled={isSendingSetupEmail}
+              style={{ padding: "9px 16px", borderRadius: 8, fontSize: 13, color: "var(--primary, #2563EB)", borderColor: "var(--primary, #2563EB)" }}
+              title="Send or resend branded employee onboarding invitation link (valid 7 days)"
             >
-              <option value="Applied">Applied</option>
-              <option value="Screening">Screening</option>
-              <option value="Interviewing">Interviewing</option>
-              <option value="Offer">Offer</option>
-              <option value="Hired">Hired &amp; Onboard</option>
-              <option value="Rejected">Rejected</option>
-            </select>
+              {isSendingSetupEmail ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
+              <span>{candidate.stage.toLowerCase() === "hired" ? "Resend Setup Email" : "Send Setup Email"}</span>
+            </button>
+
+            <button
+              className="btn-neutral row gap-6 fw-600"
+              onClick={() => setIsOnboardingModalOpen(true)}
+              style={{ padding: "9px 14px", borderRadius: 8, fontSize: 13 }}
+              title="Copy or inspect onboarding link"
+            >
+              <Link2 size={15} />
+              <span>Onboarding Link</span>
+            </button>
+
+            <div style={{ width: 170 }}>
+              <SearchableSelect
+                options={STAGE_OPTIONS}
+                value={candidate.stage}
+                onChange={async (val) => {
+                  await updateCandidateStage(candidate.id, val);
+                  setCandidate((prev: any) => prev ? { ...prev, stage: val } : prev);
+                }}
+                size="sm"
+                placeholder="Stage"
+              />
+            </div>
+
             {candidate.stage.toLowerCase() !== "hired" ? (
               <button
                 className="btn-primary row gap-8 fw-600"
@@ -241,22 +299,23 @@ export default function CandidateProfilePage() {
                   setCandidate((prev: any) => prev ? { ...prev, stage: "Hired" } : prev);
                 }}
                 style={{
-                  padding: "10px 20px",
+                  padding: "9px 18px",
                   borderRadius: 8,
                   background: "linear-gradient(135deg, #16A34A 0%, #15803D 100%)",
                   color: "white",
                   border: "none",
+                  fontSize: 13,
                 }}
               >
-                <CheckCircle2 size={16} /> Hire Candidate
+                <CheckCircle2 size={15} /> Hire Candidate
               </button>
             ) : (
               <Link
                 href="/people"
                 className="btn-secondary row gap-8 fw-600"
-                style={{ padding: "10px 18px", borderRadius: 8, color: "#16A34A", borderColor: "#86EFAC" }}
+                style={{ padding: "9px 16px", borderRadius: 8, color: "#16A34A", borderColor: "#86EFAC", fontSize: 13, textDecoration: "none" }}
               >
-                <CheckCircle2 size={16} /> View in Directory
+                <CheckCircle2 size={15} /> View in Directory
               </Link>
             )}
           </div>
@@ -675,6 +734,16 @@ export default function CandidateProfilePage() {
               </div>
             </CardBody>
           </Card>
+        )}
+
+        {candidate && (
+          <OnboardingLinkModal
+            isOpen={isOnboardingModalOpen}
+            onClose={() => setIsOnboardingModalOpen(false)}
+            employeeId={candidate.id}
+            employeeName={candidate.name}
+            employeeEmail={candidate.email}
+          />
         )}
       </div>
     </div>

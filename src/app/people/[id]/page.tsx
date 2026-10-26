@@ -29,8 +29,10 @@ import {
   Eye,
   Printer,
   Link2,
+  CreditCard,
 } from "lucide-react";
 import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
+import { PaymentMethodModal } from "@/components/people/PaymentMethodModal";
 import { useAuth } from "@clerk/nextjs";
 import { useRole } from "@/context/RoleContext";
 import { usePayroll } from "@/context/PayrollContext";
@@ -96,6 +98,7 @@ export default function EmployeeProfile() {
   const [isActivating, setIsActivating] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOnboardingLinkModalOpen, setIsOnboardingLinkModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [managers, setManagers] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
@@ -121,11 +124,26 @@ export default function EmployeeProfile() {
     reason: "",
   });
 
-  const empId = params?.id || 'emp-bushu';
-  const fallbackFullName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : 'Bushu Hamuli Zacharie';
-  const empComp = getEmployeeCompensation(empId, fallbackFullName);
+  const empId = (params?.id as string) || "";
+  const currentFullName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : "Team Member";
+  const empComp = getEmployeeCompensation(
+    empId,
+    currentFullName,
+    employee?.jobTitle,
+    employee?.department,
+    employee?.workEmail,
+    employee?.employeeNumber
+  );
   const employeeBonusesPenalties = getEmployeeBonusesPenalties(empId);
-  const compensationRows = getEmployeeCompensationDetails(empId);
+  const compensationRows = getEmployeeCompensationDetails(
+    empId,
+    currentFullName,
+    employee?.jobTitle,
+    employee?.department,
+    employee?.workEmail,
+    employee?.employeeNumber,
+    empComp.currency
+  );
 
   const getMonthName = (m: number) => {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -410,12 +428,12 @@ export default function EmployeeProfile() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
             {employee.status === "onboarding" && (
               <>
                 <button
                   onClick={() => setIsOnboardingLinkModalOpen(true)}
-                  className="btn-neutral btn-sm"
+                  className="btn-secondary btn-sm"
                   title="Generate a fresh non-expired onboarding link (7 days) or resend email"
                   style={{
                     display: "inline-flex",
@@ -424,10 +442,13 @@ export default function EmployeeProfile() {
                     padding: "8px 14px",
                     borderRadius: 9,
                     fontSize: 12,
+                    color: "var(--primary, #2563EB)",
+                    borderColor: "var(--primary, #2563EB)",
+                    fontWeight: 600,
                   }}
                 >
-                  <Link2 size={13.5} />
-                  <span>Onboarding Link</span>
+                  <Mail size={13.5} />
+                  <span>Resend Onboarding Link</span>
                 </button>
                 <button
                   onClick={handleActivate}
@@ -440,6 +461,7 @@ export default function EmployeeProfile() {
                     padding: "8px 16px",
                     borderRadius: 9,
                     fontSize: 12,
+                    fontWeight: 600,
                   }}
                 >
                   {isActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
@@ -447,6 +469,23 @@ export default function EmployeeProfile() {
                 </button>
               </>
             )}
+            <button
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="btn-neutral btn-sm"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                borderRadius: 9,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+              title="Configure or update disbursement payout method (Bank, Mobile Money, etc.)"
+            >
+              <CreditCard size={13.5} />
+              <span>Payment Method</span>
+            </button>
             <button
               onClick={() => setIsEditModalOpen(true)}
               className="btn-neutral btn-sm"
@@ -457,6 +496,7 @@ export default function EmployeeProfile() {
                 padding: "8px 14px",
                 borderRadius: 9,
                 fontSize: 12,
+                fontWeight: 600,
               }}
             >
               <Edit2 size={13.5} />
@@ -553,13 +593,26 @@ export default function EmployeeProfile() {
             </Card>
 
             {/* Compensation & Disbursement */}
-            {(employee.paymentMethod || employee.mobileMoneyProvider || employee.bankName) && (
-              <Card>
-                <CardBody>
+            <Card>
+              <CardBody>
+                <div className="row-between mb-16 align-center">
                   <SectionHeading
-                    title="Disbursement & Payroll"
-                    description="Designated compensation payout account"
+                    title="Disbursement & Payment Method"
+                    description="Designated compensation payout account where wages are transferred"
                   />
+                  {(isHRAdmin || isManager || isOwnProfile) && (
+                    <button
+                      type="button"
+                      onClick={() => setIsPaymentModalOpen(true)}
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8 }}
+                    >
+                      <CreditCard size={13} />
+                      <span>{employee.paymentMethod || employee.bankName || employee.mobileMoneyProvider ? "Edit Payment Method" : "Add Payment Method"}</span>
+                    </button>
+                  )}
+                </div>
+                {employee.paymentMethod || employee.mobileMoneyProvider || employee.bankName ? (
                   <div className="col gap-12">
                     <DataRow
                       leading={
@@ -581,12 +634,46 @@ export default function EmployeeProfile() {
                           : employee.paymentMethod || "Direct Deposit"
                       }
                       subtitle={employee.paymentMethod || "Disbursement Channel"}
-                      meta={<StatusPill tone="success">Active</StatusPill>}
+                      meta={<StatusPill tone="success">Active Disbursement</StatusPill>}
                     />
                   </div>
-                </CardBody>
-              </Card>
-            )}
+                ) : (
+                  <div
+                    style={{
+                      background: "#F8FAFC",
+                      borderRadius: 10,
+                      border: "1px dashed #CBD5E1",
+                      padding: "18px 20px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>
+                        No disbursement method configured yet
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                        Set up a bank account (direct deposit), mobile money (MTN / Airtel), or PayPal wallet for automatic payroll payout.
+                      </div>
+                    </div>
+                    {(isHRAdmin || isManager || isOwnProfile) && (
+                      <button
+                        type="button"
+                        onClick={() => setIsPaymentModalOpen(true)}
+                        className="btn-primary btn-sm"
+                        style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 8 }}
+                      >
+                        <Plus size={13} />
+                        <span>Add Payment Method</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
 
             {/* Payroll Compensation, Formula & Payslips (HR Access) */}
             <Card>
@@ -1136,13 +1223,31 @@ export default function EmployeeProfile() {
       )}
 
       {employee && (
-        <OnboardingLinkModal
-          isOpen={isOnboardingLinkModalOpen}
-          onClose={() => setIsOnboardingLinkModalOpen(false)}
-          employeeId={employee.id}
-          employeeName={`${employee.firstName} ${employee.lastName}`}
-          employeeEmail={employee.personalEmail || employee.workEmail}
-        />
+        <>
+          <OnboardingLinkModal
+            isOpen={isOnboardingLinkModalOpen}
+            onClose={() => setIsOnboardingLinkModalOpen(false)}
+            employeeId={employee.id}
+            employeeName={`${employee.firstName} ${employee.lastName}`}
+            employeeEmail={employee.personalEmail || employee.workEmail}
+          />
+          <PaymentMethodModal
+            isOpen={isPaymentModalOpen}
+            onClose={() => setIsPaymentModalOpen(false)}
+            onSuccess={() => fetchProfile()}
+            employeeId={employee.id}
+            employeeName={`${employee.firstName} ${employee.lastName}`}
+            initialData={{
+              paymentMethod: employee.paymentMethod,
+              bankName: employee.bankName,
+              bankAccountNumber: employee.bankAccountNumber,
+              bankRoutingNumber: employee.bankRoutingNumber,
+              mobileMoneyProvider: employee.mobileMoneyProvider,
+              mobileMoneyPhone: employee.mobileMoneyPhone,
+              walletEmail: employee.walletEmail,
+            }}
+          />
+        </>
       )}
     </>
   );
