@@ -1497,7 +1497,8 @@ export default function PayrollPage() {
                                   }}
                                   title="Hours automatically synchronized from employee clock-in & timesheet records"
                                 >
-                                  ⏱️ Synced
+                                  <Clock size={10} style={{ display: "inline-block", marginRight: 3, verticalAlign: "middle" }} />
+                                  Synced
                                 </span>
                               )}
                             </td>
@@ -2646,8 +2647,9 @@ export default function PayrollPage() {
                       color: "var(--text-2)",
                     }}
                   >
-                    <span>
-                      ⏱️ <strong>Clock-in &amp; Timesheets:</strong> {(totalTsMinutes / 60).toFixed(1)} hrs recorded for this staff.
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                      <Clock size={13} style={{ color: "var(--primary)" }} />
+                      <span><strong>Clock-in &amp; Timesheets:</strong> {(totalTsMinutes / 60).toFixed(1)} hrs recorded for this staff.</span>
                     </span>
                     <button
                       type="button"

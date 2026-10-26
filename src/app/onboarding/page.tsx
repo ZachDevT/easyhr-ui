@@ -32,6 +32,7 @@ import {
   Info,
   UploadCloud,
   BookOpen,
+  Link2,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -43,6 +44,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useHR } from "@/context/HRContext";
+import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
 import { toast } from "@/components/ui/Toast";
 import { getVideoEmbedUrl } from "@/lib/videoEmbed";
 
@@ -98,6 +100,8 @@ export default function HrOnboardingPage() {
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [selectedDeptId, setSelectedDeptId] = useState("");
   const [isLaunching, setIsLaunching] = useState(false);
+  const [selectedLinkHire, setSelectedLinkHire] = useState<{ id: string; name: string; email?: string } | null>(null);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   // Dynamic Onboarding Settings state
   const [onboardingSettings, setOnboardingSettings] = useState<OnboardingSettings>({
@@ -521,7 +525,33 @@ export default function HrOnboardingPage() {
                                   </Badge>
                                 </td>
                                 <td style={{ padding: "20px 24px", textAlign: "right" }}>
-                                  <div className="row gap-8 justify-end" onClick={(e) => e.stopPropagation()}>
+                                  <div className="row gap-8 justify-end align-center" onClick={(e) => e.stopPropagation()}>
+                                    {hire.status !== "Completed" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedLinkHire({
+                                            id: hire.employeeId || hire.id,
+                                            name: hire.name,
+                                            email: hire.email,
+                                          });
+                                          setIsLinkModalOpen(true);
+                                        }}
+                                        className="btn-neutral"
+                                        title="Generate a fresh non-expired onboarding link (7 days) or resend email"
+                                        style={{
+                                          padding: "6px 12px",
+                                          fontSize: 12,
+                                          fontWeight: 650,
+                                          borderRadius: 8,
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: 4,
+                                        }}
+                                      >
+                                        <Link2 size={13} /> Link
+                                      </button>
+                                    )}
                                     {hire.status !== "Completed" ? (
                                       <button
                                         onClick={() => completeOnboarding(hire.id)}
@@ -1074,6 +1104,19 @@ export default function HrOnboardingPage() {
           </div>
         )}
       </Modal>
+
+      {selectedLinkHire && (
+        <OnboardingLinkModal
+          isOpen={isLinkModalOpen}
+          onClose={() => {
+            setIsLinkModalOpen(false);
+            setSelectedLinkHire(null);
+          }}
+          employeeId={selectedLinkHire.id}
+          employeeName={selectedLinkHire.name}
+          employeeEmail={selectedLinkHire.email}
+        />
+      )}
     </div>
   );
 }

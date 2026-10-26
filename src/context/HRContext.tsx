@@ -40,6 +40,7 @@ export type OnboardingRecord = {
   candidateId: string;
   employeeId?: string;
   name: string;
+  email?: string;
   role: string;
   department: string;
   startDate: string;
@@ -224,6 +225,7 @@ export function HRProvider({ children }: { children: ReactNode }) {
       candidateId: candidate.id,
       employeeId,
       name: candidate.name,
+      email: candidate.email,
       role: candidate.role,
       department,
       startDate,

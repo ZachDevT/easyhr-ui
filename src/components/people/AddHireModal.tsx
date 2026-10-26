@@ -7,6 +7,8 @@ import { API_BASE_URL } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 import { SearchableSelect, SelectOption } from "@/components/ui/SearchableSelect";
 import { Loader2, UserPlus, Mail, Briefcase, Building, MapPin, UserCheck, Calendar, ShieldCheck, Check, Plus } from "lucide-react";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { OnboardingLinkModal } from "./OnboardingLinkModal";
 
 interface AddHireModalProps {
   isOpen: boolean;
@@ -46,6 +48,8 @@ export function AddHireModal({
   const [employmentType, setEmploymentType] = useState("full_time");
   const [sendInvitation, setSendInvitation] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdEmployeeInfo, setCreatedEmployeeInfo] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
   useEffect(() => {
     setPositionId("");
@@ -182,16 +186,28 @@ export function AddHireModal({
         throw new Error(errJson.detail || errJson.title || "Failed to create employee record");
       }
 
+      const createdEmp = await res.json();
+      const empId = createdEmp.id;
+      const empName = `${firstName} ${lastName}`.trim();
+      const empEmail = personalEmail || workEmail;
+
       toast.success(
         "New Hire Enrolled",
         sendInvitation
-          ? `Record created for ${firstName} ${lastName}. An onboarding link has been sent to ${personalEmail || workEmail}.`
-          : `Record created for ${firstName} ${lastName} in onboarding status.`
+          ? `Record created for ${empName}. An onboarding link has been sent to ${empEmail}.`
+          : `Record created for ${empName} in onboarding status.`
       );
 
       resetForm();
       onSuccess();
       onClose();
+
+      setCreatedEmployeeInfo({
+        id: empId,
+        name: empName,
+        email: empEmail,
+      });
+      setShowLinkModal(true);
     } catch (err: any) {
       console.error("Failed to create employee:", err);
       toast.error("Could not add hire", err.message || "An unexpected error occurred.");
@@ -201,7 +217,8 @@ export function AddHireModal({
   };
 
   return (
-    <Modal
+    <>
+      <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Add New Hire"
@@ -354,12 +371,10 @@ export function AddHireModal({
             <label style={{ fontSize: 12, fontWeight: 650, color: "#3F3F46" }}>
               Start Date
             </label>
-            <input
-              type="date"
-              className="input"
+            <DatePicker
               value={hiredOn}
-              onChange={(e) => setHiredOn(e.target.value)}
-              style={{ fontSize: 13 }}
+              onValueChange={setHiredOn}
+              placeholder="Select start date"
             />
           </div>
         </div>
@@ -478,5 +493,19 @@ export function AddHireModal({
         </div>
       </form>
     </Modal>
+
+    {createdEmployeeInfo && (
+      <OnboardingLinkModal
+        isOpen={showLinkModal}
+        onClose={() => {
+          setShowLinkModal(false);
+          setCreatedEmployeeInfo(null);
+        }}
+        employeeId={createdEmployeeInfo.id}
+        employeeName={createdEmployeeInfo.name}
+        employeeEmail={createdEmployeeInfo.email}
+      />
+    )}
+  </>
   );
 }

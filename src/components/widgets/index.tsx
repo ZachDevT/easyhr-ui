@@ -37,6 +37,7 @@ import {
   Briefcase,
   Mail,
   User,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { useRole } from '@/context/RoleContext';
@@ -49,6 +50,8 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { toast } from '../ui/Toast';
 import { Textarea } from '../ui/Textarea';
+import { DatePicker } from '../ui/DatePicker';
+import { TimePicker } from '../ui/TimePicker';
 import { timeSummary, weekEntries } from '../../data/timeData';
 import { timeOffBalances } from '../../data/timeOff';
 
@@ -571,8 +574,10 @@ export function CompulsoryMyTimeWidget() {
                 className="btn-primary w-full"
                 style={{
                   flex: 1,
-                  padding: '12px 20px',
+                  padding: '12px 24px',
+                  borderRadius: 9999,
                   fontSize: 14,
+                  fontWeight: 700,
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -701,7 +706,7 @@ export function CompulsoryMyTimeWidget() {
                           }
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                           <span
                             style={{
                               width: 8,
@@ -716,15 +721,21 @@ export function CompulsoryMyTimeWidget() {
                               fontSize: 13,
                               fontWeight: isSelected ? 700 : 500,
                               color: isSelected ? 'var(--primary)' : 'var(--text-1)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
                             }}
                           >
                             {act.name}
                           </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
                           <span
                             style={{
                               fontSize: 10,
                               fontWeight: 700,
-                              padding: '2px 6px',
+                              padding: '2px 8px',
                               borderRadius: 10,
                               background: act.isBillable ? '#ecfdf5' : '#f1f5f9',
                               color: act.isBillable ? '#059669' : '#64748b',
@@ -732,25 +743,25 @@ export function CompulsoryMyTimeWidget() {
                           >
                             {act.isBillable ? 'Billable' : 'Non-billable'}
                           </span>
-                        </div>
 
-                        {isSelected && (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              background: 'rgba(124, 58, 237, 0.12)',
-                              color: 'var(--primary)',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Check size={12} strokeWidth={3} />
-                          </span>
-                        )}
+                          {isSelected && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 20,
+                                height: 20,
+                                borderRadius: '50%',
+                                background: 'rgba(37, 99, 235, 0.12)',
+                                color: 'var(--primary)',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
@@ -955,27 +966,27 @@ export function CompulsoryMyTimeWidget() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label className="form-label">Date</label>
-            <Input
-              type="date"
+            <DatePicker
               value={manualDate}
-              onChange={(e) => setManualDate(e.target.value)}
+              onValueChange={setManualDate}
+              placeholder="Select date"
             />
           </div>
           <div className="grid-2 gap-12">
             <div>
               <label className="form-label">Start Time*</label>
-              <Input
-                type="time"
+              <TimePicker
                 value={manualStartTime}
-                onChange={(e) => setManualStartTime(e.target.value)}
+                onValueChange={setManualStartTime}
+                placeholder="Start time"
               />
             </div>
             <div>
               <label className="form-label">End Time*</label>
-              <Input
-                type="time"
+              <TimePicker
                 value={manualEndTime}
-                onChange={(e) => setManualEndTime(e.target.value)}
+                onValueChange={setManualEndTime}
+                placeholder="End time"
               />
             </div>
           </div>
@@ -1226,7 +1237,7 @@ export function CompulsoryTimeOffWidget() {
 
         <button
           className="btn-secondary w-full"
-          style={{ padding: '12px 24px', fontSize: 13.5, fontWeight: 700 }}
+          style={{ padding: '12px 24px', fontSize: 13.5, fontWeight: 700, borderRadius: 9999 }}
           onClick={() => {
             const today = new Date().toISOString().slice(0, 10);
             setFormStartDate(today);
@@ -1246,10 +1257,10 @@ export function CompulsoryTimeOffWidget() {
         subtitle="Submit a full-day or partial-day (hours) leave request."
         footer={
           <>
-            <button className="btn-neutral" onClick={() => setModal(false)} disabled={isSubmitting}>
+            <button className="btn-neutral" onClick={() => setModal(false)} disabled={isSubmitting} style={{ borderRadius: 9999 }}>
               Cancel
             </button>
-            <button className="btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+            <button className="btn-primary" onClick={handleSubmit} disabled={isSubmitting} style={{ borderRadius: 9999 }}>
               {isSubmitting ? 'Submitting...' : `Submit Request (${formHours}h)`}
             </button>
           </>
@@ -1294,9 +1305,14 @@ export function CompulsoryTimeOffWidget() {
                   fontWeight: 700,
                   fontSize: 12.5,
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                 }}
               >
-                📅 Full Day(s)
+                <Calendar size={14} />
+                <span>Full Day(s)</span>
               </button>
               <button
                 type="button"
@@ -1313,9 +1329,14 @@ export function CompulsoryTimeOffWidget() {
                   fontWeight: 700,
                   fontSize: 12.5,
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                 }}
               >
-                ⏱️ Hours / Partial Day
+                <Clock size={14} />
+                <span>Hours / Partial Day</span>
               </button>
             </div>
           </div>
@@ -1324,12 +1345,11 @@ export function CompulsoryTimeOffWidget() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label className="form-label">Date *</label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={formStartDate}
-                  onChange={(e) => {
-                    setFormStartDate(e.target.value);
-                    setFormEndDate(e.target.value);
+                  onValueChange={(val) => {
+                    setFormStartDate(val);
+                    setFormEndDate(val);
                   }}
                   required
                 />
@@ -1374,14 +1394,12 @@ export function CompulsoryTimeOffWidget() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="grid-2">
+              <div className="grid-2 gap-12">
                 <div>
                   <label className="form-label">Start Date *</label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formStartDate}
-                    onChange={(e) => {
-                      const newStart = e.target.value;
+                    onValueChange={(newStart) => {
                       const end = formEndDate || newStart;
                       let days = 1;
                       if (newStart && end && end >= newStart) {
@@ -1397,11 +1415,10 @@ export function CompulsoryTimeOffWidget() {
                 </div>
                 <div>
                   <label className="form-label">End Date *</label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formEndDate}
-                    onChange={(e) => {
-                      const newEnd = e.target.value;
+                    minDate={formStartDate}
+                    onValueChange={(newEnd) => {
                       const start = formStartDate || newEnd;
                       let days = 1;
                       if (start && newEnd && newEnd >= start) {

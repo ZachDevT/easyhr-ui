@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Avatar } from "@/components/ui/Avatar";
+import { DatePicker } from "@/components/ui/DatePicker";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -1836,9 +1837,14 @@ export default function TimeOffPage() {
                   fontWeight: 700,
                   fontSize: 13,
                   cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
                 }}
               >
-                📅 Full Day(s)
+                <Calendar size={14} />
+                <span>Full Day(s)</span>
               </button>
               <button
                 type="button"
@@ -1859,9 +1865,14 @@ export default function TimeOffPage() {
                   fontWeight: 700,
                   fontSize: 13,
                   cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
                 }}
               >
-                ⏱️ Hours / Partial Day
+                <Clock size={14} />
+                <span>Hours / Partial Day</span>
               </button>
             </div>
           </div>
@@ -1871,17 +1882,15 @@ export default function TimeOffPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label className="form-label">Date *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={requestForm.startDate}
-                  onChange={(e) =>
+                  onValueChange={(val) =>
                     setRequestForm({
                       ...requestForm,
-                      startDate: e.target.value,
-                      endDate: e.target.value,
+                      startDate: val,
+                      endDate: val,
                     })
                   }
-                  className="input"
                   required
                 />
               </div>
@@ -1933,11 +1942,9 @@ export default function TimeOffPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label className="form-label">Start Date *</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={requestForm.startDate}
-                    onChange={(e) => {
-                      const newStart = e.target.value;
+                    onValueChange={(newStart) => {
                       const end = requestForm.endDate || newStart;
                       let days = 1;
                       if (newStart && end && end >= newStart) {
@@ -1951,17 +1958,15 @@ export default function TimeOffPage() {
                         hours: days * 8,
                       });
                     }}
-                    className="input"
                     required
                   />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label className="form-label">End Date *</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={requestForm.endDate}
-                    onChange={(e) => {
-                      const newEnd = e.target.value;
+                    minDate={requestForm.startDate}
+                    onValueChange={(newEnd) => {
                       const start = requestForm.startDate || newEnd;
                       let days = 1;
                       if (start && newEnd && newEnd >= start) {
@@ -1974,7 +1979,6 @@ export default function TimeOffPage() {
                         hours: days * 8,
                       });
                     }}
-                    className="input"
                     required
                   />
                 </div>

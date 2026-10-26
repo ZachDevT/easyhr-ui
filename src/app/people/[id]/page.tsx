@@ -28,7 +28,9 @@ import {
   Plus,
   Eye,
   Printer,
+  Link2,
 } from "lucide-react";
+import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
 import { useAuth } from "@clerk/nextjs";
 import { useRole } from "@/context/RoleContext";
 import { usePayroll } from "@/context/PayrollContext";
@@ -93,6 +95,7 @@ export default function EmployeeProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isActivating, setIsActivating] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isOnboardingLinkModalOpen, setIsOnboardingLinkModalOpen] = useState(false);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [managers, setManagers] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
@@ -409,22 +412,40 @@ export default function EmployeeProfile() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {employee.status === "onboarding" && (
-              <button
-                onClick={handleActivate}
-                disabled={isActivating}
-                className="btn-primary btn-sm"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "8px 16px",
-                  borderRadius: 9,
-                  fontSize: 12,
-                }}
-              >
-                {isActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                <span>Activate Employee</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setIsOnboardingLinkModalOpen(true)}
+                  className="btn-neutral btn-sm"
+                  title="Generate a fresh non-expired onboarding link (7 days) or resend email"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 14px",
+                    borderRadius: 9,
+                    fontSize: 12,
+                  }}
+                >
+                  <Link2 size={13.5} />
+                  <span>Onboarding Link</span>
+                </button>
+                <button
+                  onClick={handleActivate}
+                  disabled={isActivating}
+                  className="btn-primary btn-sm"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 16px",
+                    borderRadius: 9,
+                    fontSize: 12,
+                  }}
+                >
+                  {isActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  <span>Activate Employee</span>
+                </button>
+              </>
             )}
             <button
               onClick={() => setIsEditModalOpen(true)}
@@ -1112,6 +1133,16 @@ export default function EmployeeProfile() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {employee && (
+        <OnboardingLinkModal
+          isOpen={isOnboardingLinkModalOpen}
+          onClose={() => setIsOnboardingLinkModalOpen(false)}
+          employeeId={employee.id}
+          employeeName={`${employee.firstName} ${employee.lastName}`}
+          employeeEmail={employee.personalEmail || employee.workEmail}
+        />
       )}
     </>
   );

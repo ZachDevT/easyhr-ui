@@ -161,7 +161,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
     const borderColor = hasError
       ? 'var(--danger, #D14343)'
       : isOpen
-      ? 'var(--primary, #7c3aed)'
+      ? 'var(--primary, #2563EB)'
       : 'var(--card-border, #EAEAE4)';
     const boxShadow = isOpen
       ? hasError
@@ -233,7 +233,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
             <CalendarIcon
               size={17}
               style={{
-                color: isOpen ? 'var(--primary, #7c3aed)' : '#71717A',
+                color: isOpen ? 'var(--primary, #2563EB)' : '#71717A',
                 flexShrink: 0,
               }}
             />
@@ -416,7 +416,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
                       borderRadius: '6px',
                       border: 'none',
                       background: isSelected
-                        ? 'var(--primary, #7c3aed)'
+                        ? 'var(--primary, #2563EB)'
                         : isToday
                         ? 'var(--primary-tint, #F5F3FF)'
                         : 'transparent',
@@ -425,7 +425,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
                         : !item.isCurrentMonth
                         ? '#D4D4D8'
                         : isToday
-                        ? 'var(--primary, #7c3aed)'
+                        ? 'var(--primary, #2563EB)'
                         : '#18181B',
                       fontSize: '12px',
                       fontWeight: isSelected || isToday ? 700 : 400,
