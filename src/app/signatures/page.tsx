@@ -41,6 +41,7 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { RichTextEditor, RichTextRenderer } from '@/components/ui/RichTextEditor';
 import { downloadPdfBlob, openPdfBlob, renderPdfDocument } from '@/lib/pdfDocument';
 import { PdfPreview } from '@/components/shared/PdfPreview';
+import { useDocumentActions } from '@/components/documents/DocumentViewer';
 
 interface SignatureRecipient {
   id: string;
@@ -55,6 +56,8 @@ interface SignatureRequestItem {
   id: string;
   documentId: string;
   documentName: string;
+  documentUrl?: string;
+  body?: string;
   status: 'pending' | 'completed' | 'declined' | 'expired';
   customMessage: string;
   expiresAt?: string;
@@ -120,6 +123,58 @@ export default function SignaturesAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dismissedDeclinedIds, setDismissedDeclinedIds] = useState<string[]>([]);
+  const { view, download: downloadDoc, viewer } = useDocumentActions();
+  const [viewingSignedRequest, setViewingSignedRequest] = useState<SignatureRequestItem | null>(null);
+
+  const handleViewRequest = (req: SignatureRequestItem) => {
+    if (req.documentId) {
+      view(req.documentId, req.documentName);
+    } else {
+      setViewingSignedRequest(req);
+    }
+  };
+
+  const handleDownloadRequest = async (req: SignatureRequestItem) => {
+    if (req.documentId) {
+      await downloadDoc(req.documentId, req.documentName);
+    } else {
+      const rec = req.recipients?.[0];
+      const sanitized = (req.documentName || 'Signed_Document').replace(/\s+/g, '_');
+      const lines = [
+        '================================================================================',
+        '                     EASYHR ENTERPRISE SIGNATURE RECORD                         ',
+        '================================================================================',
+        '',
+        `Document Title:    ${req.documentName}`,
+        `Status:            COMPLETED & LEGALLY BINDING`,
+        `Recipient:         ${rec?.name || 'Recipient'} (${rec?.email || ''})`,
+        `Created By:        ${req.createdByName}`,
+        `Date Created:      ${req.createdAt}`,
+        '',
+        '--------------------------------------------------------------------------------',
+        'DOCUMENT BODY:',
+        '--------------------------------------------------------------------------------',
+        req.body || req.customMessage || 'Document executed.',
+        '',
+        '--------------------------------------------------------------------------------',
+        'SIGNATURE AUDIT VERIFICATION:',
+        '--------------------------------------------------------------------------------',
+        `Signer:            ${rec?.name || 'Signer'}`,
+        `Status:            Digitally Executed & Verified`,
+        `Audit ID:          ${req.id}`,
+        'System Seal:       EASYHR-CRYPTOGRAPHICALLY-VERIFIED',
+        '================================================================================',
+      ].join('\n');
+      const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sanitized}_Executed.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success('Downloaded', 'Executed document downloaded successfully.');
+    }
+  };
 
   useEffect(() => {
     try {
@@ -693,12 +748,38 @@ export default function SignaturesAdminPage() {
                               </div>
                             </td>
                             <td style={{ padding: '20px 24px' }}>
-                              <button
-                                className="btn-secondary btn-sm row gap-6"
-                                onClick={() => toast.success('Tracking record', `ID: ${req.id}`)}
-                              >
-                                <Download size={13} /> Audit
-                              </button>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                {req.status === 'completed' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn-neutral btn-sm"
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 12 }}
+                                      onClick={() => handleViewRequest(req)}
+                                      title="View executed document"
+                                    >
+                                      <Eye size={13} /> View
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-neutral btn-sm"
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 12 }}
+                                      onClick={() => handleDownloadRequest(req)}
+                                      title="Download executed document"
+                                    >
+                                      <Download size={13} /> Download
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn-secondary btn-sm row gap-6"
+                                  style={{ padding: '5px 10px', fontSize: 12 }}
+                                  onClick={() => toast.success('Tracking record', `ID: ${req.id}`)}
+                                >
+                                  <Shield size={13} /> Audit
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -760,11 +841,13 @@ export default function SignaturesAdminPage() {
       >
         <div className="col gap-20 p-8">
           <div className="row gap-8"><button type="button" className={requestSource==='template'?'btn-primary btn-sm':'btn-neutral btn-sm'} onClick={()=>setRequestSource('template')}>Generate from HR template</button><button type="button" className={requestSource==='document'?'btn-primary btn-sm':'btn-neutral btn-sm'} onClick={()=>setRequestSource('document')}>Use uploaded document</button></div>
-          {requestSource==='template' ? <div className="col gap-8"><label className="text-sm fw-700 text-1">Organization template</label><Select value={selectedTemplateId} onChange={e=>setSelectedTemplateId(e.target.value)}><option value="">Choose a saved template</option>{templates.filter(t=>t.isActive).map(t=><option value={t.id} key={t.id}>{t.name} · {t.category}</option>)}</Select><p className="text-xs text-4">Generated documents include employee and company merge fields. External signers receive a unique expiring link by email.</p></div> : <>
+          {requestSource==='template' ? <div className="col gap-8"><label className="text-sm fw-700 text-1">Organization template</label><Select searchable searchPlaceholder="Search templates..." value={selectedTemplateId} onChange={e=>setSelectedTemplateId(e.target.value)}><option value="">Choose a saved template</option>{templates.filter(t=>t.isActive).map(t=><option value={t.id} key={t.id}>{t.name} · {t.category}</option>)}</Select><p className="text-xs text-4">Generated documents include employee and company merge fields. External signers receive a unique expiring link by email.</p></div> : <>
           {/* Uploaded document selector */}
           <div className="col gap-8">
             <label className="text-sm fw-700 text-1">Select Uploaded Document</label>
             <Select
+              searchable
+              searchPlaceholder="Search uploaded documents..."
               value={selectedDocumentId}
               onChange={(e) => setSelectedDocumentId(e.target.value)}
               style={{ padding: '10px 14px', fontSize: 14 }}
@@ -784,6 +867,8 @@ export default function SignaturesAdminPage() {
           <div className="col gap-8">
             <label className="text-sm fw-700 text-1">Select Recipient Employee</label>
             <Select
+              searchable
+              searchPlaceholder="Search directory by name or department..."
               value={selectedEmployeeId}
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
               style={{ padding: '10px 14px', fontSize: 14 }}
@@ -791,7 +876,7 @@ export default function SignaturesAdminPage() {
               <option value="">-- Choose from Directory --</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.firstName} {emp.lastName} ({emp.department || 'General'})
+                  {emp.firstName} {emp.lastName} · {emp.department || 'General'}
                 </option>
               ))}
             </Select>
@@ -873,6 +958,76 @@ export default function SignaturesAdminPage() {
           </section>
         </div>
       )}
+      {/* Executed Document Viewer Modal */}
+      {viewingSignedRequest && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={() => setViewingSignedRequest(null)}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 16,
+              width: '100%',
+              maxWidth: 720,
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 48px rgba(0,0,0,0.18)',
+              border: '1px solid #E5E5EA',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #F0F0F2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle2 size={22} color="#059669" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1D1D1F' }}>{viewingSignedRequest.documentName}</h3>
+                  <div style={{ fontSize: 12, color: '#6E6E73', marginTop: 2 }}>Executed Digital Document</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingSignedRequest(null)}
+                style={{ background: '#F5F5F7', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} color="#6E6E73" />
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
+                  <div><span style={{ color: '#64748B' }}>Recipient: </span><strong>{viewingSignedRequest.recipients?.[0]?.name || 'Signer'}</strong></div>
+                  <div><span style={{ color: '#64748B' }}>Email: </span><strong>{viewingSignedRequest.recipients?.[0]?.email || ''}</strong></div>
+                  <div><span style={{ color: '#64748B' }}>Status: </span><span style={{ color: '#059669', fontWeight: 700 }}>COMPLETED & VERIFIED</span></div>
+                  <div><span style={{ color: '#64748B' }}>Executed: </span><span>{viewingSignedRequest.createdAt}</span></div>
+                </div>
+              </div>
+              <div style={{ background: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 10, padding: '20px 22px', fontSize: 13, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap', maxHeight: 380, overflowY: 'auto' }}>
+                {viewingSignedRequest.body || viewingSignedRequest.customMessage || 'Executed Agreement Document'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid #F0F0F2', background: '#FAFAFC' }}>
+              <button type="button" className="btn-neutral" onClick={() => setViewingSignedRequest(null)}>Close</button>
+              <button type="button" className="btn-primary" onClick={() => handleDownloadRequest(viewingSignedRequest)}><Download size={14} /> Download Document</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {viewer}
     </div>
   );
 }

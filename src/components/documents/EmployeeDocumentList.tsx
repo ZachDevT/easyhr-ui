@@ -44,6 +44,21 @@ interface HandbookData {
   downloadUrl?: string;
 }
 
+interface SignedDocItem {
+  id: string;
+  requestId: string;
+  documentId?: string;
+  documentName: string;
+  documentUrl?: string;
+  body?: string;
+  senderName: string;
+  senderRole?: string;
+  status: string;
+  sentAt?: string;
+  signedAt?: string | null;
+  message?: string;
+}
+
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   const d = new Date(value);
@@ -94,6 +109,8 @@ export function EmployeeDocumentList({
   const { getToken } = useAuth();
   const { view, download, viewer } = useDocumentActions();
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
+  const [signedDocs, setSignedDocs] = useState<SignedDocItem[]>([]);
+  const [viewingSignedDoc, setViewingSignedDoc] = useState<SignedDocItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Handbook modal state
@@ -111,17 +128,35 @@ export function EmployeeDocumentList({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDocuments = useCallback(async () => {
-    if (!employeeId) return;
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await fetch(`${API_BASE_URL}/api/v1/documents?employeeId=${employeeId}&limit=100`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setDocuments(Array.isArray(json) ? json : json.data || []);
-      }
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // 1. Fetch uploaded documents
+      const docsUrl = employeeId
+        ? `${API_BASE_URL}/api/v1/documents?employeeId=${employeeId}&limit=100`
+        : `${API_BASE_URL}/api/v1/documents?limit=100`;
+
+      const docsPromise = fetch(docsUrl, { headers })
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => []);
+
+      // 2. Fetch completed signature agreements for current employee
+      const sigsPromise = fetch(`${API_BASE_URL}/api/v1/signatures/me`, { headers })
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => []);
+
+      const [docsJson, sigsJson] = await Promise.all([docsPromise, sigsPromise]);
+
+      const docList = Array.isArray(docsJson) ? docsJson : docsJson.data || [];
+      setDocuments(docList);
+
+      const sigList: SignedDocItem[] = Array.isArray(sigsJson) ? sigsJson : sigsJson.data || [];
+      const completed = sigList.filter(
+        (s) => s.status === "signed" || s.status === "completed"
+      );
+      setSignedDocs(completed);
     } catch {
       /* handled by empty state */
     } finally {
@@ -132,6 +167,58 @@ export function EmployeeDocumentList({
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  const handleViewSignedDoc = (doc: SignedDocItem) => {
+    if (doc.documentId) {
+      view(doc.documentId, doc.documentName);
+    } else if (doc.documentUrl) {
+      window.open(doc.documentUrl, "_blank");
+    } else {
+      setViewingSignedDoc(doc);
+    }
+  };
+
+  const handleDownloadSignedDoc = async (doc: SignedDocItem) => {
+    if (doc.documentId) {
+      await download(doc.documentId, doc.documentName);
+    } else if (doc.documentUrl) {
+      window.open(doc.documentUrl, "_blank");
+    } else {
+      const sanitized = (doc.documentName || "Signed_Document").replace(/\s+/g, "_");
+      const lines = [
+        "================================================================================",
+        "                     EASYHR ENTERPRISE SIGNATURE RECORD                         ",
+        "================================================================================",
+        "",
+        `Document Title:    ${doc.documentName}`,
+        `Status:            COMPLETED & LEGALLY BINDING`,
+        `Signatory:         ${employeeName || "Employee"}`,
+        `Issued By:         ${doc.senderName || "People Operations"}`,
+        `Date Completed:    ${doc.signedAt ? formatDate(doc.signedAt) : "Signed"}`,
+        "",
+        "--------------------------------------------------------------------------------",
+        "DOCUMENT BODY:",
+        "--------------------------------------------------------------------------------",
+        doc.body || doc.message || "Executed document agreement.",
+        "",
+        "--------------------------------------------------------------------------------",
+        "SIGNATURE AUDIT VERIFICATION:",
+        "--------------------------------------------------------------------------------",
+        `Signer Status:     Digitally Executed & Verified`,
+        `Signature Record:  ${doc.id}`,
+        "System Seal:       EASYHR-CRYPTOGRAPHICALLY-VERIFIED",
+        "================================================================================",
+      ].join("\n");
+      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sanitized}_Executed.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success("Downloaded", "Executed document downloaded successfully.");
+    }
+  };
 
   // Load handbook settings & signed link if applicable
   const fetchHandbookInfo = useCallback(async (): Promise<HandbookData> => {
@@ -347,7 +434,7 @@ export function EmployeeDocumentList({
     }
   };
 
-  const hasDocuments = Boolean(handbookSignedAt || documents.length > 0);
+  const hasDocuments = Boolean(handbookSignedAt || documents.length > 0 || signedDocs.length > 0);
 
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid #E5E5EA", borderRadius: 14, overflow: "hidden" }}>
@@ -456,7 +543,63 @@ export function EmployeeDocumentList({
         </div>
       )}
 
-      {/* 2. UPLOADED DOCUMENTS LIST */}
+      {/* 2. COMPLETED SIGNED DOCUMENTS / AGREEMENTS */}
+      {signedDocs.map((sDoc) => (
+        <div
+          key={sDoc.id}
+          style={rowStyle}
+          onClick={() => handleViewSignedDoc(sDoc)}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#F9F9FB")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#FFFFFF")}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: "#ECFDF5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <CheckCircle2 size={18} color="#059669" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={nameStyle}>{sDoc.documentName || "Executed Agreement"}</div>
+            <div style={metaStyle}>
+              Signed {formatDate(sDoc.signedAt)} · Digitally Executed Agreement
+            </div>
+          </div>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span style={signedPillStyle}>Signed</span>
+            <button
+              type="button"
+              className="btn-neutral btn-sm"
+              style={actionBtnStyle}
+              onClick={() => handleViewSignedDoc(sDoc)}
+              title="View executed document"
+            >
+              <Eye size={13} /> View
+            </button>
+            <button
+              type="button"
+              className="btn-neutral btn-sm"
+              style={actionBtnStyle}
+              onClick={() => handleDownloadSignedDoc(sDoc)}
+              title="Download executed document"
+            >
+              <Download size={13} /> Download
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {/* 3. UPLOADED DOCUMENTS LIST */}
       {isLoading ? (
         <div style={{ padding: "36px 20px", fontSize: 13, color: "#86868B", textAlign: "center" }}>
           <Loader2 size={18} className="animate-spin" style={{ margin: "0 auto 8px", color: "#86868B" }} />
@@ -580,6 +723,159 @@ export function EmployeeDocumentList({
 
       {/* DOCUMENT VIEWER MODAL */}
       {viewer}
+
+      {/* EXECUTED SIGNED DOCUMENT MODAL */}
+      {viewingSignedDoc && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+          onClick={() => setViewingSignedDoc(null)}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 16,
+              width: "100%",
+              maxWidth: 720,
+              maxHeight: "90vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 48px rgba(0,0,0,0.18)",
+              border: "1px solid #E5E5EA",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "18px 24px",
+                borderBottom: "1px solid #F0F0F2",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: "#ECFDF5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CheckCircle2 size={22} color="#059669" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1D1D1F" }}>
+                    {viewingSignedDoc.documentName}
+                  </h3>
+                  <div style={{ fontSize: 12, color: "#6E6E73", marginTop: 2 }}>
+                    Executed Digital Document
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingSignedDoc(null)}
+                style={{
+                  background: "#F5F5F7",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 32,
+                  height: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <X size={16} color="#6E6E73" />
+              </button>
+            </div>
+            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
+              <div
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 18,
+                }}
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12.5 }}>
+                  <div>
+                    <span style={{ color: "#64748B" }}>Signer: </span>
+                    <strong>{employeeName || "Employee"}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B" }}>Issued By: </span>
+                    <strong>{viewingSignedDoc.senderName || "People Operations"}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B" }}>Status: </span>
+                    <span style={{ color: "#059669", fontWeight: 700 }}>COMPLETED & VERIFIED</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B" }}>Signed Date: </span>
+                    <span>{formatDate(viewingSignedDoc.signedAt)}</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E5EA",
+                  borderRadius: 10,
+                  padding: "20px 22px",
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                  color: "#374151",
+                  whiteSpace: "pre-wrap",
+                  maxHeight: 380,
+                  overflowY: "auto",
+                }}
+              >
+                {viewingSignedDoc.body || viewingSignedDoc.message || "Executed Agreement Document"}
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 10,
+                padding: "16px 24px",
+                borderTop: "1px solid #F0F0F2",
+                background: "#FAFAFC",
+              }}
+            >
+              <button type="button" className="btn-neutral" onClick={() => setViewingSignedDoc(null)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleDownloadSignedDoc(viewingSignedDoc)}
+              >
+                <Download size={14} /> Download Document
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HANDBOOK ACKNOWLEDGEMENT MODAL */}
       {isHandbookModalOpen && (

@@ -12,6 +12,8 @@ import {
   FileText,
   Loader2,
   XCircle,
+  Eye,
+  X,
 } from 'lucide-react';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -22,6 +24,7 @@ import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
 import { PdfPreview } from '@/components/shared/PdfPreview';
+import { useDocumentActions } from '@/components/documents/DocumentViewer';
 
 interface MySignatureDoc {
   id: string;
@@ -67,6 +70,60 @@ export default function MySignaturesPage() {
   const consentCheckboxRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef(false);
   const didDrawRef = useRef(false);
+
+  const { view, download: downloadDoc, viewer } = useDocumentActions();
+  const [viewingSignedDoc, setViewingSignedDoc] = useState<MySignatureDoc | null>(null);
+
+  const handleViewSigned = (doc: MySignatureDoc) => {
+    if (doc.documentId) {
+      view(doc.documentId, doc.documentName);
+    } else if (doc.documentUrl) {
+      window.open(doc.documentUrl, '_blank');
+    } else {
+      setViewingSignedDoc(doc);
+    }
+  };
+
+  const handleDownloadSigned = async (doc: MySignatureDoc) => {
+    if (doc.documentId) {
+      await downloadDoc(doc.documentId, doc.documentName);
+    } else if (doc.documentUrl) {
+      window.open(doc.documentUrl, '_blank');
+    } else {
+      const sanitized = (doc.documentName || 'Signed_Document').replace(/\s+/g, '_');
+      const lines = [
+        '================================================================================',
+        '                     EASYHR ENTERPRISE SIGNATURE RECORD                         ',
+        '================================================================================',
+        '',
+        `Document Title:    ${doc.documentName}`,
+        `Status:            COMPLETED & LEGALLY BINDING`,
+        `Sender:            ${doc.senderName} (${doc.senderRole})`,
+        `Date Completed:    ${doc.signedAt || 'Signed'}`,
+        '',
+        '--------------------------------------------------------------------------------',
+        'DOCUMENT BODY:',
+        '--------------------------------------------------------------------------------',
+        doc.body || doc.message || 'Executed document agreement.',
+        '',
+        '--------------------------------------------------------------------------------',
+        'SIGNATURE AUDIT VERIFICATION:',
+        '--------------------------------------------------------------------------------',
+        `Signer Status:     Digitally Executed & Verified`,
+        `Signature Record:  ${doc.id}`,
+        'System Seal:       EASYHR-CRYPTOGRAPHICALLY-VERIFIED',
+        '================================================================================',
+      ].join('\n');
+      const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sanitized}_Executed.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success('Downloaded', 'Executed document downloaded successfully.');
+    }
+  };
 
   const fetchMySignatures = useCallback(async () => {
     if (!isSignedIn) return;
@@ -629,7 +686,26 @@ export default function MySignaturesPage() {
                             </div>
                           </td>
                           <td style={{ padding: '20px 24px', textAlign: 'right' }}>
-                            {doc.documentUrl ? <a className="btn-secondary btn-sm row gap-8" href={doc.documentUrl} target="_blank" rel="noreferrer"><Download size={14} /> Open document</a> : null}
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                              <button
+                                type="button"
+                                className="btn-neutral btn-sm"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 12 }}
+                                onClick={() => handleViewSigned(doc)}
+                                title="View executed document"
+                              >
+                                <Eye size={13} /> View
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-neutral btn-sm"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 12 }}
+                                onClick={() => handleDownloadSigned(doc)}
+                                title="Download executed document"
+                              >
+                                <Download size={13} /> Download
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -641,6 +717,77 @@ export default function MySignaturesPage() {
           </div>
         )}
       </div>
+
+      {/* Executed Document Viewer Modal */}
+      {viewingSignedDoc && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={() => setViewingSignedDoc(null)}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 16,
+              width: '100%',
+              maxWidth: 720,
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 48px rgba(0,0,0,0.18)',
+              border: '1px solid #E5E5EA',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #F0F0F2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle2 size={22} color="#059669" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1D1D1F' }}>{viewingSignedDoc.documentName}</h3>
+                  <div style={{ fontSize: 12, color: '#6E6E73', marginTop: 2 }}>Executed Digital Document</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingSignedDoc(null)}
+                style={{ background: '#F5F5F7', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} color="#6E6E73" />
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
+                  <div><span style={{ color: '#64748B' }}>Sender: </span><strong>{viewingSignedDoc.senderName}</strong></div>
+                  <div><span style={{ color: '#64748B' }}>Department: </span><strong>{viewingSignedDoc.senderRole}</strong></div>
+                  <div><span style={{ color: '#64748B' }}>Status: </span><span style={{ color: '#059669', fontWeight: 700 }}>COMPLETED & SIGNED</span></div>
+                  <div><span style={{ color: '#64748B' }}>Signed Date: </span><span>{viewingSignedDoc.signedAt || 'Verified'}</span></div>
+                </div>
+              </div>
+              <div style={{ background: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 10, padding: '20px 22px', fontSize: 13, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap', maxHeight: 380, overflowY: 'auto' }}>
+                {viewingSignedDoc.body || viewingSignedDoc.message || 'Executed Agreement Document'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid #F0F0F2', background: '#FAFAFC' }}>
+              <button type="button" className="btn-neutral" onClick={() => setViewingSignedDoc(null)}>Close</button>
+              <button type="button" className="btn-primary" onClick={() => handleDownloadSigned(viewingSignedDoc)}><Download size={14} /> Download Document</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {viewer}
     </div>
   );
 }

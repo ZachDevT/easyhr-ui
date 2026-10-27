@@ -123,6 +123,12 @@ export function HRProvider({ children }: { children: ReactNode }) {
         headers: getAuthHeaders(token),
       });
 
+      if (res.status === 403) {
+        // Non-HR users do not have access to applicants; silently ignore
+        setCandidates([]);
+        return;
+      }
+
       if (res.ok) {
         const json = await res.json();
         const rawList = json.data || [];
@@ -149,8 +155,8 @@ export function HRProvider({ children }: { children: ReactNode }) {
         }));
         setCandidates(mapped);
       }
-    } catch (err) {
-      console.error("Failed to fetch applicants", err);
+    } catch {
+      /* handled silently */
     } finally {
       setIsLoading(false);
     }

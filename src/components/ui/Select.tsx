@@ -33,6 +33,14 @@ export interface SelectProps
   onValueChange?: (value: string) => void;
 }
 
+function extractTextFromNode(node: any): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractTextFromNode).join('');
+  if (React.isValidElement(node)) return extractTextFromNode((node.props as any)?.children);
+  return '';
+}
+
 /**
  * Universal Select & Custom Dropdown with search support.
  * Works seamlessly with both:
@@ -91,9 +99,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       React.Children.forEach(children, (child) => {
         if (React.isValidElement(child) && child.type === 'option') {
           const optProps = child.props as any;
+          const textLabel = extractTextFromNode(optProps.children) || String(optProps.value || '');
           list.push({
-            value: optProps.value !== undefined ? String(optProps.value) : String(optProps.children || ''),
-            label: String(optProps.children || optProps.value || ''),
+            value: optProps.value !== undefined ? String(optProps.value) : textLabel,
+            label: textLabel,
             disabled: !!optProps.disabled,
           });
         }
@@ -101,8 +110,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       return list;
     }, [propOptions, children]);
 
-    // Decide if search should be enabled (auto-enable when there are 6+ options or explicitly searchable)
-    const isSearchable = searchable !== undefined ? searchable : parsedOptions.length >= 6;
+    // Decide if search should be enabled (auto-enable when explicitly searchable or 3+ options)
+    const isSearchable = searchable !== undefined ? searchable : parsedOptions.length >= 3;
 
     // Filtered options based on user search query
     const filteredOptions = useMemo(() => {
