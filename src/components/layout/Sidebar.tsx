@@ -48,6 +48,9 @@ import {
   ShieldCheck,
   LifeBuoy,
   ClipboardList,
+  KeyRound,
+  Building,
+  Check,
 } from "lucide-react";
 import { useRole } from "../../context/RoleContext";
 import { useCompany } from "../../context/CompanyContext";
@@ -84,16 +87,53 @@ interface FlyoutState {
 
 export function Sidebar() {
   const { role, currentUser } = useRole();
-  const { company } = useCompany();
-  const { signOut } = useClerk();
+  const { company, workspaces, switchWorkspace } = useCompany();
+  const { signOut, openUserProfile } = useClerk();
   const { getToken, isSignedIn } = useAuth();
   const pathname = usePathname();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedPref, setCollapsed] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({
     dashboard: true,
     hiring: true,
   });
+
+  // ─── Responsive: off-canvas drawer on tablets & phones ───────────────────
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 900px)");
+    const sync = () => {
+      setIsMobile(mq.matches);
+      if (!mq.matches) setMobileOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    const toggle = () => setMobileOpen((o) => !o);
+    const close = () => setMobileOpen(false);
+    window.addEventListener("easyhr:toggle-sidebar", toggle);
+    window.addEventListener("easyhr:close-sidebar", close);
+    return () => {
+      mq.removeEventListener("change", sync);
+      window.removeEventListener("easyhr:toggle-sidebar", toggle);
+      window.removeEventListener("easyhr:close-sidebar", close);
+    };
+  }, []);
+  // Close the drawer after navigating
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+  // Lock background scroll while the drawer is open
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = isMobile && mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileOpen]);
+  // In drawer mode the sidebar always shows full labels
+  const collapsed = isMobile ? false : collapsedPref;
 
   // Automatically collapse sidebar into icons-only mode when entering chat
   useEffect(() => {
@@ -413,6 +453,8 @@ export function Sidebar() {
   // Flyout trigger handlers with smooth hover delay
   const handleItemMouseEnter = (item: NavParent, e: React.MouseEvent<HTMLDivElement>) => {
     if (!item.children || item.children.length === 0) return;
+    // Hover flyouts make no sense on touch drawers
+    if (isMobile) return;
     // Show flyout when: (1) sidebar is collapsed OR (2) parent is not expanded!
     if (collapsed || !expandedParents[item.id]) {
       if (flyoutCloseTimer.current) clearTimeout(flyoutCloseTimer.current);
@@ -466,7 +508,16 @@ export function Sidebar() {
 
   return (
     <>
+      {isMobile && mobileOpen && (
+        <div
+          className="app-sidebar-backdrop"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <aside
+        className={`app-sidebar${mobileOpen ? " is-open" : ""}`}
+        aria-hidden={isMobile && !mobileOpen ? true : undefined}
         style={{
           width: collapsed ? 68 : 236,
           margin: "12px 0 12px 14px",
@@ -485,6 +536,7 @@ export function Sidebar() {
       >
         {/* ─── Circular Edge Toggle Button (< / >) ────────────────────────── */}
         <button
+          className="sidebar-edge-toggle"
           onClick={() => {
             setCollapsed(!collapsed);
             setFlyoutState(null);
@@ -1233,6 +1285,79 @@ export function Sidebar() {
                     <Settings size={14} color="#4F46E5" /> Company Settings
                   </Link>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    openUserProfile();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    width: "100%",
+                    padding: "8px 10px",
+                    border: "none",
+                    background: "transparent",
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "#374151",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#F3F4F6")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <KeyRound size={14} color="#4F46E5" /> Password & Security
+                </button>
+
+                {workspaces && workspaces.length > 1 && (
+                  <>
+                    <div style={{ height: 1, background: "#E5E7EB", margin: "4px 0" }} />
+                    <div style={{ fontSize: 9.5, fontWeight: 800, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 10px 2px 10px" }}>
+                      Workspaces ({workspaces.length})
+                    </div>
+                    {workspaces.map((ws) => (
+                      <button
+                        key={ws.id || ws.subdomain}
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          if (!ws.isCurrent && ws.subdomain) switchWorkspace(ws.subdomain);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          width: "100%",
+                          padding: "6px 10px",
+                          border: "none",
+                          background: ws.isCurrent ? "rgba(79, 70, 229, 0.08)" : "transparent",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: ws.isCurrent ? 700 : 500,
+                          color: ws.isCurrent ? "#4F46E5" : "#374151",
+                          cursor: ws.isCurrent ? "default" : "pointer",
+                          textAlign: "left",
+                        }}
+                        onMouseEnter={(e) => !ws.isCurrent && (e.currentTarget.style.background = "#F3F4F6")}
+                        onMouseLeave={(e) => !ws.isCurrent && (e.currentTarget.style.background = "transparent")}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {ws.name}
+                        </span>
+                        {ws.isCurrent ? (
+                          <Check size={12} strokeWidth={3} />
+                        ) : (
+                          <span style={{ fontSize: 10, color: "#9CA3AF" }}>Switch</span>
+                        )}
+                      </button>
+                    ))}
+                  </>
+                )}
+
                 <div style={{ height: 1, background: "#E5E7EB", margin: "4px 0" }} />
                 <button
                   onClick={() => {

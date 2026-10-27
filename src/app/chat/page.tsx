@@ -230,16 +230,34 @@ function GroupChatContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<WysiwygEditorRef>(null);
 
-  // Handle explicit ?channelId= param
+  // Responsive chat viewport detection (phones & tablets)
+  const [isMobileChat, setIsMobileChat] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 900px)');
+    const sync = () => setIsMobileChat(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  // Handle explicit ?channelId= param (apply ONCE per param value, so the user can
+  // freely switch to other channels afterwards and we never loop on channel updates)
+  const handledChannelParamRef = useRef<string | null>(null);
   useEffect(() => {
     if (!channelIdParam || isLoadingChannels) return;
+    if (handledChannelParamRef.current === channelIdParam) return;
     const targetChannel = channels.find((c) => c.id === channelIdParam);
     if (targetChannel) {
+      handledChannelParamRef.current = channelIdParam;
       setActiveChannelId(targetChannel.id);
       if (targetChannel.channelType === 'dm' || targetChannel.channelType === 'group_dm') {
         setActiveChatTab('dms');
       } else {
         setActiveChatTab('channels');
+      }
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/chat');
       }
       setTimeout(() => {
         editorRef.current?.focus();
@@ -267,6 +285,9 @@ function GroupChatContent() {
       handledDmParamRef.current = dmParam;
       setActiveChannelId(existing.id);
       setActiveChatTab('dms');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/chat');
+      }
       setTimeout(() => {
         editorRef.current?.focus();
       }, 100);
@@ -287,6 +308,9 @@ function GroupChatContent() {
       .then((newCh) => {
         setActiveChannelId(newCh.id);
         setActiveChatTab('dms');
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/chat');
+        }
         setTimeout(() => {
           editorRef.current?.focus();
         }, 150);
@@ -721,11 +745,11 @@ function GroupChatContent() {
          ═══════════════════════════════════════════════════════════════════════ */}
       <aside
         style={{
-          width: 260,
+          width: isMobileChat ? '100%' : 260,
           flexShrink: 0,
-          borderRight: '1px solid var(--card-border, #E4E4E7)',
+          borderRight: isMobileChat ? 'none' : '1px solid var(--card-border, #E4E4E7)',
           background: '#FAF9F7',
-          display: 'flex',
+          display: isMobileChat && activeChannel ? 'none' : 'flex',
           flexDirection: 'column',
           height: '100%',
           userSelect: 'none',
@@ -2103,11 +2127,12 @@ function GroupChatContent() {
       <div
         style={{
           flex: 1,
-          display: 'flex',
+          display: isMobileChat && !activeChannel ? 'none' : 'flex',
           flexDirection: 'column',
           minWidth: 0,
           background: '#FFFFFF',
           height: '100%',
+          position: 'relative',
         }}
       >
         {activeChannel ? (
@@ -2128,6 +2153,34 @@ function GroupChatContent() {
             >
               {/* Left: Channel Breadcrumb & Topic or DM User Profile */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                {isMobileChat && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveChannelId('');
+                      setActiveThread(null);
+                      setSelectedProfileMember(null);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '5px 9px',
+                      borderRadius: 8,
+                      border: '1px solid var(--card-border, #E4E4E7)',
+                      background: '#F4F4F5',
+                      color: 'var(--text-1, #18181B)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                    aria-label="Back to channels"
+                  >
+                    <ChevronLeft size={16} />
+                    <span>Channels</span>
+                  </button>
+                )}
                 {activeChannel.channelType === 'dm' || activeChannel.channelType === 'group_dm' ? (
                   (() => {
                     const dmInfo = getDMParticipant(activeChannel);
@@ -4988,7 +5041,10 @@ function GroupChatContent() {
       ) : selectedProfileMember ? (
         <aside
           style={{
-            width: 310,
+            width: isMobileChat ? '100%' : 310,
+            position: isMobileChat ? 'absolute' : 'relative',
+            inset: isMobileChat ? 0 : undefined,
+            zIndex: isMobileChat ? 80 : undefined,
             flexShrink: 0,
             borderLeft: '1px solid var(--card-border, #E4E4E7)',
             background: '#FFFFFF',
@@ -5266,7 +5322,7 @@ function GroupChatContent() {
             )}
           </div>
         </aside>
-      ) : showMemberDrawer && activeChannel ? (
+      ) : showMemberDrawer && activeChannel && !isMobileChat ? (
         <aside
           style={{
             width: 280,

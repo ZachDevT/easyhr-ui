@@ -4,6 +4,7 @@ import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useCompany } from "./CompanyContext";
+import { useRole } from "./RoleContext";
 import { toast } from "@/components/ui/Toast";
 
 export type Candidate = {
@@ -83,6 +84,7 @@ const BACKEND_TO_STAGE: Record<string, string> = {
 export function HRProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn } = useAuth();
   const { company } = useCompany();
+  const { isHRAdmin } = useRole();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +100,8 @@ export function HRProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchCandidates = useCallback(async () => {
-    if (!isSignedIn || !company) {
+    // Non-HR users do not have permissions to read applicant pipelines
+    if (!isSignedIn || !company || !isHRAdmin) {
       setIsLoading(false);
       return;
     }

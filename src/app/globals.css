@@ -1592,4 +1592,150 @@ tr:hover td { background: #FAFAF8; }
   }
 }
 
+/* ==========================================================================
+   GLOBAL RESPONSIVE DESIGN (Media Queries for Tablets & Phones)
+   ========================================================================== */
+
+/* ─── Mobile drawer hamburger trigger (hidden on desktop) ─── */
+.topbar-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--card-border, #E4E4E7);
+  background: #FFFFFF;
+  color: var(--text-1, #18181B);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.topbar-menu-btn:hover {
+  background: #F4F4F5;
+}
+
+.topbar-menu-btn:active {
+  transform: scale(0.96);
+}
+
+@keyframes easyhrFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  /* Off-canvas mobile drawer sidebar */
+  .app-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 100 !important;
+    margin: 0 !important;
+    height: 100vh !important;
+    width: 275px !important;
+    border-radius: 0 16px 16px 0 !important;
+    transform: translateX(-105%) !important;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.32) !important;
+    background: #FAF9F7 !important;
+  }
+
+  .app-sidebar.is-open {
+    transform: translateX(0) !important;
+  }
+
+  .sidebar-edge-toggle {
+    display: none !important;
+  }
+
+  .app-sidebar-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(15, 23, 42, 0.55) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    z-index: 99 !important;
+    animation: easyhrFadeIn 0.2s ease-out !important;
+  }
+
+  /* TopBar compacting */
+  .topbar {
+    padding: 0 12px !important;
+    height: 56px !important;
+    gap: 8px !important;
+  }
+
+  .topbar-menu-btn {
+    display: inline-flex !important;
+  }
+
+  .topbar-search {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .topbar-chat-label {
+    display: none !important;
+  }
+
+  .topbar-role-badge {
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .topbar-dropdown {
+    position: fixed !important;
+    top: 60px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 76px) !important;
+    overflow-y: auto !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  /* Page body responsive padding */
+  .page-body {
+    padding: 12px 14px 24px 14px !important;
+    gap: 12px !important;
+  }
+
+  /* Responsive Grids */
+  .dash-grid,
+  .widget-grid,
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Responsive tables & horizontal overflow */
+  .table-container,
+  .responsive-table {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-role-badge {
+    display: none !important;
+  }
+
+  .topbar-workspace-pill {
+    max-width: 130px !important;
+  }
+
+  .page-body {
+    padding: 10px 10px 20px 10px !important;
+  }
+}
+
+
 

@@ -22,6 +22,11 @@ import {
   ChevronRight,
   Check,
   MessageSquare,
+  Menu,
+  Building,
+  KeyRound,
+  Plus,
+  Lock,
 } from 'lucide-react';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRole } from '../../context/RoleContext';
@@ -45,10 +50,10 @@ interface NotificationItem {
 export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { signOut } = useClerk();
+  const { signOut, openUserProfile } = useClerk();
   const { getToken, isSignedIn } = useAuth();
   const { role, isHRAdmin, currentUser } = useRole();
-  const { userProfile, company } = useCompany();
+  const { userProfile, company, workspaces, switchWorkspace } = useCompany();
   const { channels } = useChat();
 
   // Compute live chat activity badge (unread channel messages + pending join requests for admins)
@@ -194,13 +199,23 @@ export function TopBar() {
 
   return (
     <header className="topbar" style={{ position: 'relative', zIndex: 70 }}>
+      {/* Mobile / tablet navigation drawer trigger */}
+      <button
+        type="button"
+        className="topbar-menu-btn"
+        aria-label="Open navigation menu"
+        onClick={() => window.dispatchEvent(new Event('easyhr:toggle-sidebar'))}
+      >
+        <Menu size={19} strokeWidth={2.2} />
+      </button>
+
       {/* Global Search */}
       <div className="topbar-search">
         <Input
           type="text"
           placeholder="Search people, documents, policies..."
           leftIcon={<Search size={15} />}
-          containerStyle={{ width: 300 }}
+          containerStyle={{ width: '100%', maxWidth: 300 }}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -212,8 +227,46 @@ export function TopBar() {
       </div>
 
       <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Workspace Quick Switcher Pill */}
+        {workspaces && workspaces.length > 0 && (
+          <button
+            type="button"
+            className="topbar-workspace-pill"
+            onClick={() => {
+              setSettingsOpen((prev) => !prev);
+              setNotifOpen(false);
+              setHelpOpen(false);
+            }}
+            title="Workspaces & Organizations"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 10px',
+              borderRadius: 20,
+              border: '1px solid var(--card-border)',
+              background: '#FFFFFF',
+              color: 'var(--text-1)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Building size={13} style={{ color: 'var(--primary)' }} />
+            <span style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {company?.name || 'Workspace'}
+            </span>
+            {workspaces.length > 1 && (
+              <span style={{ fontSize: 10, background: 'var(--primary-tint)', color: 'var(--primary)', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>
+                {workspaces.length}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Dynamic Role Badge */}
         <div
+          className="topbar-role-badge"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -282,7 +335,7 @@ export function TopBar() {
             <circle cx="14.6" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #2563EB)'} />
             <circle cx="16.9" cy="15" r="1" fill={isChatActive ? '#FFFFFF' : 'var(--primary, #2563EB)'} />
           </svg>
-          <span>Chat</span>
+          <span className="topbar-chat-label">Chat</span>
           {chatActivityCount > 0 && (
             <span
               style={{
@@ -326,7 +379,8 @@ export function TopBar() {
 
           {notifOpen && (
             <div
-              style={{
+              className="topbar-dropdown"
+                style={{
                 position: 'absolute',
                 top: 'calc(100% + 10px)',
                 right: 0,
@@ -543,7 +597,8 @@ export function TopBar() {
 
           {helpOpen && (
             <div
-              style={{
+              className="topbar-dropdown"
+                style={{
                 position: 'absolute',
                 top: 'calc(100% + 10px)',
                 right: 0,
@@ -684,7 +739,8 @@ export function TopBar() {
 
           {settingsOpen && (
             <div
-              style={{
+              className="topbar-dropdown"
+                style={{
                 position: 'absolute',
                 top: 'calc(100% + 10px)',
                 right: 0,
@@ -705,29 +761,67 @@ export function TopBar() {
                   background: 'var(--primary-tint, #f8f7ff)',
                 }}
               >
-                <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
-                  {currentUser.firstName} {currentUser.lastName}
-                </p>
-                <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '2px 0 0 0' }}>
-                  {currentUser.email}
-                </p>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    marginTop: 6,
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: 10,
-                    background: 'var(--primary)',
-                    color: '#ffffff',
-                  }}
-                >
-                  {company?.name || 'EasyHR Workspace'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 13.5, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {currentUser.firstName} {currentUser.lastName}
+                    </p>
+                    <p style={{ fontSize: 11.5, color: 'var(--text-4)', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {currentUser.email}
+                    </p>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      background: 'var(--primary)',
+                      color: '#ffffff',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {company?.name || 'Workspace'}
+                  </span>
+                </div>
               </div>
 
-              <div style={{ padding: '8px 6px' }}>
+              <div style={{ padding: '8px 6px', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                {/* ─── Account & Security (Clerk Modal) ─── */}
+                <div style={{ padding: '4px 10px 4px 10px', fontSize: 10, fontWeight: 800, color: 'var(--text-4)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                  Account & Security
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    openUserProfile();
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: 'var(--text-1)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                  className="hover:bg-primary-tint"
+                >
+                  <KeyRound size={16} style={{ color: 'var(--primary)' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div>Password & Security</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--text-4)', fontWeight: 400 }}>Change password, MFA, auth</div>
+                  </div>
+                </button>
+
                 <Link
                   href="/people/me?tab=Personal"
                   onClick={() => setSettingsOpen(false)}
@@ -735,9 +829,9 @@ export function TopBar() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '9px 12px',
+                    padding: '8px 12px',
                     borderRadius: 8,
-                    fontSize: 13,
+                    fontSize: 12.5,
                     color: 'var(--text-1)',
                     textDecoration: 'none',
                   }}
@@ -746,6 +840,110 @@ export function TopBar() {
                   <User size={16} className="text-4" />
                   <span>My Profile Details</span>
                 </Link>
+
+                <div className="divider" style={{ margin: '6px 0' }} />
+
+                {/* ─── Workspaces Switcher ─── */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 10px 4px 10px' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-4)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                    Workspaces ({workspaces?.length || 1})
+                  </span>
+                  <Link
+                    href="/company/register"
+                    onClick={() => setSettingsOpen(false)}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: 'var(--primary)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 2,
+                    }}
+                  >
+                    <Plus size={11} strokeWidth={3} />
+                    <span>New</span>
+                  </Link>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 6px 0' }}>
+                  {workspaces && workspaces.length > 0 ? (
+                    workspaces.map((ws) => (
+                      <button
+                        key={ws.id || ws.subdomain}
+                        type="button"
+                        onClick={() => {
+                          setSettingsOpen(false);
+                          if (!ws.isCurrent && ws.subdomain) {
+                            switchWorkspace(ws.subdomain);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '7px 10px',
+                          borderRadius: 8,
+                          border: ws.isCurrent ? '1px solid var(--primary-tint)' : '1px solid transparent',
+                          background: ws.isCurrent ? 'var(--primary-tint, #eff6ff)' : 'transparent',
+                          cursor: ws.isCurrent ? 'default' : 'pointer',
+                          fontSize: 12,
+                          color: 'var(--text-1)',
+                          textAlign: 'left',
+                        }}
+                        className={ws.isCurrent ? '' : 'hover:bg-primary-tint'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <div
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              background: ws.brandColor || 'var(--primary)',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {ws.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: ws.isCurrent ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ws.name}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-4)' }}>
+                              {ws.role || 'Member'}
+                            </div>
+                          </div>
+                        </div>
+                        {ws.isCurrent ? (
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                            <Check size={12} strokeWidth={3} /> Current
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--text-4)' }}>
+                            Switch &rarr;
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-4)' }}>
+                      {company?.name || 'Default Workspace'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="divider" style={{ margin: '6px 0' }} />
+
+                {/* ─── Workspace Settings ─── */}
+                <div style={{ padding: '4px 10px 4px 10px', fontSize: 10, fontWeight: 800, color: 'var(--text-4)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                  Workspace Settings
+                </div>
 
                 {isHRAdmin && (
                   <>
@@ -756,9 +954,9 @@ export function TopBar() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
-                        padding: '9px 12px',
+                        padding: '8px 12px',
                         borderRadius: 8,
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: 'var(--text-1)',
                         textDecoration: 'none',
                       }}
@@ -775,9 +973,9 @@ export function TopBar() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
-                        padding: '9px 12px',
+                        padding: '8px 12px',
                         borderRadius: 8,
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: 'var(--text-1)',
                         textDecoration: 'none',
                       }}
@@ -796,9 +994,9 @@ export function TopBar() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '9px 12px',
+                    padding: '8px 12px',
                     borderRadius: 8,
-                    fontSize: 13,
+                    fontSize: 12.5,
                     color: 'var(--text-1)',
                     textDecoration: 'none',
                   }}
@@ -821,9 +1019,9 @@ export function TopBar() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '9px 12px',
+                    padding: '8px 12px',
                     borderRadius: 8,
-                    fontSize: 13,
+                    fontSize: 12.5,
                     color: '#ef4444',
                     background: 'none',
                     border: 'none',

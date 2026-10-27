@@ -276,12 +276,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastEventIdRef = useRef<string>('');
 
+  const lastReadPostRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
   const handleSetActiveChannelId = useCallback((id: string) => {
     setActiveChannelId(id);
     if (id) {
-      setChannels((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-      );
+      // Only produce a new channels array when the unread count actually changes,
+      // otherwise effects depending on `channels` would re-run forever.
+      setChannels((prev) => {
+        const target = prev.find((c) => c.id === id);
+        if (!target || !target.unreadCount) return prev;
+        return prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c));
+      });
+      // Throttle duplicate read receipts for the same channel (max once per 3s)
+      const now = Date.now();
+      if (lastReadPostRef.current.id === id && now - lastReadPostRef.current.at < 3000) return;
+      lastReadPostRef.current = { id, at: now };
       getToken().then((token) => {
         if (!token) return;
         fetch(`${API_BASE_URL}/api/v1/chat/channels/${id}/read`, {

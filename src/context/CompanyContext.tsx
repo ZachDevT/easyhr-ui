@@ -46,12 +46,24 @@ export interface LocationItem {
   status: string;
 }
 
+export interface WorkspaceItem {
+  id: string;
+  name: string;
+  subdomain: string;
+  brandColor: string;
+  logoUrl: string;
+  role: string;
+  isCurrent: boolean;
+}
+
 interface CompanyContextType {
   company: CompanyData | null;
   userProfile: UserProfileData | null;
   locations: LocationItem[];
+  workspaces: WorkspaceItem[];
   isLoading: boolean;
   refresh: () => Promise<void>;
+  switchWorkspace: (subdomain: string) => void;
   updateCompany: (input: Partial<CompanyData>) => Promise<boolean>;
   updateProfile: (input: { firstName?: string; lastName?: string; phone?: string }) => Promise<boolean>;
   uploadLogo: (fileOrDataUrl: File | string) => Promise<string | null>;
@@ -65,6 +77,7 @@ const CACHE_KEYS = {
   company: "easyhr_company_cache",
   user: "easyhr_user_cache",
   locations: "easyhr_locations_cache",
+  workspaces: "easyhr_workspaces_cache",
 };
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
@@ -74,6 +87,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const applyBrandColor = useCallback((color: string) => {
@@ -108,6 +122,13 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         const parsedLocs = JSON.parse(cachedLocs);
         if (Array.isArray(parsedLocs)) {
           setLocations((prev) => (prev.length > 0 ? prev : parsedLocs));
+        }
+      }
+      const cachedWorkspaces = localStorage.getItem(CACHE_KEYS.workspaces);
+      if (cachedWorkspaces) {
+        const parsedWs = JSON.parse(cachedWorkspaces);
+        if (Array.isArray(parsedWs)) {
+          setWorkspaces(parsedWs);
         }
       }
     } catch {}
@@ -244,6 +265,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         setUserProfile(prof);
         applyBrandColor(comp.brandColor);
 
+        // Parse workspaces list
+        const rawWorkspaces = Array.isArray(data.workspaces) ? data.workspaces : [];
+        const mappedWorkspaces: WorkspaceItem[] = rawWorkspaces.map((w: any) => ({
+          id: w.id || "",
+          name: w.name || "Workspace",
+          subdomain: w.subdomain || "",
+          brandColor: w.brandColor || "#2563EB",
+          logoUrl: w.logoUrl || "",
+          role: w.role || "Member",
+          isCurrent: Boolean(w.isCurrent),
+        }));
+        setWorkspaces(mappedWorkspaces);
+
         if (comp.subdomain && typeof window !== "undefined") {
           const isLocalhost = window.location.hostname.includes("localhost");
           const domainAttr = isLocalhost ? "" : "; Domain=.easyhr.pro";
@@ -261,6 +295,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         try {
           localStorage.setItem(CACHE_KEYS.company, JSON.stringify(comp));
           localStorage.setItem(CACHE_KEYS.user, JSON.stringify(prof));
+          localStorage.setItem(CACHE_KEYS.workspaces, JSON.stringify(mappedWorkspaces));
         } catch {}
       }
 
@@ -443,14 +478,24 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const switchWorkspace = useCallback((targetSubdomain: string) => {
+    if (!targetSubdomain || typeof window === "undefined") return;
+    const isLocalhost = window.location.hostname.includes("localhost");
+    const domainAttr = isLocalhost ? "" : "; Domain=.easyhr.pro";
+    document.cookie = `easyhr_current_workspace=${encodeURIComponent(targetSubdomain)}; Path=/${domainAttr}; SameSite=Lax; max-age=2592000`;
+    window.location.href = getWorkspaceUrl(targetSubdomain, "/dashboard");
+  }, []);
+
   return (
     <CompanyContext.Provider
       value={{
         company,
         userProfile,
         locations,
+        workspaces,
         isLoading,
         refresh,
+        switchWorkspace,
         updateCompany,
         updateProfile,
         uploadLogo,
