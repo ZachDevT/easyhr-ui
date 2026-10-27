@@ -14,7 +14,9 @@ import {
   CalendarDays,
   User,
   UploadCloud,
+  Eye,
 } from "lucide-react";
+import { useDocumentActions } from "@/components/documents/DocumentViewer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { StatRibbon } from "@/components/ui/StatRibbon";
@@ -51,6 +53,7 @@ interface OrgEmployee {
 export default function DocumentsPage() {
   const { getToken } = useAuth();
   const { isHRAdmin, isEmployee, currentUser } = useRole();
+  const { view, download, viewer } = useDocumentActions();
   const [documents, setDocuments] = useState<OrgDocument[]>([]);
   const [employees, setEmployees] = useState<OrgEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -394,10 +397,23 @@ export default function DocumentsPage() {
                           {doc.status}
                         </StatusPill>
                         <button
+                          type="button"
                           className="btn-neutral"
+                          title="View / Read Document"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDownload(doc.id);
+                            view(doc.id, doc.filename);
+                          }}
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-neutral"
+                          title="Download Document"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            download(doc.id, doc.filename);
                           }}
                         >
                           <Download size={14} />
@@ -553,12 +569,28 @@ export default function DocumentsPage() {
               Close
             </button>
             {selectedDoc && (
-              <button
-                className="btn-primary"
-                onClick={() => handleDownload(selectedDoc.id)}
-              >
-                <Download size={15} /> Download Document
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn-neutral"
+                  onClick={() => {
+                    const doc = selectedDoc;
+                    setSelectedDoc(null);
+                    view(doc.id, doc.filename);
+                  }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <Eye size={14} /> Read Document
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => download(selectedDoc.id, selectedDoc.filename)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <Download size={14} /> Download
+                </button>
+              </>
             )}
           </>
         }
@@ -582,6 +614,8 @@ export default function DocumentsPage() {
           </div>
         )}
       </Modal>
+
+      {viewer}
     </>
   );
 }

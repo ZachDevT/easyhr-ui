@@ -134,6 +134,14 @@ export default function PayslipPage() {
     window.print();
   };
 
+  // `?print=1` (used by "PDF" actions) opens the browser's Save-as-PDF dialog once the slip renders.
+  useEffect(() => {
+    if (!slip || typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('print') !== '1') return;
+    const t = window.setTimeout(() => window.print(), 400);
+    return () => window.clearTimeout(t);
+  }, [slip]);
+
   const handleCopyLink = () => {
     if (typeof window !== 'undefined') {
       navigator.clipboard.writeText(window.location.href);

@@ -76,6 +76,7 @@ import {
   calculateChargeableGross,
   calculateUgandaPAYE,
   calculateNSSF,
+  estimatePay,
 } from "@/components/payroll/payrollModel";
 
 import { PayrollWalkthroughWidget } from "@/components/payroll/PayrollWalkthroughWidget";
@@ -841,14 +842,26 @@ export default function PayrollPage() {
   };
 
   // Lock & Finalize Run
-  const handleLockRun = async () => {
+  const handleLockRun = async (
+    itemsToLock?: Array<{
+      employeeId: string;
+      basePay: number;
+      earnings: number;
+      deductions: number;
+      netPay: number;
+    }>
+  ) => {
     if (!activeRun) return;
     setIsProcessingRun(true);
     try {
       const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/v1/payroll/runs/${activeRun.id}/lock`, {
         method: "POST",
-        headers: getAuthHeaders(token),
+        headers: {
+          ...getAuthHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ items: itemsToLock || [] }),
       });
 
       if (!res.ok) {
@@ -1395,10 +1408,11 @@ export default function PayrollPage() {
               insuranceMinor: 0,
             };
 
+            const contractedBaseMinor = comp && comp.baseAmountMinor > 0 ? comp.baseAmountMinor : item.basePay;
             const calc = calculateChargeableGross({
               payRateMinor: parsed.hourlyRateMinor,
               isHourly: parsed.model === "hourly",
-              monthlyBaseMinor: item.basePay,
+              monthlyBaseMinor: contractedBaseMinor,
               productiveHours: adj.productiveHours,
               standardMonthlyHours: parsed.standardHours || (activeConfig ? activeConfig.standardMonthlyMinutes / 60 : (settings.standardMonthlyHours || 173.33)),
               overtimeHours: adj.overtimeHours,
@@ -1410,19 +1424,35 @@ export default function PayrollPage() {
               holidayMultiplier: activeHolidayMultiplier,
             });
 
-            const paye = currentCountry === "UG" ? calculateUgandaPAYE(calc.chargeableGrossMinor) : Math.round(item.deductions * 0.8);
-            const nssf = currentCountry === "UG" ? calculateNSSF(calc.chargeableGrossMinor) : Math.round(item.deductions * 0.2);
-            const totalDeductions = paye + nssf;
+            const activeRules = taxRules.filter((r) => r.active);
+            const empObj = employees.find((e) => e.id === item.employeeId);
+            const est = activeRules.length > 0 ? estimatePay(calc.chargeableGrossMinor, activeRules, empObj) : null;
+            const paye = est
+              ? est.deductions
+              : currentCountry === "UG"
+                ? calculateUgandaPAYE(calc.chargeableGrossMinor)
+                : Math.round(item.deductions * 0.8);
+            const nssf = est
+              ? 0
+              : currentCountry === "UG"
+                ? calculateNSSF(calc.chargeableGrossMinor)
+                : Math.round(item.deductions * 0.2);
+            const totalDeductions = est ? est.deductions : paye + nssf;
+            const deductionLabel = est
+              ? est.lines.map((l) => `${l.name} ${formatMoney(l.amount, currentCurrency)}`).join(" · ")
+              : `PAYE ${formatMoney(paye, currentCurrency)} · NSSF ${formatMoney(nssf, currentCurrency)}`;
             const netPay = Math.max(0, calc.chargeableGrossMinor - totalDeductions);
 
             return {
               item,
+              contractedBaseMinor,
               parsed,
               adj,
               calc,
               paye,
               nssf,
               totalDeductions,
+              deductionLabel,
               netPay,
             };
           });
@@ -1522,7 +1552,7 @@ export default function PayrollPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {evaluatedItems.map(({ item, parsed, adj, calc, paye, nssf, totalDeductions, netPay }) => {
+                        {evaluatedItems.map(({ item, contractedBaseMinor, parsed, adj, calc, paye, nssf, totalDeductions, deductionLabel, netPay }) => {
                           const hasAdjustments = calc.totalHigherRatesMinor > 0 || calc.totalBonusesMinor > 0 || calc.totalPenaltiesMinor > 0;
                           return (
                             <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
@@ -1569,7 +1599,7 @@ export default function PayrollPage() {
                                   <strong>{formatMoney(calc.effectiveHourlyRateMinor, currentCurrency)}</strong>/hr
                                   {parsed.model !== "hourly" && (
                                     <span style={{ color: "var(--text-4)", fontSize: 10.5, display: "block" }}>
-                                      {formatMoney(item.basePay, currentCurrency)}/mo base
+                                      {formatMoney(contractedBaseMinor, currentCurrency)}/mo base
                                     </span>
                                   )}
                                 </div>
@@ -1649,7 +1679,7 @@ export default function PayrollPage() {
                                   -{formatMoney(totalDeductions, currentCurrency)}
                                 </strong>
                                 <div style={{ fontSize: 10.5, color: "var(--text-4)", marginTop: 2 }}>
-                                  PAYE {formatMoney(paye, currentCurrency)} · NSSF {formatMoney(nssf, currentCurrency)}
+                                  {deductionLabel}
                                 </div>
                               </td>
 
@@ -1734,7 +1764,17 @@ export default function PayrollPage() {
                       type="button"
                       className="btn-primary"
                       disabled={isProcessingRun}
-                      onClick={handleLockRun}
+                      onClick={() =>
+                        handleLockRun(
+                          evaluatedItems.map(({ item, calc, totalDeductions, netPay }) => ({
+                            employeeId: item.employeeId,
+                            basePay: calc.baseMonthlyCompensationMinor,
+                            earnings: Math.max(0, calc.chargeableGrossMinor - calc.baseMonthlyCompensationMinor),
+                            deductions: totalDeductions,
+                            netPay,
+                          }))
+                        )
+                      }
                       style={{ padding: "10px 22px", fontSize: 13.5 }}
                     >
                       {isProcessingRun ? <Loader2 size={15} className="animate-spin mr-6" /> : <ShieldCheck size={16} className="mr-6" />}
@@ -2637,10 +2677,11 @@ export default function PayrollPage() {
             const penMinor = toMinor(parseFloat(formPenalties) || 0);
             const insMinor = toMinor(parseFloat(formInsurance) || 0);
 
+            const contractedBaseMinor = comp && comp.baseAmountMinor > 0 ? comp.baseAmountMinor : editingAdjItem.basePay;
             const liveCalc = calculateChargeableGross({
               payRateMinor: parsed.hourlyRateMinor,
               isHourly: parsed.model === "hourly",
-              monthlyBaseMinor: editingAdjItem.basePay,
+              monthlyBaseMinor: contractedBaseMinor,
               productiveHours: pHours,
               standardMonthlyHours: parsed.standardHours || (activeConfig ? activeConfig.standardMonthlyMinutes / 60 : (settings.standardMonthlyHours || 173.33)),
               overtimeHours: otHours,
@@ -2652,15 +2693,20 @@ export default function PayrollPage() {
               holidayMultiplier: activeHolidayMultiplier,
             });
 
-            const livePaye =
-              currentCountry === "UG"
+            const activeRules = taxRules.filter((r) => r.active);
+            const empObj = employees.find((e) => e.id === editingAdjItem.employeeId);
+            const liveEst = activeRules.length > 0 ? estimatePay(liveCalc.chargeableGrossMinor, activeRules, empObj) : null;
+            const livePaye = liveEst
+              ? liveEst.deductions
+              : currentCountry === "UG"
                 ? calculateUgandaPAYE(liveCalc.chargeableGrossMinor)
                 : Math.round(editingAdjItem.deductions * 0.8);
-            const liveNssf =
-              currentCountry === "UG"
+            const liveNssf = liveEst
+              ? 0
+              : currentCountry === "UG"
                 ? calculateNSSF(liveCalc.chargeableGrossMinor)
                 : Math.round(editingAdjItem.deductions * 0.2);
-            const liveTotalDeductions = livePaye + liveNssf;
+            const liveTotalDeductions = liveEst ? liveEst.deductions : livePaye + liveNssf;
             const liveNet = Math.max(0, liveCalc.chargeableGrossMinor - liveTotalDeductions);
 
             const empTimesheets = timesheets.filter(

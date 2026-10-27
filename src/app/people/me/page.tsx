@@ -64,6 +64,10 @@ import { ProfileMeSkeleton } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
 import { toast } from "@/components/ui/Toast";
 import { API_BASE_URL } from "@/lib/api";
+import { ProfileSectionCard } from "@/components/people/ProfileSectionCard";
+import { EmployeePayslipsTable } from "@/components/payroll/EmployeePayslipsTable";
+import { EmployeeDocumentList } from "@/components/documents/EmployeeDocumentList";
+import { WeeklyTimesheet } from "@/components/time/WeeklyTimesheet";
 
 const TABS = [
   "Personal",
@@ -1066,33 +1070,29 @@ function ProfileContent() {
         {/* Right Column: Tab Content */}
         <div
           style={{
-            background: "var(--card-bg, #FFFFFF)",
-            borderRadius: 14,
-            border: "1px solid var(--card-border, #E4E4E7)",
-            padding: 28,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
             minHeight: 520,
           }}
         >
           {/* TAB 1: PERSONAL */}
           {activeTab === "Personal" && (
-            <div>
-              <div className="row-between mb-24">
-                <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Personal & Culture Profile</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Your official contact details, residential address, bio, and team culture favorites.
-                  </p>
-                </div>
-                {!isEditingPersonal && (
+            <ProfileSectionCard
+              title="Personal & Culture Profile"
+              subtitle="Your official contact details, residential address, bio, and team culture favorites."
+              action={
+                !isEditingPersonal && (
                   <button
+                    type="button"
                     className="btn-primary btn-sm row gap-6 align-center"
                     onClick={() => setIsEditingPersonal(true)}
                   >
-                    <Edit2 size={14} /> Edit Info
+                    <Edit2 size={13} /> Edit Profile
                   </button>
-                )}
-              </div>
+                )
+              }
+            >
 
               {isEditingPersonal ? (
                 <div>
@@ -1297,81 +1297,51 @@ function ProfileContent() {
                     </div>
                   )}
 
-                  {/* Culture & Team Favorites */}
-                  <div style={{ borderTop: "1px solid #F0F0F2", paddingTop: 24, marginTop: 20 }}>
-                    <div style={{ marginBottom: 14 }}>
+                  {/* Culture & Team Favorites (Compact & Pro) */}
+                  <div style={{ borderTop: "1px solid #F0F0F2", paddingTop: 20, marginTop: 4 }}>
+                    <div style={{ marginBottom: 16 }}>
                       <h4 style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", margin: 0 }}>
                         Team Culture &amp; Preferences
                       </h4>
                       <p style={{ fontSize: 12, color: "#86868B", margin: "2px 0 0" }}>
-                        Workplace perks, team gift sizing, and personal favorites
+                        Workplace perks, team sizing, and personal favorites
                       </p>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                      {/* T-Shirt Size */}
-                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
-                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
-                          T-Shirt Size
-                        </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>{employee?.shirtSize || "L"}</span>
-                          <span style={{ fontSize: 11, color: "#86868B" }}>Unisex</span>
-                        </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 24px" }}>
+                      <div>
+                        <span className="text-xs text-5 mb-4 block">T-Shirt Size</span>
+                        <div className="text-sm text-1 fw-600">{employee?.shirtSize ? `${employee.shirtSize} (Unisex)` : "Not specified"}</div>
                       </div>
-
-                      {/* Beverage */}
-                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
-                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
-                          Beverage Choice
-                        </span>
-                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>
-                          {employee?.coffeeTea || "Coffee"}
-                        </span>
+                      <div>
+                        <span className="text-xs text-5 mb-4 block">Beverage Choice</span>
+                        <div className="text-sm text-1 fw-600">{employee?.coffeeTea || "Not specified"}</div>
                       </div>
-
-                      {/* Favorite Food */}
-                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
-                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
-                          Favorite Food
-                        </span>
-                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>
-                          {employee?.favoriteFood || "Not specified"}
-                        </span>
+                      <div>
+                        <span className="text-xs text-5 mb-4 block">Favorite Food</span>
+                        <div className="text-sm text-1 fw-600">{employee?.favoriteFood || "Not specified"}</div>
                       </div>
-
-                      {/* Music & Genres */}
-                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
-                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
-                          Music &amp; Genres
-                        </span>
-                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>
-                          {employee?.favoriteMusic || "Not specified"}
-                        </span>
+                      <div>
+                        <span className="text-xs text-5 mb-4 block">Music &amp; Genres</span>
+                        <div className="text-sm text-1 fw-600">{employee?.favoriteMusic || "Not specified"}</div>
                       </div>
-
-                      {/* Fun Fact / Superpower */}
-                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px", gridColumn: "span 2" }}>
-                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
-                          Fun Fact / Superpower
-                        </span>
-                        <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "#1D1D1F" }}>
-                          {employee?.funFact || "Not specified"}
-                        </span>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <span className="text-xs text-5 mb-4 block">Fun Fact / Superpower</span>
+                        <div className="text-sm text-1 fw-500">{employee?.funFact || "Not specified"}</div>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
-            </div>
+            </ProfileSectionCard>
           )}
 
           {/* TAB 2: JOB */}
           {activeTab === "Job" && (
-            <div>
-              <div className="row-between mb-24">
-                <h3 className="text-lg fw-700 text-1 m-0">Official Employment Record</h3>
-              </div>
+            <ProfileSectionCard
+              title="Official Employment Record"
+              subtitle="Official position, department, division, work location, and supervisor assignment."
+            >
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px 24px" }}>
                 <div>
                   <label className="text-xs text-5 mb-4 block">Official Job Title</label>
@@ -1549,242 +1519,48 @@ function ProfileContent() {
                   </div>
                 </div>
               </div>
-            </div>
+            </ProfileSectionCard>
           )}
 
-          {/* TAB: PAYSLIPS (Matching Reference Screenshot UI) */}
+          {/* TAB: PAYSLIPS */}
           {activeTab === "Payslips" && canViewPayslips && (
-            <div>
-              {/* Header */}
-              <div className="row-between mb-20 align-center">
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      background: "var(--primary-tint, #EEF2F6)",
-                      color: "var(--primary, #2563EB)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+            <EmployeePayslipsTable
+              actions={
+                isHRAdmin ? (
+                  <Link
+                    href="/payroll"
+                    className="btn-primary btn-sm"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, textDecoration: "none" }}
                   >
-                    <Receipt size={18} />
-                  </div>
-                  <h3 className="text-xl fw-700 text-1 m-0">Payslips</h3>
-                </div>
-
-                {isHRAdmin && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCompensationForm({
-                          compensationModel: empComp.compensationModel,
-                          hourlyRate: String(empComp.hourlyRate || 18500),
-                          baseSalary: String(empComp.baseSalary || 3200000),
-                          dailyRate: String(empComp.dailyRate || 145000),
-                          currency: empComp.currency || "UGX",
-                          isExemptFromOvertime: Boolean(empComp.isExemptFromOvertime),
-                        });
-                        setIsEditCompensationOpen(true);
-                      }}
-                      className="btn-neutral btn-sm"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
-                    >
-                      <Edit2 size={13} /> Edit Compensation Model
-                    </button>
-                    <Link
-                      href="/payroll"
-                      className="btn-primary btn-sm"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, textDecoration: "none" }}
-                    >
-                      <DollarSign size={13} /> Payroll System
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              {/* Apple-Inspired Payslips Table */}
-              <div
-                style={{
-                  background: "#FFFFFF",
-                  borderRadius: 12,
-                  border: "1px solid #E5E5EA",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "14px 20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderBottom: "1px solid #F0F0F2",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 7,
-                        background: "#F5F5F7",
-                        color: "#1D1D1F",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Receipt size={14} />
-                    </div>
-                    <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
-                      Certified Pay Statements
-                    </h4>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsFormulaHelpOpen(true)}
-                    style={{
-                      background: "#F5F5F7",
-                      border: "1px solid #E5E5EA",
-                      borderRadius: 6,
-                      padding: "4px 10px",
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      color: "#636366",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <span>Calculation Formula</span>
-                    <span style={{ fontSize: 11, color: "#86868B" }}>ℹ️</span>
-                  </button>
-                </div>
-
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700, fontSize: 12.5 }}>
-                    <thead>
-                      <tr
-                        style={{
-                          background: "#FBFBFD",
-                          borderBottom: "1px solid #E5E5EA",
-                          color: "#86868B",
-                          textAlign: "left",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                        }}
-                      >
-                        <th style={{ padding: "10px 16px" }}>Pay Period</th>
-                        <th style={{ padding: "10px 14px" }}>Productive Hours</th>
-                        <th style={{ padding: "10px 14px" }}>Gross Earnings</th>
-                        <th style={{ padding: "10px 14px" }}>Deductions</th>
-                        <th style={{ padding: "10px 14px" }}>Net Disbursed</th>
-                        <th style={{ padding: "10px 14px" }}>Status</th>
-                        <th style={{ padding: "10px 16px", textAlign: "right" }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compensationRows.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={7}
-                            style={{ padding: "48px 20px", textAlign: "center", color: "#86868B" }}
-                          >
-                            <Receipt size={28} style={{ margin: "0 auto 10px", opacity: 0.35 }} />
-                            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1D1D1F", marginBottom: 3 }}>
-                              No pay statements yet
-                            </div>
-                            <div style={{ fontSize: 12, color: "#86868B" }}>
-                              Pay statements will appear here once a monthly payroll run is approved by HR.
-                            </div>
-                          </td>
-                        </tr>
-                      ) : (
-                        compensationRows.map((row) => (
-                          <tr key={`${row.periodYear}-${row.periodMonth}`} style={{ borderBottom: "1px solid #F5F5F7" }}>
-                            <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1D1D1F" }}>
-                              {getMonthName(row.periodMonth)} {row.periodYear}
-                            </td>
-                            <td style={{ padding: "12px 14px", color: "#1D1D1F" }}>
-                              <span style={{ fontWeight: 600 }}>{row.productiveHours}h</span>
-                              <span style={{ fontSize: 11, color: "#86868B", marginLeft: 4 }}>
-                                ({row.productiveHoursPercent}%)
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 14px", fontWeight: 600, color: "#1D1D1F" }}>
-                              {formatMoney(row.grossPay, row.currency)}
-                            </td>
-                            <td style={{ padding: "12px 14px", color: "#636366" }}>
-                              -{formatMoney(row.employeeDeductions, row.currency)}
-                            </td>
-                            <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--primary, #2563EB)" }}>
-                              {formatMoney(row.netPay, row.currency)}
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#F5F5F7", padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 600, color: "#1D1D1F" }}>
-                                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--primary, #2563EB)" }} />
-                                Paid
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedPayslipModal(row)}
-                                className="btn-neutral btn-sm"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                  fontSize: 11.5,
-                                  padding: "4px 10px",
-                                  borderRadius: 7,
-                                }}
-                              >
-                                <Eye size={12} /> View Statement
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+                    <DollarSign size={13} /> Payroll System
+                  </Link>
+                ) : undefined
+              }
+            />
           )}
 
           {/* TAB 3: EMERGENCY */}
           {activeTab === "Emergency" && (
-            <div>
-              <div className="row-between mb-24">
-                <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Emergency Contacts</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Verified contacts designated in case of medical or workplace emergencies.
-                  </p>
-                </div>
+            <ProfileSectionCard
+              title="Emergency Contacts"
+              subtitle="Verified contacts designated in case of medical or workplace emergencies."
+              action={
                 <button
+                  type="button"
                   className="btn-primary btn-sm row gap-6 align-center"
                   onClick={() => setIsEmergencyModalOpen(true)}
                 >
-                  <Plus size={14} /> {employee?.emergencyContactName ? "Edit Contact" : "Add Contact"}
+                  <Plus size={13} /> {employee?.emergencyContactName ? "Edit Contact" : "Add Contact"}
                 </button>
-              </div>
-
+              }
+            >
               {employee?.emergencyContactName ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
                   <div
                     style={{
-                      border: "1px solid var(--border)",
+                      border: "1px solid #E5E5EA",
                       borderRadius: 12,
-                      padding: 24,
+                      padding: 20,
                       background: "#FAFAFA",
                     }}
                   >
@@ -1802,7 +1578,7 @@ function ProfileContent() {
                   </div>
                 </div>
               ) : (
-                <div style={{ textAlign: "center", padding: "48px 20px", border: "1px dashed var(--border)", borderRadius: 12 }}>
+                <div style={{ textAlign: "center", padding: "48px 20px", border: "1px dashed #E5E5EA", borderRadius: 12 }}>
                   <AlertCircle size={32} color="#9CA3AF" style={{ margin: "0 auto 12px" }} />
                   <h4 className="text-sm fw-700 text-1 m-0 mb-4">No emergency contact registered yet</h4>
                   <p className="text-xs text-5 m-0 mb-16">
@@ -1813,32 +1589,29 @@ function ProfileContent() {
                   </button>
                 </div>
               )}
-            </div>
+            </ProfileSectionCard>
           )}
 
           {/* TAB 4: PAY INFO (DISBURSEMENT) */}
           {activeTab === "Pay Info" && (
-            <div>
-              <div className="row-between mb-24">
-                <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Compensation & Disbursement</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Your active payroll payout channel and disbursement account details.
-                  </p>
-                </div>
+            <ProfileSectionCard
+              title="Compensation & Disbursement"
+              subtitle="Your active payroll payout channel and disbursement account details."
+              action={
                 <button
+                  type="button"
                   className="btn-primary btn-sm row gap-6 align-center"
                   onClick={() => setIsPayoutModalOpen(true)}
                 >
-                  <Edit2 size={14} /> Update Payout Channel
+                  <Edit2 size={13} /> Update Payout Channel
                 </button>
-              </div>
-
+              }
+            >
               <div
                 style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 14,
-                  padding: 24,
+                  border: "1px solid #E5E5EA",
+                  borderRadius: 12,
+                  padding: 20,
                   background: "#FAFAFA",
                   display: "flex",
                   flexDirection: "column",
@@ -1926,123 +1699,23 @@ function ProfileContent() {
                   )}
                 </div>
               </div>
-            </div>
+            </ProfileSectionCard>
           )}
 
           {/* TAB 5: DOCUMENTS */}
           {activeTab === "Documents" && (
-            <div>
-              <div className="row-between mb-24">
-                <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Employee Documents & Compliance</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Official verified documentation, agreements, and handbook sign-offs.
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {/* Signed Handbook Record */}
-                {employee?.handbookSignedAt && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: 16,
-                      border: "1px solid #E4E4E7",
-                      borderRadius: 10,
-                      background: "#FFFFFF",
-                    }}
-                  >
-                    <div className="row gap-12 align-center">
-                      <div
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          background: "#F0FDF4",
-                          color: "#16A34A",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <ShieldCheck size={20} />
-                      </div>
-                      <div>
-                        <div className="text-sm fw-700 text-1">Employee Handbook & Policies Sign-Off</div>
-                        <div className="text-xs text-5 mt-2">
-                          Digitally signed and acknowledged on {new Date(employee.handbookSignedAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant="success">Verified & Signed</Badge>
-                  </div>
-                )}
-
-                {/* Real Documents List from backend */}
-                {documents.map((doc: any) => (
-                  <div
-                    key={doc.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: 16,
-                      border: "1px solid #E4E4E7",
-                      borderRadius: 10,
-                      background: "#FFFFFF",
-                    }}
-                  >
-                    <div className="row gap-12 align-center">
-                      <FileText size={20} className="text-primary" />
-                      <div>
-                        <div className="text-sm fw-600 text-1">{doc.fileName || doc.title || "Employee Document"}</div>
-                        <div className="text-xs text-5 mt-2">
-                          {doc.category || "General"} · {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : "Uploaded"}
-                        </div>
-                      </div>
-                    </div>
-                    {doc.downloadUrl && (
-                      <a
-                        href={doc.downloadUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-neutral btn-sm row gap-6 align-center"
-                        style={{ textDecoration: "none" }}
-                      >
-                        <Download size={14} /> Download
-                      </a>
-                    )}
-                  </div>
-                ))}
-
-                {!employee?.handbookSignedAt && documents.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "48px 20px", border: "1px dashed var(--border)", borderRadius: 12 }}>
-                    <FileText size={32} color="#9CA3AF" style={{ margin: "0 auto 12px" }} />
-                    <h4 className="text-sm fw-700 text-1 m-0 mb-4">No documents on file yet</h4>
-                    <p className="text-xs text-5 m-0">
-                      Uploaded agreements and company documents will appear here automatically.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <EmployeeDocumentList
+              employeeId={employee?.id}
+              handbookSignedAt={employee?.handbookSignedAt}
+            />
           )}
 
           {/* TAB 6: TIME OFF */}
           {activeTab === "Time Off" && (
-            <div>
-              <div className="row-between mb-20">
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
-                    Leave Balances &amp; Allocations
-                  </h3>
-                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
-                    Dynamic PTO, annual vacation, and statutory sick day accruals.
-                  </p>
-                </div>
+            <ProfileSectionCard
+              title="Leave Balances & Allocations"
+              subtitle="Dynamic PTO, annual vacation, and statutory sick day accruals."
+              action={
                 <Link
                   href="/time-off"
                   className="btn-primary btn-sm"
@@ -2058,8 +1731,8 @@ function ProfileContent() {
                 >
                   <Plus size={14} /> Request Time Off
                 </Link>
-              </div>
-
+              }
+            >
               {/* Dynamic Apple-Style Leave Cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 28 }}>
                 {normalizedBalances.map((bal) => {
@@ -2234,121 +1907,23 @@ function ProfileContent() {
                   </span>
                 </div>
               )}
-            </div>
+            </ProfileSectionCard>
           )}
 
           {/* TAB 7: TIMESHEET */}
           {activeTab === "Timesheet" && (
-            <div>
-              <div className="row-between mb-20">
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
-                    Live Timesheet &amp; Punches
-                  </h3>
-                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
-                    Real-time work sessions, punch clocks, and approved productive hours.
-                  </p>
-                </div>
-                <Link
-                  href="/attendance"
-                  className="btn-neutral btn-sm"
-                  style={{ textDecoration: "none", padding: "6px 14px", borderRadius: 8, fontSize: 12.5 }}
-                >
-                  Attendance Matrix
-                </Link>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20, alignItems: "start" }}>
-                <div style={{ background: "#FFFFFF", border: "1px solid #E5E5EA", borderRadius: 12, overflow: "hidden" }}>
-                  <div
-                    style={{
-                      padding: "14px 18px",
-                      background: "#FAFAFC",
-                      borderBottom: "1px solid #E5E5EA",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B" }}>
-                      Current Pay Period Work Logs
-                    </span>
-                    <span style={{ fontSize: 11.5, color: "#86868B" }}>
-                      {groupedPunches.length} work days recorded
-                    </span>
-                  </div>
-
-                  {groupedPunches.length > 0 ? (
-                    groupedPunches.map((entry, idx) => (
-                      <div
-                        key={entry.date}
-                        style={{
-                          padding: "14px 18px",
-                          borderBottom: idx === groupedPunches.length - 1 ? "none" : "1px solid #F0F0F2",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div style={{ width: 110 }}>
-                          <div style={{ fontSize: 13, fontWeight: 650, color: "#1D1D1F" }}>{entry.day}</div>
-                          <div style={{ fontSize: 11.5, color: "#86868B" }}>{entry.date}</div>
-                        </div>
-                        <div style={{ flex: 1, paddingLeft: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          {entry.punches.map((p, i) => (
-                            <span
-                              key={i}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 5,
-                                fontSize: 11.5,
-                                fontWeight: 500,
-                                background: p.punchType === "in" ? "#F0FDF4" : "#F5F5F7",
-                                color: p.punchType === "in" ? "#166534" : "#1D1D1F",
-                                border: p.punchType === "in" ? "1px solid #BBF7D0" : "1px solid #E5E5EA",
-                                borderRadius: 6,
-                                padding: "3px 8px",
-                              }}
-                            >
-                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: p.punchType === "in" ? "#22C55E" : "#86868B" }} />
-                              {p.punchType === "in" ? "Clock In" : "Clock Out"}:{" "}
-                              {p.punchedAt ? new Date(p.punchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{ padding: "36px 20px", textAlign: "center", color: "#86868B" }}>
-                      <Clock size={24} style={{ margin: "0 auto 8px", opacity: 0.6 }} />
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>No punches recorded yet this period</div>
-                      <div style={{ fontSize: 11.5, marginTop: 4 }}>Use the punch widget to clock in for your shift.</div>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ position: "sticky", top: 24 }}>
-                  <CompulsoryMyTimeWidget />
-                </div>
-              </div>
-            </div>
+            <WeeklyTimesheet showClockWidget allowManualEntry />
           )}
 
           {/* TAB 8: PERFORMANCE */}
           {activeTab === "Performance" && (
-            <div>
-              <div className="row-between mb-20">
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
-                    Performance &amp; OKR Milestones
-                  </h3>
-                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
-                    Track strategic milestones, OKRs, and manager quarterly evaluations.
-                  </p>
-                </div>
+            <ProfileSectionCard
+              title="Performance & OKR Milestones"
+              subtitle="Track strategic milestones, OKRs, and manager quarterly evaluations."
+              action={
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button
+                    type="button"
                     className="btn-primary btn-sm"
                     onClick={() => setIsGoalModalOpen(true)}
                     style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 8, padding: "6px 14px", fontSize: 12.5 }}
@@ -2365,7 +1940,8 @@ function ProfileContent() {
                     </Link>
                   )}
                 </div>
-              </div>
+              }
+            >
 
               {/* Goals Grid */}
               <div style={{ marginBottom: 24 }}>
@@ -2492,22 +2068,16 @@ function ProfileContent() {
                   </div>
                 )}
               </div>
-            </div>
+            </ProfileSectionCard>
           )}
 
           {/* TAB 9: BENEFITS */}
           {activeTab === "Benefits" && (
-            <div>
-              <div className="row-between mb-20">
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
-                    Company Benefits &amp; Coverage
-                  </h3>
-                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
-                    Active health insurance, retirement plans, and organizational perks.
-                  </p>
-                </div>
-                {isHRAdmin && (
+            <ProfileSectionCard
+              title="Company Benefits & Coverage"
+              subtitle="Active health insurance, retirement plans, and organizational perks."
+              action={
+                isHRAdmin ? (
                   <Link
                     href="/benefits"
                     className="btn-neutral btn-sm"
@@ -2515,9 +2085,9 @@ function ProfileContent() {
                   >
                     Benefits Administration
                   </Link>
-                )}
-              </div>
-
+                ) : undefined
+              }
+            >
               {/* Active Enrollments */}
               <div style={{ marginBottom: 24 }}>
                 <span style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 12 }}>
@@ -2642,7 +2212,7 @@ function ProfileContent() {
                   </div>
                 )}
               </div>
-            </div>
+            </ProfileSectionCard>
           )}
         </div>
       </div>

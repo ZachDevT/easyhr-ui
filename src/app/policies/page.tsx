@@ -14,7 +14,10 @@ import {
   Loader2,
   CheckCircle2,
   Shield,
+  Download,
+  Eye,
 } from "lucide-react";
+import { useDocumentActions } from "@/components/documents/DocumentViewer";
 import { useAuth } from "@clerk/nextjs";
 import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -42,6 +45,7 @@ const CATEGORIES = ["General", "Operations", "Security", "Compliance", "Time Off
 export default function PoliciesPage() {
   const { getToken } = useAuth();
   const { isHRAdmin } = useRole();
+  const { view, download, viewer } = useDocumentActions();
   const [activeTab, setActiveTab] = useState("Policy Library");
   const [policies, setPolicies] = useState<PolicyItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -324,7 +328,40 @@ export default function PoliciesPage() {
                         className="row-between align-center pt-16 mt-8"
                         style={{ borderTop: "1px dashed var(--border)" }}
                       >
-                        <div className="row gap-8 align-center"><Badge variant="neutral">{policy.category}</Badge><button className="btn-neutral btn-sm" onClick={() => handlePolicyDownload(policy.documentId)}><FileText size={14}/> View file</button></div>
+                        <div className="row gap-8 align-center">
+                          <Badge variant="neutral">{policy.category}</Badge>
+                          {policy.documentId ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-neutral btn-sm"
+                                title="Read Policy"
+                                onClick={() => view(policy.documentId!, `${policy.title}.pdf`)}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                              >
+                                <Eye size={13} /> Read
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-neutral btn-sm"
+                                title="Download Policy"
+                                onClick={() => download(policy.documentId!, `${policy.title}.pdf`)}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                              >
+                                <Download size={13} /> Download
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-neutral btn-sm"
+                              onClick={() => handlePolicyDownload(policy.documentId)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                            >
+                              <FileText size={13} /> View file
+                            </button>
+                          )}
+                        </div>
                         {policy.requiresSignature ? (
                           <div className="row gap-8 align-center text-sm">
                             <CheckSquare size={16} className="text-warning" />
@@ -526,6 +563,8 @@ export default function PoliciesPage() {
           </div>
         </Modal>
       )}
+
+      {viewer}
     </div>
   );
 }

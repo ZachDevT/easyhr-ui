@@ -8,7 +8,7 @@ import {
   MonitorPlay, MonitorStop, RefreshCw, CalendarDays, Edit3, Send,
   CheckCircle2, LogIn, LogOut, UserCheck, ShieldAlert, Trash2, Plus
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -56,7 +56,14 @@ const DEFAULT_ACTIVITIES: ActivityItem[] = [
 function AttendanceContent() {
   const { getToken, isSignedIn } = useAuth();
   const { isHRAdmin, isManager, currentUser } = useRole();
+  const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!isHRAdmin && !isManager) {
+      router.replace("/time");
+    }
+  }, [isHRAdmin, isManager, router]);
   const initialTab = searchParams?.get("tab") === "activities" ? "Punch Activities" : "Live Attendance";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [records, setRecords] = useState<LiveAttendanceItem[]>([]);

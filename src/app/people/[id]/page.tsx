@@ -57,6 +57,10 @@ import { toast } from "@/components/ui/Toast";
 import { EditEmployeeModal } from "@/components/people/EditEmployeeModal";
 import { ProfileMeSkeleton } from "@/components/ui/Skeleton";
 import { Modal } from "@/components/ui/Modal";
+import { ProfileSectionCard } from "@/components/people/ProfileSectionCard";
+import { EmployeePayslipsTable } from "@/components/payroll/EmployeePayslipsTable";
+import { EmployeeDocumentList } from "@/components/documents/EmployeeDocumentList";
+import { WeeklyTimesheet } from "@/components/time/WeeklyTimesheet";
 
 interface EmployeeProfileData {
   id: string;
@@ -111,12 +115,13 @@ interface EmployeeProfileData {
 const ALL_TABS = [
   "Personal",
   "Job",
-  "Pay Info",
   "Payslips",
-  "Documents",
+  "Timesheet",
   "Time Off",
-  "Performance",
+  "Documents",
+  "Pay Info",
   "Benefits",
+  "Performance",
   "Emergency",
 ];
 
@@ -1183,159 +1188,54 @@ export default function EmployeeProfile() {
 
             {/* TAB: PAYSLIPS */}
             {activeTab === "Payslips" && (
-              <Card>
-                <CardBody>
-                  <div className="row-between mb-16 align-center">
-                    <SectionHeading
-                      title="Historical Pay Statements &amp; Payslips"
-                      description={`Certified monthly payroll statements for ${fullName}`}
-                    />
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => setIsFormulaHelpOpen(true)}
-                        style={{
-                          background: "#F5F5F7",
-                          border: "1px solid #E5E5EA",
-                          borderRadius: 6,
-                          padding: "5px 10px",
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          color: "#636366",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <HelpCircle size={13} />
-                        <span>Formula</span>
-                      </button>
-                      <Link
-                        href="/payroll"
-                        className="btn-neutral btn-sm"
-                        style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
-                      >
-                        <Receipt size={13} />
-                        <span>Payroll Runs Archive</span>
-                      </Link>
-                    </div>
+              <EmployeePayslipsTable
+                employeeId={params.id}
+                actions={
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsFormulaHelpOpen(true)}
+                      style={{
+                        background: "#F5F5F7",
+                        border: "1px solid #E5E5EA",
+                        borderRadius: 6,
+                        padding: "5px 10px",
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: "#636366",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <HelpCircle size={13} />
+                      <span>Formula</span>
+                    </button>
+                    <Link
+                      href="/payroll"
+                      className="btn-neutral btn-sm"
+                      style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
+                    >
+                      <Receipt size={13} />
+                      <span>Payroll Runs Archive</span>
+                    </Link>
                   </div>
+                }
+              />
+            )}
 
-                  {compensationRows.length > 0 ? (
-                  <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: 8 }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 720 }}>
-                      <thead style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", color: "#64748B", textAlign: "left", fontSize: 11.5 }}>
-                        <tr>
-                          <th style={{ padding: "12px 16px" }}>Pay Period</th>
-                          <th style={{ padding: "12px 14px" }}>Productive %</th>
-                          <th style={{ padding: "12px 14px" }}>Rate</th>
-                          <th style={{ padding: "12px 14px" }}>Gross Pay</th>
-                          <th style={{ padding: "12px 14px" }}>Deductions</th>
-                          <th style={{ padding: "12px 14px" }}>Net Disbursed</th>
-                          <th style={{ padding: "12px 14px" }}>Status</th>
-                          <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {compensationRows.map((row) => (
-                          <tr key={`${row.periodYear}-${row.periodMonth}`} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                            <td style={{ padding: "12px 16px", fontWeight: 700, color: "var(--text-1)" }}>
-                              {getMonthName(row.periodMonth)} {row.periodYear}
-                            </td>
-                            <td style={{ padding: "12px 14px", color: "#0F766E", fontWeight: 600 }}>
-                              {row.productiveHoursPercent}% ({row.productiveHours}h)
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>{row.payRateDisplay}</td>
-                            <td style={{ padding: "12px 14px", fontWeight: 600 }}>
-                              {formatMoney(row.grossPay, row.currency)}
-                            </td>
-                            <td style={{ padding: "12px 14px", color: "#DC2626", fontWeight: 600 }}>
-                              -{formatMoney(row.employeeDeductions, row.currency)}
-                            </td>
-                            <td style={{ padding: "12px 14px", fontWeight: 800, color: "#16A34A" }}>
-                              {formatMoney(row.netPay, row.currency)}
-                            </td>
-                            <td style={{ padding: "12px 14px" }}>
-                              <StatusPill tone="success">Paid &amp; Finalized</StatusPill>
-                            </td>
-                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                              <div style={{ display: "inline-flex", gap: 6 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedPayslipModal(row)}
-                                  className="btn-neutral btn-sm"
-                                  style={{ fontSize: 11.5 }}
-                                >
-                                  <Eye size={12} className="mr-4" /> View
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPayslipModal(row);
-                                    setTimeout(() => window.print(), 300);
-                                  }}
-                                  className="btn-neutral btn-sm"
-                                  style={{ fontSize: 11.5 }}
-                                >
-                                  <Printer size={12} className="mr-4" /> Print
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  ) : (
-                    <div style={{ padding: "36px 20px", textAlign: "center", background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10 }}>
-                      <Receipt size={24} color="#86868B" style={{ margin: "0 auto 8px" }} />
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1D1D1F" }}>No certified pay statements issued yet</div>
-                      <div style={{ fontSize: 11.5, color: "#86868B", marginTop: 4 }}>
-                        Historical statements will appear here automatically once monthly payroll runs are executed and approved.
-                      </div>
-                    </div>
-                  )}
-                </CardBody>
-              </Card>
+            {/* TAB: TIMESHEET */}
+            {activeTab === "Timesheet" && (
+              <WeeklyTimesheet employeeId={params.id} allowManualEntry />
             )}
 
             {/* TAB: DOCUMENTS */}
             {activeTab === "Documents" && (
-              <Card>
-                <CardBody>
-                  <SectionHeading
-                    title="Compliance &amp; Verification Documents"
-                    description="Official employee documentation, signed policies, and work permits"
-                  />
-                  <div className="col gap-12 mt-16">
-                    <DataRow
-                      leading={<ShieldCheck size={18} color="var(--success)" />}
-                      title="Identity &amp; Employment Verification"
-                      subtitle="Primary government work authorization verified"
-                      meta={<StatusPill tone="success">Verified</StatusPill>}
-                    />
-                    <DataRow
-                      leading={<Mail size={18} color="var(--primary)" />}
-                      title="Work Email &amp; Identity Access"
-                      subtitle={employee.workEmail}
-                      meta={<StatusPill tone="success">Active</StatusPill>}
-                    />
-                    <DataRow
-                      leading={<CheckCircle2 size={18} color="#16A34A" />}
-                      title="Employee Handbook &amp; Code of Conduct"
-                      subtitle={employee.handbookSignedAt ? `Signed digitally on ${employee.handbookSignedAt}` : "Signed & stored in enterprise compliance vault"}
-                      meta={<StatusPill tone="success">Signed</StatusPill>}
-                    />
-                    <DataRow
-                      leading={<Briefcase size={18} color="var(--primary)" />}
-                      title="Employment Contract &amp; Offer Letter"
-                      subtitle={`Executed agreement for ${employee.jobTitle || 'Team Member'}`}
-                      meta={<StatusPill tone="success">Executed</StatusPill>}
-                    />
-                  </div>
-                </CardBody>
-              </Card>
+              <EmployeeDocumentList
+                employeeId={params.id}
+                handbookSignedAt={employee.handbookSignedAt}
+              />
             )}
 
             {/* TAB: TIME OFF */}
