@@ -2497,6 +2497,7 @@ interface NewHireProfile {
   department: string;
   location?: string;
   startDate?: string;
+  createdAt?: string;
   avatar?: string;
   bio?: string;
   funFact?: string;
@@ -2504,6 +2505,52 @@ interface NewHireProfile {
   favoriteMovies?: string;
   favoriteMusic?: string;
   coffeeTea?: string;
+}
+
+function formatJoinTimeAgo(startDateStr?: string, createdAtStr?: string): string {
+  const target = startDateStr || createdAtStr;
+  if (!target) return 'Joined recently';
+
+  const parsed = new Date(target);
+  if (isNaN(parsed.getTime())) return 'Joined recently';
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const joinDay = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+
+  const diffMs = today.getTime() - joinDay.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    const futureDays = Math.abs(diffDays);
+    if (futureDays === 1) return 'Starts tomorrow';
+    return `Starts in ${futureDays} days`;
+  }
+  if (diffDays === 0) {
+    return 'Joined today';
+  }
+  if (diffDays === 1) {
+    return 'Joined yesterday';
+  }
+  if (diffDays < 7) {
+    return `Joined ${diffDays} days ago`;
+  }
+  if (diffDays < 14) {
+    return 'Joined 1 week ago';
+  }
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `Joined ${weeks} weeks ago`;
+  }
+  if (diffDays < 60) {
+    return 'Joined 1 month ago';
+  }
+  const months = Math.floor(diffDays / 30);
+  if (months < 12) {
+    return `Joined ${months} months ago`;
+  }
+  const years = Math.floor(months / 12);
+  return years === 1 ? 'Joined 1 year ago' : `Joined ${years} years ago`;
 }
 
 export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; preview?: boolean }) {
@@ -2519,13 +2566,13 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
       try {
         const token = await getToken();
         if (!token) return;
-        const res = await fetch(`${API_BASE_URL}/api/v1/employees?limit=6`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/employees?sort=newest&limit=12`, {
           headers: getAuthHeaders(token),
         });
         if (res.ok) {
           const data = await res.json();
           if (data?.data && Array.isArray(data.data)) {
-            const mapped: NewHireProfile[] = data.data.slice(0, 5).map((e: any) => ({
+            const mapped: NewHireProfile[] = data.data.map((e: any) => ({
               id: e.id,
               firstName: e.firstName || e.name?.split(' ')[0] || 'Teammate',
               name: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.name || 'Team Member',
@@ -2533,9 +2580,18 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
               department: e.department || 'Operations',
               location: e.location || 'Headquarters',
               startDate: e.hiredOn || e.startDate,
+              createdAt: e.createdAt,
               avatar: e.avatarUrl || e.avatar,
             }));
-            setNewHires(mapped);
+
+            // Chronological sort: newest hire / join date first
+            mapped.sort((a, b) => {
+              const timeA = new Date(a.startDate || a.createdAt || 0).getTime() || 0;
+              const timeB = new Date(b.startDate || b.createdAt || 0).getTime() || 0;
+              return timeB - timeA;
+            });
+
+            setNewHires(mapped.slice(0, 6));
           }
         }
       } catch {}
@@ -2644,13 +2700,20 @@ export function NewHiresWidget({ onRemove, preview }: { onRemove?: () => void; p
                         <span
                           style={{
                             fontSize: 10,
-                            padding: '1px 7px',
+                            fontWeight: 600,
+                            padding: '2px 8px',
                             borderRadius: 999,
-                            background: 'var(--primary-tint)',
-                            color: 'var(--primary)',
+                            background: 'var(--primary-tint, #EFF6FF)',
+                            color: 'var(--primary, #2563EB)',
+                            border: '1px solid color-mix(in srgb, var(--primary) 18%, transparent)',
+                            whiteSpace: 'nowrap',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            lineHeight: 1.3,
                           }}
                         >
-                          New
+                          {formatJoinTimeAgo(emp.startDate, emp.createdAt)}
                         </span>
                       </div>
                       <p className="text-xs text-5 mt-2 m-0 truncate">
