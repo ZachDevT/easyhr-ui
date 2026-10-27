@@ -3,7 +3,7 @@
 import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Building2, ChevronRight, Mail, MapPin, Search, Users, UserPlus, Link2 } from "lucide-react";
+import { Building2, ChevronRight, MapPin, Search, Users, UserPlus, Link2 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -324,10 +324,6 @@ export default function PeopleDirectory() {
                           <div className="row gap-8 align-center">
                             <MapPin size={13} />
                             <span>{e.location || "Headquarters"}</span>
-                          </div>
-                          <div className="row gap-8 align-center">
-                            <Mail size={13} />
-                            <span>{e.workEmail}</span>
                           </div>
                         </div>
 

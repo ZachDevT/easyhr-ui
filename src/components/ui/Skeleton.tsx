@@ -695,7 +695,6 @@ export function PeopleDirectorySkeleton() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <Skeleton width="85%" height={12} />
                 <Skeleton width="65%" height={12} />
-                <Skeleton width="75%" height={12} />
               </div>
               <Skeleton width={70} height={22} radius={12} />
             </div>
