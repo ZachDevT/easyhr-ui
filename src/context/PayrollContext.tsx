@@ -105,108 +105,9 @@ const DEFAULT_SETTINGS: PayrollSettings = {
   dailyStandardHours: 8.0,
 };
 
-const SEED_BONUSES_PENALTIES: BonusPenaltyRecord[] = [
-  {
-    id: 'bp-001',
-    employeeId: 'emp-bushu',
-    employeeName: 'Bushu Hamuli Zacharie',
-    type: 'bonus',
-    category: 'Performance Bonus',
-    amount: 350000,
-    currency: 'UGX',
-    periodMonth: 10,
-    periodYear: 2026,
-    reason: 'Exceeded ticket resolution target by 28% in October',
-    status: 'approved',
-    addedBy: 'Nelson Kivuya Mun (Manager)',
-    createdAt: '2026-10-15T10:30:00Z',
-  },
-  {
-    id: 'bp-002',
-    employeeId: 'emp-bushu',
-    employeeName: 'Bushu Hamuli Zacharie',
-    type: 'bonus',
-    category: 'Attendance Bonus',
-    amount: 150000,
-    currency: 'UGX',
-    periodMonth: 9,
-    periodYear: 2026,
-    reason: '100% on-time shift compliance in September',
-    status: 'approved',
-    addedBy: 'Nelson Kivuya Mun (Manager)',
-    createdAt: '2026-09-28T09:15:00Z',
-  },
-  {
-    id: 'bp-003',
-    employeeId: 'emp-bushu',
-    employeeName: 'Bushu Hamuli Zacharie',
-    type: 'penalty',
-    category: 'Unpaid Absence Adjustment',
-    amount: 85000,
-    currency: 'UGX',
-    periodMonth: 8,
-    periodYear: 2026,
-    reason: 'Unexcused absence on August 14th without prior cover',
-    status: 'approved',
-    addedBy: 'HR Administration',
-    createdAt: '2026-08-20T14:00:00Z',
-  },
-];
+const SEED_BONUSES_PENALTIES: BonusPenaltyRecord[] = [];
 
-const SEED_RUNS: PayrollRunRecord[] = [
-  {
-    id: 'run-2026-10',
-    title: 'October 2026 Regular Payroll',
-    periodStart: '2026-10-01',
-    periodEnd: '2026-10-31',
-    payDate: '2026-10-31',
-    currency: 'UGX',
-    status: 'calculated',
-    totalEmployees: 12,
-    totalGrossPay: 38400000,
-    totalDeductions: 8750000,
-    totalNetPay: 29650000,
-    totalEmployerCost: 42240000,
-    itemCount: 12,
-    createdAt: '2026-10-18T16:00:00Z',
-  },
-  {
-    id: 'run-2026-09',
-    title: 'September 2026 Regular Payroll',
-    periodStart: '2026-09-01',
-    periodEnd: '2026-09-30',
-    payDate: '2026-09-30',
-    currency: 'UGX',
-    status: 'finalized',
-    totalEmployees: 12,
-    totalGrossPay: 37200000,
-    totalDeductions: 8400000,
-    totalNetPay: 28800000,
-    totalEmployerCost: 40920000,
-    itemCount: 12,
-    createdAt: '2026-09-29T17:00:00Z',
-    approvedAt: '2026-09-30T10:00:00Z',
-    approvedBy: 'HR Director',
-  },
-  {
-    id: 'run-2026-08',
-    title: 'August 2026 Regular Payroll',
-    periodStart: '2026-08-01',
-    periodEnd: '2026-08-31',
-    payDate: '2026-08-31',
-    currency: 'UGX',
-    status: 'paid',
-    totalEmployees: 11,
-    totalGrossPay: 34100000,
-    totalDeductions: 7800000,
-    totalNetPay: 26300000,
-    totalEmployerCost: 37510000,
-    itemCount: 11,
-    createdAt: '2026-08-30T15:00:00Z',
-    approvedAt: '2026-08-31T09:30:00Z',
-    approvedBy: 'Finance Controller',
-  },
-];
+const SEED_RUNS: PayrollRunRecord[] = [];
 
 const PayrollContext = createContext<PayrollContextType | undefined>(undefined);
 
@@ -228,10 +129,26 @@ export function PayrollProvider({ children }: { children: React.ReactNode }) {
       if (savedProfiles) setEmployeeProfiles(JSON.parse(savedProfiles));
 
       const savedBP = localStorage.getItem('easyhr_payroll_bonuses_penalties');
-      if (savedBP) setBonusesPenalties(JSON.parse(savedBP));
+      if (savedBP) {
+        const parsedBP = JSON.parse(savedBP);
+        if (Array.isArray(parsedBP) && parsedBP.some((b: any) => b.id?.startsWith('bp-00'))) {
+          localStorage.removeItem('easyhr_payroll_bonuses_penalties');
+          setBonusesPenalties([]);
+        } else {
+          setBonusesPenalties(parsedBP);
+        }
+      }
 
       const savedRuns = localStorage.getItem('easyhr_payroll_runs');
-      if (savedRuns) setPayrollRuns(JSON.parse(savedRuns));
+      if (savedRuns) {
+        const parsedRuns = JSON.parse(savedRuns);
+        if (Array.isArray(parsedRuns) && parsedRuns.some((r: any) => r.id?.startsWith('run-2026-'))) {
+          localStorage.removeItem('easyhr_payroll_runs');
+          setPayrollRuns([]);
+        } else {
+          setPayrollRuns(parsedRuns);
+        }
+      }
 
       const savedSettings = localStorage.getItem('easyhr_payroll_settings');
       if (savedSettings) setSettings(JSON.parse(savedSettings));
@@ -420,7 +337,7 @@ export function PayrollProvider({ children }: { children: React.ReactNode }) {
     [getEmployeeCompensation, rules, bonusesPenalties]
   );
 
-  // Historical compensation details for the table (e.g. October, September, August 2026)
+  // Historical compensation details for the table (synced strictly from actual payroll runs)
   const getEmployeeCompensationDetails = useCallback(
     (
       employeeId: string,
@@ -431,36 +348,42 @@ export function PayrollProvider({ children }: { children: React.ReactNode }) {
       employeeNumber?: string,
       currency?: string
     ): PayrollCalculationResult[] => {
+      // If there are no real payroll runs recorded, return an empty array (zero fake mock records)
+      if (!payrollRuns || payrollRuns.length === 0) {
+        return [];
+      }
+
       const profile = getEmployeeCompensation(employeeId, employeeName, jobTitle, department, email, employeeNumber, currency);
-      const months = [
-        { month: 10, year: 2026, prodHours: 168.5, otHours: 8.5, specialHours: 8.0 },
-        { month: 9, year: 2026, prodHours: 173.33, otHours: 12.0, specialHours: 0 },
-        { month: 8, year: 2026, prodHours: 160.0, otHours: 4.0, specialHours: 0 },
-      ];
 
-      return months.map((m) => {
-        const attendance: AttendancePayrollSummary = {
-          employeeId,
-          periodStart: `${m.year}-${String(m.month).padStart(2, '0')}-01`,
-          periodEnd: `${m.year}-${String(m.month).padStart(2, '0')}-28`,
-          recordedHours: m.prodHours + m.otHours + 2.5,
-          productiveHours: m.prodHours,
-          billableHours: m.prodHours - 8,
-          payableRegularHours: Math.min(m.prodHours, profile.standardMonthlyHours),
-          approvedOvertimeHours: m.otHours,
-          unapprovedOvertimeHours: 0,
-          holidaySpecialHours: m.specialHours,
-          nightShiftHours: 0,
-          daysWorked: 21,
-          expectedDays: 22,
-          absentDays: 1,
-          missingPunchCount: 0,
-        };
+      return payrollRuns
+        .filter((r) => r.status === 'calculated' || r.status === 'finalized' || r.status === 'paid' || r.status === 'approved')
+        .map((run) => {
+          const date = new Date(run.periodEnd || run.payDate);
+          const month = isNaN(date.getMonth()) ? 10 : date.getMonth() + 1;
+          const year = isNaN(date.getFullYear()) ? 2026 : date.getFullYear();
 
-        return calculateEmployeePayroll(profile, attendance, rules, bonusesPenalties, m.month, m.year);
-      });
+          const attendance: AttendancePayrollSummary = {
+            employeeId,
+            periodStart: run.periodStart,
+            periodEnd: run.periodEnd,
+            recordedHours: 173.33,
+            productiveHours: 173.33,
+            billableHours: 173.33,
+            payableRegularHours: profile.standardMonthlyHours,
+            approvedOvertimeHours: 0,
+            unapprovedOvertimeHours: 0,
+            holidaySpecialHours: 0,
+            nightShiftHours: 0,
+            daysWorked: 22,
+            expectedDays: 22,
+            absentDays: 0,
+            missingPunchCount: 0,
+          };
+
+          return calculateEmployeePayroll(profile, attendance, rules, bonusesPenalties, month, year);
+        });
     },
-    [getEmployeeCompensation, rules, bonusesPenalties]
+    [getEmployeeCompensation, rules, bonusesPenalties, payrollRuns]
   );
 
   // Execute a new payroll run

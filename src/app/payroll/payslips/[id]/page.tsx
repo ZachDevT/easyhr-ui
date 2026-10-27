@@ -299,67 +299,67 @@ export default function PayslipPage() {
       </header>
 
       {/* Main Container */}
-      <main style={{ maxWidth: 880, margin: '32px auto 0', padding: '0 16px' }}>
+      <main style={{ maxWidth: 740, margin: '24px auto 0', padding: '0 16px' }}>
         {isLoading ? (
           <div
             style={{
               background: '#FFFFFF',
-              borderRadius: 16,
-              padding: '80px 24px',
+              borderRadius: 14,
+              padding: '60px 24px',
               textAlign: 'center',
-              border: '1px solid #E5E7EB',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+              border: '1px solid #E5E5EA',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
             }}
           >
             <Loader2
-              size={36}
+              size={32}
               className="animate-spin"
-              style={{ margin: '0 auto 16px', color: 'var(--primary, #2563EB)' }}
+              style={{ margin: '0 auto 14px', color: 'var(--primary, #2563EB)' }}
             />
-            <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1, #111827)', marginBottom: 6 }}>
-              Generating Certified Pay Statement...
+            <h2 style={{ fontSize: 16, fontWeight: 650, color: '#1D1D1F', marginBottom: 4 }}>
+              Loading Pay Statement...
             </h2>
-            <p style={{ fontSize: 13, color: 'var(--text-4, #6B7280)', margin: 0 }}>
-              Retrieving cryptographic ledger records and corporate payroll balances.
+            <p style={{ fontSize: 12.5, color: '#86868B', margin: 0 }}>
+              Retrieving statement balances and breakdown details.
             </p>
           </div>
         ) : error ? (
           <div
             style={{
               background: '#FFFFFF',
-              borderRadius: 16,
-              padding: '60px 32px',
+              borderRadius: 14,
+              padding: '48px 24px',
               textAlign: 'center',
-              border: '1px solid #FCA5A5',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+              border: '1px solid #E5E5EA',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
             }}
           >
             <div
               style={{
-                width: 52,
-                height: 52,
+                width: 44,
+                height: 44,
                 borderRadius: '50%',
-                background: '#FEF2F2',
-                color: '#EF4444',
+                background: '#F5F5F7',
+                color: '#86868B',
                 display: 'grid',
                 placeItems: 'center',
-                margin: '0 auto 16px',
+                margin: '0 auto 14px',
               }}
             >
-              <Lock size={26} />
+              <Lock size={20} />
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#991B1B', marginBottom: 8 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1D1D1F', marginBottom: 6 }}>
               Statement Unavailable
             </h2>
-            <p style={{ fontSize: 13.5, color: '#4B5563', maxWidth: 460, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: '#636366', maxWidth: 420, margin: '0 auto 20px', lineHeight: 1.5 }}>
               {error}. You may not have permission to view this confidential payroll record, or the statement has not yet been approved.
             </p>
             <Link
               href="/payroll"
-              className="btn-primary"
-              style={{ display: 'inline-flex', padding: '9px 20px', borderRadius: 8, textDecoration: 'none' }}
+              className="btn-neutral"
+              style={{ display: 'inline-flex', padding: '7px 16px', borderRadius: 8, textDecoration: 'none', fontSize: 12.5 }}
             >
-              Return to Payroll Management
+              Return to Payroll
             </Link>
           </div>
         ) : slip && (
@@ -367,472 +367,313 @@ export default function PayslipPage() {
             id="printable-payslip"
             style={{
               background: '#FFFFFF',
-              borderRadius: 16,
-              border: '1px solid #E5E7EB',
-              boxShadow: '0 10px 30px rgba(17, 24, 39, 0.06)',
-              overflow: 'hidden',
+              borderRadius: 14,
+              border: '1px solid #E5E5EA',
+              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
+              padding: '30px 34px',
             }}
           >
-            {/* Top Brand Stripe */}
+            {/* Header: Company & Statement Reference */}
             <div
               style={{
-                height: 6,
-                background: 'linear-gradient(90deg, #2563EB 0%, #4F46E5 50%, #7C3AED 100%)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 16,
+                paddingBottom: 18,
+                borderBottom: '1px solid #F0F0F2',
+                flexWrap: 'wrap',
               }}
-            />
-
-            <div style={{ padding: '36px 44px' }}>
-              {/* Header: Company & Statement Meta */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: 24,
-                  paddingBottom: 24,
-                  borderBottom: '2px solid #F3F4F6',
-                  flexWrap: 'wrap',
-                }}
-              >
-                {/* Left: Organization Info */}
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 12,
-                      background: 'linear-gradient(135deg, #1E40AF 0%, #2563EB 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#FFFFFF',
-                      fontSize: 22,
-                      fontWeight: 800,
-                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {company?.logoUrl ? (
-                      <img
-                        src={company.logoUrl}
-                        alt={companyDisplayName}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 12 }}
-                      />
-                    ) : (
-                      companyDisplayName.slice(0, 2).toUpperCase()
-                    )}
-                  </div>
-                  <div>
-                    <h2
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 800,
-                        color: '#111827',
-                        margin: '0 0 2px 0',
-                        letterSpacing: '-0.02em',
-                      }}
-                    >
-                      {companyDisplayName}
-                    </h2>
-                    <div style={{ fontSize: 12.5, color: '#6B7280', fontWeight: 500 }}>
-                      Official Corporate Payroll Disbursement Record
-                    </div>
-                    <div style={{ fontSize: 11.5, color: '#9CA3AF', marginTop: 3 }}>
-                      Reg: {company?.registrationNumber || 'CORP-HR-2026'} · Verified Secure Payout
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Statement Metadata */}
-                <div style={{ textAlign: 'right', minWidth: 200 }}>
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      background: '#ECFDF5',
-                      color: '#065F46',
-                      border: '1px solid #A7F3D0',
-                      padding: '4px 10px',
-                      borderRadius: 999,
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      letterSpacing: '0.02em',
-                      textTransform: 'uppercase',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <CheckCircle2 size={13} style={{ color: '#059669' }} /> Paid &amp; Finalized
-                  </div>
-
-                  <h3
-                    style={{
-                      fontSize: 21,
-                      fontWeight: 800,
-                      color: '#1F2937',
-                      margin: '0 0 4px 0',
-                      letterSpacing: '-0.03em',
-                    }}
-                  >
-                    PAY STATEMENT
-                  </h3>
-                  <div style={{ fontSize: 12, color: '#6B7280', fontFamily: 'monospace' }}>
-                    REF: #{slip.id.slice(0, 8).toUpperCase()}
-                  </div>
-                  <div style={{ fontSize: 12.5, color: '#4B5563', marginTop: 4, fontWeight: 600 }}>
-                    Pay Date: <span style={{ color: '#111827' }}>{formatDate(slip.payDate)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Particulars Grid (4 Information Cards) */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: 16,
-                  padding: '22px 0',
-                  borderBottom: '1px solid #E5E7EB',
-                }}
-              >
-                {/* 1. Employee Details */}
-                <div style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 10, border: '1px solid #F3F4F6' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                    Employee
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginBottom: 2 }}>
-                    {slip.employeeName}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#4B5563' }}>
-                    {employeeMeta?.employeeNumber || 'ID: EMP-10024'}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#6B7280', marginTop: 2, wordBreak: 'break-all' }}>
-                    {slip.email}
-                  </div>
-                </div>
-
-                {/* 2. Position & Department */}
-                <div style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 10, border: '1px solid #F3F4F6' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                    Position &amp; Unit
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 2 }}>
-                    {employeeMeta?.jobTitle || 'Executive / Staff'}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#4B5563' }}>
-                    {employeeMeta?.department || 'Operations'}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#6B7280', marginTop: 2 }}>
-                    {employeeMeta?.location || 'Headquarters'}
-                  </div>
-                </div>
-
-                {/* 3. Pay Period Details */}
-                <div style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 10, border: '1px solid #F3F4F6' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                    Pay Cycle
-                  </div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#111827', marginBottom: 2 }}>
-                    Monthly Pay Period
-                  </div>
-                  <div style={{ fontSize: 12, color: '#4B5563' }}>
-                    {periodDisplay}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#059669', fontWeight: 600, marginTop: 2 }}>
-                    Currency: {slip.currency}
-                  </div>
-                </div>
-
-                {/* 4. Disbursement Channel */}
-                <div style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 10, border: '1px solid #F3F4F6' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                    Disbursement Payout
-                  </div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#111827', marginBottom: 2 }}>
-                    {employeeMeta?.paymentMethod || (employeeMeta?.bankName ? 'Direct Deposit' : 'Electronic Transfer')}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#4B5563' }}>
-                    {employeeMeta?.bankName || employeeMeta?.mobileMoneyProvider || 'Bank Account on File'}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#6B7280', marginTop: 2, fontFamily: 'monospace' }}>
-                    {employeeMeta?.bankAccountNumber
-                      ? `••••${employeeMeta.bankAccountNumber.slice(-4)}`
-                      : employeeMeta?.mobileMoneyPhone || 'Verified Account'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Three High-Level Summary Metrics */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 16,
-                  padding: '24px 0',
-                }}
-              >
-                {/* Gross */}
+            >
+              {/* Left: Organization */}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <div
                   style={{
-                    background: '#F8FAFC',
-                    borderRadius: 12,
-                    padding: '16px 20px',
-                    border: '1px solid #E2E8F0',
+                    width: 38,
+                    height: 38,
+                    borderRadius: 9,
+                    background: company?.logoUrl ? '#FFFFFF' : 'var(--primary, #2563EB)',
+                    border: company?.logoUrl ? '1px solid #E5E5EA' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFFFFF',
+                    fontSize: 15,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    overflow: 'hidden',
                   }}
                 >
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Gross Earnings
-                  </div>
-                  <div style={{ fontSize: 21, fontWeight: 800, color: '#0F172A', marginTop: 6 }}>
-                    {money(slip.basePay + slip.earnings)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 3 }}>
-                    Base + additional compensation
-                  </div>
+                  {company?.logoUrl ? (
+                    <img
+                      src={company.logoUrl}
+                      alt={companyDisplayName}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    companyDisplayName.slice(0, 2).toUpperCase()
+                  )}
                 </div>
-
-                {/* Deductions */}
-                <div
-                  style={{
-                    background: '#FEF2F2',
-                    borderRadius: 12,
-                    padding: '16px 20px',
-                    border: '1px solid #FECACA',
-                  }}
-                >
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: '#991B1B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Total Deductions
-                  </div>
-                  <div style={{ fontSize: 21, fontWeight: 800, color: '#DC2626', marginTop: 6 }}>
-                    -{money(slip.deductions)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#B91C1C', marginTop: 3 }}>
-                    Taxes, withholdings &amp; statutory
-                  </div>
-                </div>
-
-                {/* Net Pay (Hero Metric) */}
-                <div
-                  style={{
-                    background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                    borderRadius: 12,
-                    padding: '16px 20px',
-                    border: '1.5px solid #93C5FD',
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
-                  }}
-                >
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Net Disbursed Pay
-                  </div>
-                  <div style={{ fontSize: 23, fontWeight: 800, color: '#1D4ED8', marginTop: 6 }}>
-                    {money(slip.netPay)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#2563EB', fontWeight: 600, marginTop: 3 }}>
-                    Direct deposit funds credited
-                  </div>
-                </div>
-              </div>
-
-              {/* Itemized Financials: Earnings vs Deductions Table */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                  gap: 24,
-                  marginTop: 8,
-                  marginBottom: 24,
-                }}
-              >
-                {/* Left: Earnings Table */}
-                <div style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      background: '#F8FAFC',
-                      padding: '12px 18px',
-                      borderBottom: '1px solid #E5E7EB',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                      Earnings &amp; Allowances
-                    </span>
-                    <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Amount ({slip.currency})</span>
-                  </div>
-                  <div style={{ padding: '4px 0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 18px', borderBottom: '1px solid #F3F4F6', fontSize: 13 }}>
-                      <div>
-                        <strong style={{ color: '#1F2937' }}>Base Pay / Regular Salary</strong>
-                        <div style={{ fontSize: 11.5, color: '#6B7280' }}>Contracted monthly compensation</div>
-                      </div>
-                      <span style={{ fontWeight: 600, color: '#111827' }}>{money(slip.basePay)}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 18px', borderBottom: '1px solid #F3F4F6', fontSize: 13 }}>
-                      <div>
-                        <strong style={{ color: '#1F2937' }}>Additional Earnings</strong>
-                        <div style={{ fontSize: 11.5, color: '#6B7280' }}>Allowances, overtime &amp; bonuses</div>
-                      </div>
-                      <span style={{ fontWeight: 600, color: '#111827' }}>{money(slip.earnings)}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 18px', background: '#F9FAFB', fontSize: 13.5, fontWeight: 800 }}>
-                      <span style={{ color: '#111827' }}>Total Gross Earnings</span>
-                      <span style={{ color: '#0F172A' }}>{money(slip.basePay + slip.earnings)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Deductions Table */}
-                <div style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      background: '#F8FAFC',
-                      padding: '12px 18px',
-                      borderBottom: '1px solid #E5E7EB',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                      Withholdings &amp; Deductions
-                    </span>
-                    <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Amount ({slip.currency})</span>
-                  </div>
-                  <div style={{ padding: '4px 0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 18px', borderBottom: '1px solid #F3F4F6', fontSize: 13 }}>
-                      <div>
-                        <strong style={{ color: '#1F2937' }}>Statutory PAYE Tax / Withholding</strong>
-                        <div style={{ fontSize: 11.5, color: '#6B7280' }}>Standard tax deduction on chargeable income</div>
-                      </div>
-                      <span style={{ fontWeight: 600, color: '#DC2626' }}>-{money(slip.deductions)}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 18px', borderBottom: '1px solid #F3F4F6', fontSize: 13 }}>
-                      <div>
-                        <strong style={{ color: '#1F2937' }}>Pension / Social Security</strong>
-                        <div style={{ fontSize: 11.5, color: '#6B7280' }}>Statutory social retirement fund</div>
-                      </div>
-                      <span style={{ fontWeight: 600, color: '#6B7280' }}>{money(0)}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 18px', background: '#F9FAFB', fontSize: 13.5, fontWeight: 800 }}>
-                      <span style={{ color: '#111827' }}>Total Deductions</span>
-                      <span style={{ color: '#DC2626' }}>-{money(slip.deductions)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Net Salary Payable Final Highlight Banner */}
-              <div
-                style={{
-                  background: '#0F172A',
-                  color: '#FFFFFF',
-                  borderRadius: 12,
-                  padding: '20px 24px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 16,
-                  flexWrap: 'wrap',
-                  marginBottom: 28,
-                  boxShadow: '0 4px 14px rgba(15, 23, 42, 0.15)',
-                }}
-              >
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                    Net Salary Disbursed to Recipient
-                  </div>
-                  <div style={{ fontSize: 13, color: '#CBD5E1', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <CheckCircle2 size={15} style={{ color: '#10B981' }} />
-                    Disbursed on {formatDate(slip.payDate)} via Electronic Payment Network
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: '#38BDF8', letterSpacing: '-0.03em' }}>
-                    {money(slip.netPay)}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                    Exact amount transferred to account
+                  <h2
+                    style={{
+                      fontSize: 17,
+                      fontWeight: 700,
+                      color: '#1D1D1F',
+                      margin: 0,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    {companyDisplayName}
+                  </h2>
+                  <div style={{ fontSize: 12, color: '#86868B', marginTop: 1 }}>
+                    Pay Statement
                   </div>
                 </div>
               </div>
 
-              {/* Compliance Verification & Corporate Authorization Block */}
-              <div
-                style={{
-                  borderTop: '1px solid #E5E7EB',
-                  paddingTop: 22,
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                  gap: 24,
-                  alignItems: 'flex-start',
-                }}
-              >
-                {/* Left: System Seal */}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div
+              {/* Right: Status, Pay Date & Ref */}
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    background: '#F5F5F7',
+                    color: '#1D1D1F',
+                    padding: '3px 8px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    marginBottom: 5,
+                  }}
+                >
+                  <span
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      background: '#F0FDF4',
-                      border: '1px solid #BBF7D0',
-                      display: 'grid',
-                      placeItems: 'center',
-                      color: '#16A34A',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ShieldCheck size={22} />
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: 12.5, color: '#1F2937', display: 'block', marginBottom: 2 }}>
-                      Certified Digital Pay Record
-                    </strong>
-                    <p style={{ fontSize: 11.5, color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
-                      Generated automatically by the EasyHR Multi-currency Payroll Engine. Verified with immutable ledger transaction hash: <span style={{ fontFamily: 'monospace', color: '#4B5563' }}>{slip.id.slice(0, 16)}</span>.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right: Corporate Sign-off */}
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 20 }}>
-                    Authorized Payroll Administrator
-                  </div>
-                  <div
-                    style={{
-                      borderBottom: '1px dashed #9CA3AF',
-                      width: 220,
-                      margin: '0 0 6px auto',
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: 'var(--primary, #2563EB)',
                     }}
                   />
-                  <div style={{ fontSize: 11.5, color: '#6B7280' }}>
-                    {companyDisplayName} HR &amp; Finance Operations
+                  <span>Paid &amp; Finalized</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: '#1D1D1F', fontWeight: 600 }}>
+                  Pay Date: {formatDate(slip.payDate)}
+                </div>
+                <div style={{ fontSize: 11, color: '#86868B', fontFamily: 'monospace', marginTop: 2 }}>
+                  Ref: #{slip.id.slice(0, 8).toUpperCase()}
+                </div>
+              </div>
+            </div>
+
+            {/* Key Particulars Grid (Typographic, Clean, No Card Boxes) */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 16,
+                padding: '16px 0',
+                borderBottom: '1px solid #F0F0F2',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#86868B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                  Employee
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1D1D1F' }}>
+                  {slip.employeeName}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#86868B', marginTop: 1, wordBreak: 'break-all' }}>
+                  {employeeMeta?.employeeNumber ? `${employeeMeta.employeeNumber} · ` : ''}{slip.email}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#86868B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                  Role &amp; Unit
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1D1D1F' }}>
+                  {employeeMeta?.jobTitle || 'Executive / Staff'}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#86868B', marginTop: 1 }}>
+                  {employeeMeta?.department || 'Operations'} · {employeeMeta?.location || 'Remote'}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#86868B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                  Pay Period
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1D1D1F' }}>
+                  {periodDisplay}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#86868B', marginTop: 1 }}>
+                  Monthly · Currency: {slip.currency}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#86868B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                  Disbursement
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1D1D1F' }}>
+                  {employeeMeta?.paymentMethod || (employeeMeta?.bankName ? 'Direct Deposit' : 'Electronic Transfer')}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#86868B', marginTop: 1 }}>
+                  {employeeMeta?.bankName || employeeMeta?.mobileMoneyProvider || 'Account on file'}
+                  {employeeMeta?.bankAccountNumber && ` · ••••${employeeMeta.bankAccountNumber.slice(-4)}`}
+                </div>
+              </div>
+            </div>
+
+            {/* Apple-Style Financial Summary Banner */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 20px',
+                margin: '18px 0',
+                background: '#FBFBFD',
+                borderRadius: 10,
+                border: '1px solid #E5E5EA',
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#86868B' }}>
+                    Gross Earnings
                   </div>
-                  <div style={{ fontSize: 10.5, color: '#9CA3AF' }}>
-                    Digitally signed on {formatDate(slip.payDate)}
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1D1D1F', marginTop: 2 }}>
+                    {money(slip.basePay + slip.earnings)}
+                  </div>
+                </div>
+
+                <div style={{ width: 1, height: 26, background: '#E5E5EA' }} />
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#86868B' }}>
+                    Total Deductions
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#636366', marginTop: 2 }}>
+                    -{money(slip.deductions)}
                   </div>
                 </div>
               </div>
 
-              {/* Small Print Confidential Notice */}
-              <div
-                style={{
-                  marginTop: 24,
-                  paddingTop: 16,
-                  borderTop: '1px solid #F3F4F6',
-                  textAlign: 'center',
-                  fontSize: 11,
-                  color: '#9CA3AF',
-                  lineHeight: 1.5,
-                }}
-              >
-                PRIVILEGED &amp; CONFIDENTIAL: This document is intended solely for the recipient named above. If you received this statement in error, please notify your HR department immediately.
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary, #2563EB)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Net Disbursed Pay
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary, #2563EB)', letterSpacing: '-0.03em', marginTop: 1 }}>
+                  {money(slip.netPay)}
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Breakdown: Side-by-side minimalist ledger */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: 24,
+                marginBottom: 16,
+              }}
+            >
+              {/* Earnings Column */}
+              <div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#1D1D1F',
+                    paddingBottom: 7,
+                    borderBottom: '1px solid #E5E5EA',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Earnings &amp; Allowances</span>
+                  <span style={{ color: '#86868B', fontWeight: 500 }}>{slip.currency}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #F5F5F7', fontSize: 12.5 }}>
+                  <span style={{ color: '#1D1D1F' }}>Base Pay / Regular Salary</span>
+                  <span style={{ fontWeight: 600, color: '#1D1D1F' }}>{money(slip.basePay)}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #F5F5F7', fontSize: 12.5 }}>
+                  <span style={{ color: '#1D1D1F' }}>Additional Earnings &amp; Overtime</span>
+                  <span style={{ fontWeight: 600, color: '#1D1D1F' }}>{money(slip.earnings)}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', fontSize: 13, fontWeight: 700, color: '#1D1D1F' }}>
+                  <span>Total Gross</span>
+                  <span>{money(slip.basePay + slip.earnings)}</span>
+                </div>
+              </div>
+
+              {/* Deductions Column */}
+              <div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#1D1D1F',
+                    paddingBottom: 7,
+                    borderBottom: '1px solid #E5E5EA',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Withholdings &amp; Taxes</span>
+                  <span style={{ color: '#86868B', fontWeight: 500 }}>{slip.currency}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #F5F5F7', fontSize: 12.5 }}>
+                  <span style={{ color: '#1D1D1F' }}>Statutory PAYE Tax</span>
+                  <span style={{ fontWeight: 600, color: '#636366' }}>-{money(slip.deductions)}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #F5F5F7', fontSize: 12.5 }}>
+                  <span style={{ color: '#1D1D1F' }}>Social Security &amp; Pension</span>
+                  <span style={{ fontWeight: 600, color: '#86868B' }}>{money(0)}</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', fontSize: 13, fontWeight: 700, color: '#1D1D1F' }}>
+                  <span>Total Deductions</span>
+                  <span style={{ color: '#636366' }}>-{money(slip.deductions)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Apple-Style Minimal Footer */}
+            <div
+              style={{
+                marginTop: 18,
+                paddingTop: 12,
+                borderTop: '1px solid #F0F0F2',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: 11,
+                color: '#86868B',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              <div>
+                {companyDisplayName} · Official Pay Statement
+              </div>
+              <div>
+                Confidential · Statement #{slip.id.slice(0, 8).toUpperCase()}
               </div>
             </div>
           </div>

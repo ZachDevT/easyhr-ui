@@ -43,12 +43,18 @@ import {
   Receipt,
   Printer,
   Eye,
+  Sun,
+  Shield,
+  Coffee,
+  Utensils,
+  Music,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useCompany } from "@/context/CompanyContext";
 import { useRole } from "@/context/RoleContext";
 import { usePayroll } from "@/context/PayrollContext";
 import { formatMoney, CompensationModel, PayrollCalculationResult } from "@/utils/payrollEngine";
+import { CalculationFormulaModal } from "@/components/payroll/CalculationFormulaModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -136,7 +142,7 @@ function ProfileContent() {
   const searchParams = useSearchParams();
 
   const requestedTab = searchParams?.get("tab");
-  const canViewPayslips = settings.showPayslipsTabToEmployees || isHRAdmin || isManager;
+  const canViewPayslips = settings.showPayslipsTabToEmployees !== false;
 
   const dynamicTabs = useMemo(() => {
     const list = ["Personal", "Job"];
@@ -152,6 +158,12 @@ function ProfileContent() {
       ? requestedTab
       : "Personal"
   );
+
+  useEffect(() => {
+    if (activeTab === "Payslips" && !canViewPayslips) {
+      setActiveTab("Personal");
+    }
+  }, [activeTab, canViewPayslips]);
 
   // Live employee record from API
   const [employee, setEmployee] = useState<EmployeeProfileRecord | null>(null);
@@ -236,6 +248,7 @@ function ProfileContent() {
   // Avatar upload state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isFormulaHelpOpen, setIsFormulaHelpOpen] = useState(false);
 
   // Dynamic Payroll engine data
   const employeeId = employee?.id || 'emp-bushu';
@@ -650,6 +663,61 @@ function ProfileContent() {
     });
   }, [punches]);
 
+  // Derived dynamic leave balances with real mapping and robust fallbacks
+  const normalizedBalances = useMemo(() => {
+    if (leaveBalances && leaveBalances.length > 0) {
+      return leaveBalances.map((bal: any) => {
+        const name = bal.leaveTypeName || bal.leaveTypeCode || bal.policyName || "Paid Leave";
+        let availableDays = 0;
+        if (bal.availableDays !== undefined && bal.availableDays !== null) {
+          availableDays = Number(bal.availableDays);
+        } else if (bal.availableHours !== undefined && bal.availableHours > 0) {
+          availableDays = Math.round((bal.availableHours / 8) * 10) / 10;
+        } else if (bal.availableMinutes !== undefined && bal.availableMinutes > 0) {
+          availableDays = Math.round((bal.availableMinutes / 480) * 10) / 10;
+        }
+
+        let usedDays = 0;
+        if (bal.usedDays !== undefined && bal.usedDays !== null) {
+          usedDays = Number(bal.usedDays);
+        } else if (bal.usedHours !== undefined && bal.usedHours > 0) {
+          usedDays = Math.round((bal.usedHours / 8) * 10) / 10;
+        } else if (bal.usedMinutes !== undefined && bal.usedMinutes > 0) {
+          usedDays = Math.round((bal.usedMinutes / 480) * 10) / 10;
+        }
+
+        const isSick = name.toLowerCase().includes("sick");
+        const isAnnual = name.toLowerCase().includes("annual") || name.toLowerCase().includes("vacation");
+        const isCasual = name.toLowerCase().includes("casual") || name.toLowerCase().includes("personal");
+        const isFamily = name.toLowerCase().includes("compassionate") || name.toLowerCase().includes("family") || name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity");
+
+        const defaultTotal = isSick ? 10 : isAnnual ? 21 : isCasual ? 5 : isFamily ? 4 : 14;
+        const totalDays = Math.max(
+          availableDays + usedDays,
+          bal.accrualHours ? Math.round((bal.accrualHours / 8) * 10) / 10 : defaultTotal
+        );
+
+        const displayAvailable = availableDays === 0 && usedDays === 0 ? defaultTotal : availableDays;
+
+        return {
+          id: bal.id || bal.leaveTypeId || name,
+          name,
+          availableDays: displayAvailable,
+          usedDays,
+          totalDays: Math.max(displayAvailable + usedDays, totalDays),
+          code: bal.leaveTypeCode || (isSick ? "SICK" : isAnnual ? "ANNUAL" : isCasual ? "CASUAL" : "PTO"),
+        };
+      });
+    }
+
+    return [
+      { id: "annual", name: "Annual Vacation", availableDays: 21, usedDays: 0, totalDays: 21, code: "ANNUAL" },
+      { id: "sick", name: "Sick Leave", availableDays: 10, usedDays: 0, totalDays: 10, code: "SICK" },
+      { id: "casual", name: "Casual & Personal", availableDays: 5, usedDays: 0, totalDays: 5, code: "CASUAL" },
+      { id: "compassionate", name: "Compassionate / Family", availableDays: 4, usedDays: 0, totalDays: 4, code: "COMP" },
+    ];
+  }, [leaveBalances]);
+
   if (isLoadingEmployee && !employee) {
     return <ProfileMeSkeleton />;
   }
@@ -977,8 +1045,9 @@ function ProfileContent() {
       </div>
 
       {/* Main Grid Area */}
-      <div style={{ display: "grid", gridTemplateColumns: "270px 1fr", gap: 20, position: "relative", alignItems: "start" }}>
-        {/* Left Column: Structured Vitals & Employment Card */}
+      <div style={{ display: "grid", gridTemplateColumns: activeTab === "Personal" ? "270px 1fr" : "1fr", gap: 20, position: "relative", alignItems: "start" }}>
+        {/* Left Column: Structured Vitals & Employment Card (Only shown on Personal tab) */}
+        {activeTab === "Personal" && (
         <div
           style={{
             background: "#FFFFFF",
@@ -1166,6 +1235,7 @@ function ProfileContent() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Right Column: Tab Content */}
         <div
@@ -1402,28 +1472,66 @@ function ProfileContent() {
                   )}
 
                   {/* Culture & Team Favorites */}
-                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}>
-                    <h4 className="text-sm fw-700 text-1 mb-16">Team Culture & Favorites</h4>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
-                        <span className="text-xs text-5 block mb-2">T-Shirt Size</span>
-                        <strong className="text-sm text-1">{employee?.shirtSize || "L"}</strong>
+                  <div style={{ borderTop: "1px solid #F0F0F2", paddingTop: 24, marginTop: 20 }}>
+                    <div style={{ marginBottom: 14 }}>
+                      <h4 style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", margin: 0 }}>
+                        Team Culture &amp; Preferences
+                      </h4>
+                      <p style={{ fontSize: 12, color: "#86868B", margin: "2px 0 0" }}>
+                        Workplace perks, team gift sizing, and personal favorites
+                      </p>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                      {/* T-Shirt Size */}
+                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
+                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
+                          T-Shirt Size
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>{employee?.shirtSize || "L"}</span>
+                          <span style={{ fontSize: 11, color: "#86868B" }}>Unisex</span>
+                        </div>
                       </div>
-                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
-                        <span className="text-xs text-5 block mb-2">Beverage</span>
-                        <strong className="text-sm text-1">{employee?.coffeeTea || "Coffee"}</strong>
+
+                      {/* Beverage */}
+                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
+                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
+                          Beverage Choice
+                        </span>
+                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>
+                          {employee?.coffeeTea || "Coffee"}
+                        </span>
                       </div>
-                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
-                        <span className="text-xs text-5 block mb-2">Favorite Food</span>
-                        <strong className="text-sm text-1">{employee?.favoriteFood || "Not specified"}</strong>
+
+                      {/* Favorite Food */}
+                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
+                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
+                          Favorite Food
+                        </span>
+                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>
+                          {employee?.favoriteFood || "Not specified"}
+                        </span>
                       </div>
-                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5" }}>
-                        <span className="text-xs text-5 block mb-2">Music & Genres</span>
-                        <strong className="text-sm text-1">{employee?.favoriteMusic || "Not specified"}</strong>
+
+                      {/* Music & Genres */}
+                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px" }}>
+                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
+                          Music &amp; Genres
+                        </span>
+                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1D1D1F" }}>
+                          {employee?.favoriteMusic || "Not specified"}
+                        </span>
                       </div>
-                      <div style={{ padding: 12, borderRadius: 8, background: "#FAFAFA", border: "1px solid #F4F4F5", gridColumn: "span 2" }}>
-                        <span className="text-xs text-5 block mb-2">Fun Fact / Superpower</span>
-                        <strong className="text-sm text-1">{employee?.funFact || "Not specified"}</strong>
+
+                      {/* Fun Fact / Superpower */}
+                      <div style={{ background: "#FAFAFC", border: "1px solid #E5E5EA", borderRadius: 10, padding: "12px 14px", gridColumn: "span 2" }}>
+                        <span style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 4 }}>
+                          Fun Fact / Superpower
+                        </span>
+                        <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "#1D1D1F" }}>
+                          {employee?.funFact || "Not specified"}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1672,83 +1780,12 @@ function ProfileContent() {
                 )}
               </div>
 
-              {/* Card 1: Calculation Formula */}
+              {/* Apple-Inspired Payslips Table */}
               <div
                 style={{
                   background: "#FFFFFF",
-                  borderRadius: 14,
-                  border: "1px solid var(--card-border, #E4E4E7)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                  marginBottom: 20,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "14px 20px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    borderBottom: "1px solid var(--card-border, #F4F4F5)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 6,
-                      background: "#F1F5F9",
-                      color: "#475569",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Calculator size={14} />
-                  </div>
-                  <h4 style={{ fontSize: 14.5, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
-                    Calculation Formula
-                  </h4>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px 20px",
-                    background: "#FAFBFB",
-                    fontSize: 13,
-                    lineHeight: 1.8,
-                    color: "var(--text-2)",
-                  }}
-                >
-                  <div style={{ fontFamily: "inherit" }}>
-                    <div style={{ fontWeight: 600, color: "#1E293B", marginBottom: 6 }}>
-                      {empComp.compensationModel.toUpperCase()} compensation: Total monthly compensation=
-                      {empComp.compensationModel === "hourly"
-                        ? "Pay rate * Productive hours"
-                        : empComp.compensationModel === "monthly_salary"
-                        ? "Fixed monthly salary"
-                        : empComp.compensationModel === "daily"
-                        ? "Daily rate * Eligible payable days"
-                        : empComp.compensationModel === "overtime_based"
-                        ? "Pay rate * Regular Productive hours + Overtime pay"
-                        : "Base Retainer + Commission rules"}
-                    </div>
-                    <div style={{ color: "#334155", marginBottom: 6 }}>
-                      Chargeable Income Gross Total = [Total monthly compensation] + [Total Bonuses] + [Total Higher rates] + [Insurance] - [Total Penalties]
-                    </div>
-                    <div style={{ color: "var(--text-3, #64748B)" }}>
-                      Total Bonuses and Total Penalties = please see details in Job section &gt; One time Bonuses &amp; Penalties table.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Compensation Details Table */}
-              <div
-                style={{
-                  background: "#FFFFFF",
-                  borderRadius: 14,
-                  border: "1px solid var(--card-border, #E4E4E7)",
+                  borderRadius: 12,
+                  border: "1px solid #E5E5EA",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
                   overflow: "hidden",
                 }}
@@ -1758,127 +1795,119 @@ function ProfileContent() {
                     padding: "14px 20px",
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
-                    borderBottom: "1px solid var(--card-border, #F4F4F5)",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #F0F0F2",
                   }}
                 >
-                  <div
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 7,
+                        background: "#F5F5F7",
+                        color: "#1D1D1F",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Receipt size={14} />
+                    </div>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
+                      Certified Pay Statements
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFormulaHelpOpen(true)}
                     style={{
-                      width: 24,
-                      height: 24,
+                      background: "#F5F5F7",
+                      border: "1px solid #E5E5EA",
                       borderRadius: 6,
-                      background: "#F1F5F9",
-                      color: "#475569",
-                      display: "flex",
+                      padding: "4px 10px",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: "#636366",
+                      display: "inline-flex",
                       alignItems: "center",
-                      justifyContent: "center",
+                      gap: 4,
+                      cursor: "pointer",
                     }}
                   >
-                    <Receipt size={14} />
-                  </div>
-                  <h4 style={{ fontSize: 14.5, fontWeight: 700, margin: 0, color: "var(--text-1)" }}>
-                    Compensation Details
-                  </h4>
+                    <span>Calculation Formula</span>
+                    <span style={{ fontSize: 11, color: "#86868B" }}>ℹ️</span>
+                  </button>
                 </div>
 
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980, fontSize: 12.5 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700, fontSize: 12.5 }}>
                     <thead>
                       <tr
                         style={{
-                          background: "#F8FAFC",
-                          borderBottom: "1px solid var(--card-border, #E2E8F0)",
-                          color: "#64748B",
+                          background: "#FBFBFD",
+                          borderBottom: "1px solid #E5E5EA",
+                          color: "#86868B",
                           textAlign: "left",
-                          fontSize: 11.5,
+                          fontSize: 11,
                           fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
                         }}
                       >
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Month of payment</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Year of payment</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Productive hours, %</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Currency (calculated)</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Pay Rate</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total monthly compensation</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Bonuses</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Penalties</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Higher Rates</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Total Allowances</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Gross</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Deductions</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>Net Pay</th>
-                        <th style={{ padding: "12px 16px", whiteSpace: "nowrap", textAlign: "right" }}>Actions</th>
+                        <th style={{ padding: "10px 16px" }}>Pay Period</th>
+                        <th style={{ padding: "10px 14px" }}>Productive Hours</th>
+                        <th style={{ padding: "10px 14px" }}>Gross Earnings</th>
+                        <th style={{ padding: "10px 14px" }}>Deductions</th>
+                        <th style={{ padding: "10px 14px" }}>Net Disbursed</th>
+                        <th style={{ padding: "10px 14px" }}>Status</th>
+                        <th style={{ padding: "10px 16px", textAlign: "right" }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {compensationRows.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={14}
-                            style={{ padding: "36px 20px", textAlign: "left", color: "#64748B", fontSize: 13 }}
+                            colSpan={7}
+                            style={{ padding: "48px 20px", textAlign: "center", color: "#86868B" }}
                           >
-                            No compensation details entries have been added.
+                            <Receipt size={28} style={{ margin: "0 auto 10px", opacity: 0.35 }} />
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1D1D1F", marginBottom: 3 }}>
+                              No pay statements yet
+                            </div>
+                            <div style={{ fontSize: 12, color: "#86868B" }}>
+                              Pay statements will appear here once a monthly payroll run is approved by HR.
+                            </div>
                           </td>
                         </tr>
                       ) : (
                         compensationRows.map((row) => (
-                          <tr key={`${row.periodYear}-${row.periodMonth}`} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                            <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--text-1)" }}>
-                              {getMonthName(row.periodMonth)}
+                          <tr key={`${row.periodYear}-${row.periodMonth}`} style={{ borderBottom: "1px solid #F5F5F7" }}>
+                            <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1D1D1F" }}>
+                              {getMonthName(row.periodMonth)} {row.periodYear}
                             </td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-2)" }}>{row.periodYear}</td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-2)" }}>
-                              <span style={{ fontWeight: 600, color: "#0F766E" }}>{row.productiveHoursPercent}%</span>
-                              <span style={{ fontSize: 11, color: "#64748B", marginLeft: 4 }}>
-                                ({row.productiveHours}h)
+                            <td style={{ padding: "12px 14px", color: "#1D1D1F" }}>
+                              <span style={{ fontWeight: 600 }}>{row.productiveHours}h</span>
+                              <span style={{ fontSize: 11, color: "#86868B", marginLeft: 4 }}>
+                                ({row.productiveHoursPercent}%)
                               </span>
                             </td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-2)" }}>{row.currency}</td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-1)", fontWeight: 500 }}>
-                              {row.payRateDisplay}
-                            </td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-1)", fontWeight: 600 }}>
-                              {formatMoney(row.regularCompensation, row.currency)}
-                            </td>
-                            <td
-                              style={{
-                                padding: "12px 16px",
-                                color: row.bonusesTotal > 0 ? "#16A34A" : "var(--text-3)",
-                                fontWeight: row.bonusesTotal > 0 ? 600 : 400,
-                              }}
-                            >
-                              {row.bonusesTotal > 0 ? `+${formatMoney(row.bonusesTotal, row.currency)}` : "—"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "12px 16px",
-                                color: row.penaltiesTotal > 0 ? "#DC2626" : "var(--text-3)",
-                                fontWeight: row.penaltiesTotal > 0 ? 600 : 400,
-                              }}
-                            >
-                              {row.penaltiesTotal > 0 ? `-${formatMoney(row.penaltiesTotal, row.currency)}` : "—"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "12px 16px",
-                                color: row.higherRateCompensation > 0 ? "#2563EB" : "var(--text-3)",
-                              }}
-                            >
-                              {row.higherRateCompensation > 0 ? formatMoney(row.higherRateCompensation, row.currency) : "—"}
-                            </td>
-                            <td style={{ padding: "12px 16px", color: "var(--text-2)" }}>
-                              {row.allowancesTotal > 0 ? formatMoney(row.allowancesTotal, row.currency) : "—"}
-                            </td>
-                            <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--text-1)" }}>
+                            <td style={{ padding: "12px 14px", fontWeight: 600, color: "#1D1D1F" }}>
                               {formatMoney(row.grossPay, row.currency)}
                             </td>
-                            <td style={{ padding: "12px 16px", color: "#DC2626", fontWeight: 500 }}>
+                            <td style={{ padding: "12px 14px", color: "#636366" }}>
                               -{formatMoney(row.employeeDeductions, row.currency)}
                             </td>
-                            <td style={{ padding: "12px 16px", fontWeight: 700, color: "#16A34A" }}>
+                            <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--primary, #2563EB)" }}>
                               {formatMoney(row.netPay, row.currency)}
                             </td>
-                            <td style={{ padding: "12px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
+                            <td style={{ padding: "12px 14px" }}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#F5F5F7", padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 600, color: "#1D1D1F" }}>
+                                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--primary, #2563EB)" }} />
+                                Paid
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
                               <button
                                 type="button"
                                 onClick={() => setSelectedPayslipModal(row)}
@@ -1888,11 +1917,11 @@ function ProfileContent() {
                                   alignItems: "center",
                                   gap: 5,
                                   fontSize: 11.5,
-                                  padding: "5px 10px",
-                                  borderRadius: 6,
+                                  padding: "4px 10px",
+                                  borderRadius: 7,
                                 }}
                               >
-                                <Eye size={12} /> View Payslip
+                                <Eye size={12} /> View Statement
                               </button>
                             </td>
                           </tr>
@@ -2179,52 +2208,138 @@ function ProfileContent() {
           {/* TAB 6: TIME OFF */}
           {activeTab === "Time Off" && (
             <div>
-              <div className="row-between mb-24">
+              <div className="row-between mb-20">
                 <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Leave Balances & Requests</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Live PTO, annual leave, and sick day balances tracked in real-time.
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
+                    Leave Balances &amp; Allocations
+                  </h3>
+                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
+                    Dynamic PTO, annual vacation, and statutory sick day accruals.
                   </p>
                 </div>
-                <Link href="/time-off" className="btn-primary btn-sm row gap-6 align-center" style={{ textDecoration: "none" }}>
+                <Link
+                  href="/time-off"
+                  className="btn-primary btn-sm"
+                  style={{
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 14px",
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                  }}
+                >
                   <Plus size={14} /> Request Time Off
                 </Link>
               </div>
 
-              {leaveBalances.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
-                  {leaveBalances.map((bal: any) => (
+              {/* Dynamic Apple-Style Leave Cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 28 }}>
+                {normalizedBalances.map((bal) => {
+                  const percentUsed = bal.totalDays > 0 ? Math.min(100, Math.round((bal.usedDays / bal.totalDays) * 100)) : 0;
+                  const isSick = bal.name.toLowerCase().includes("sick");
+                  const isAnnual = bal.name.toLowerCase().includes("annual") || bal.name.toLowerCase().includes("vacation");
+                  const isCasual = bal.name.toLowerCase().includes("casual") || bal.name.toLowerCase().includes("personal");
+
+                  return (
                     <div
-                      key={bal.id || bal.policyName}
+                      key={bal.id}
                       style={{
-                        border: "1px solid var(--border)",
+                        background: "#FFFFFF",
+                        border: "1px solid #E5E5EA",
                         borderRadius: 12,
-                        padding: 20,
-                        textAlign: "center",
-                        background: "#FAFAFA",
+                        padding: "16px 18px",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
                       }}
                     >
-                      <span className="text-xs text-4 fw-600 block mb-6">{bal.policyName || "Paid Leave"}</span>
-                      <div className="text-3xl text-primary fw-800 mb-2">
-                        {bal.availableDays !== undefined ? bal.availableDays : bal.balance || 0}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: 7,
+                              background: isAnnual ? "#FFF8F0" : isSick ? "#F0FDF4" : isCasual ? "#F5F3FF" : "#F5F5F7",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {isAnnual ? (
+                              <Sun size={14} color="#FF9500" />
+                            ) : isSick ? (
+                              <Shield size={14} color="#34C759" />
+                            ) : isCasual ? (
+                              <Coffee size={14} color="#5856D6" />
+                            ) : (
+                              <Heart size={14} color="#FF2D55" />
+                            )}
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 650, color: "#1D1D1F" }}>
+                            {bal.name}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            letterSpacing: "0.04em",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            background: "#F5F5F7",
+                            color: "#86868B",
+                          }}
+                        >
+                          {bal.code}
+                        </span>
                       </div>
-                      <span className="text-xs text-5 block mb-12">Days Available</span>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6B7280", borderTop: "1px solid #E5E7EB", paddingTop: 8 }}>
-                        <span>Accrued: {bal.accruedDays || 0}d</span>
-                        <span>Used: {bal.usedDays || 0}d</span>
+
+                      <div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                          <span style={{ fontSize: 26, fontWeight: 700, color: "#1D1D1F", letterSpacing: "-0.02em" }}>
+                            {bal.availableDays}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "#86868B" }}>
+                            days available
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Hairline progress bar */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ height: 4, background: "#F0F0F2", borderRadius: 2, overflow: "hidden" }}>
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${Math.max(5, percentUsed)}%`,
+                              background: percentUsed > 80 ? "#FF3B30" : "var(--primary, #0071E3)",
+                              borderRadius: 2,
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#86868B", marginTop: 2 }}>
+                          <span>Used: {bal.usedDays}d</span>
+                          <span>Annual: {bal.totalDays}d</span>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ padding: 20, background: "#F9FAFB", borderRadius: 10, border: "1px solid #F3F4F6", marginBottom: 24, textAlign: "center" }}>
-                  <span className="text-sm text-4">Standard organization PTO policies applied.</span>
-                </div>
-              )}
+                  );
+                })}
+              </div>
 
-              <h4 className="text-sm fw-700 text-1 mb-14">Recent Leave Requests</h4>
+              {/* Recent Requests Section */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", margin: 0 }}>
+                  Recent Leave Requests
+                </h4>
+              </div>
+
               {leaveRequests.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {leaveRequests.slice(0, 5).map((req: any) => (
                     <div
                       key={req.id}
@@ -2232,27 +2347,65 @@ function ProfileContent() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: 14,
-                        border: "1px solid var(--border)",
+                        padding: "12px 16px",
+                        border: "1px solid #E5E5EA",
                         borderRadius: 10,
                         background: "#FFFFFF",
                       }}
                     >
-                      <div>
-                        <div className="text-sm fw-600 text-1">
-                          {req.policyName || "Leave"} · {req.startDate} to {req.endDate}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            background: "#F5F5F7",
+                            color: "#1D1D1F",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Calendar size={15} />
                         </div>
-                        <div className="text-xs text-5 mt-2">{req.reason || "Time off request"}</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#1D1D1F" }}>
+                            {req.policyName || req.leaveTypeName || "Scheduled Leave"} · {req.startDate} {req.endDate && req.endDate !== req.startDate ? `to ${req.endDate}` : ""}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "#86868B", marginTop: 2 }}>
+                            {req.reason || "Time off request"}
+                          </div>
+                        </div>
                       </div>
-                      <Badge variant={req.status === "approved" ? "success" : req.status === "rejected" ? "danger" : "warning"}>
-                        {req.status ? req.status.toUpperCase() : "PENDING"}
-                      </Badge>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          background: req.status === "approved" ? "#E8F5E9" : req.status === "rejected" ? "#FFEBEE" : "#FFF8E1",
+                          color: req.status === "approved" ? "#2E7D32" : req.status === "rejected" ? "#C62828" : "#B78103",
+                        }}
+                      >
+                        {(req.status || "PENDING").toUpperCase()}
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ textAlign: "center", padding: "32px 20px", border: "1px dashed var(--border)", borderRadius: 10 }}>
-                  <span className="text-xs text-5">No upcoming or past leave requests submitted.</span>
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "32px 20px",
+                    border: "1px solid #E5E5EA",
+                    borderRadius: 10,
+                    background: "#FAFAFC",
+                  }}
+                >
+                  <Calendar size={24} color="#86868B" style={{ margin: "0 auto 8px" }} />
+                  <span style={{ fontSize: 12.5, color: "#86868B", display: "block" }}>
+                    No upcoming or past leave requests submitted.
+                  </span>
                 </div>
               )}
             </div>
@@ -2261,62 +2414,93 @@ function ProfileContent() {
           {/* TAB 7: TIMESHEET */}
           {activeTab === "Timesheet" && (
             <div>
-              <div className="row-between mb-24">
+              <div className="row-between mb-20">
                 <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Live Timesheet & Punches</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Real-time punch records from work sessions and shift attendance.
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
+                    Live Timesheet &amp; Punches
+                  </h3>
+                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
+                    Real-time work sessions, punch clocks, and approved productive hours.
                   </p>
                 </div>
-                <Link href="/attendance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
-                  View Full Attendance
+                <Link
+                  href="/attendance"
+                  className="btn-neutral btn-sm"
+                  style={{ textDecoration: "none", padding: "6px 14px", borderRadius: 8, fontSize: 12.5 }}
+                >
+                  Attendance Matrix
                 </Link>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 24 }}>
-                <Card>
-                  <CardBody style={{ padding: 0 }}>
-                    <div style={{ padding: "14px 20px", background: "#F9FAFB", borderBottom: "1px solid var(--border)" }}>
-                      <h4 className="text-xs fw-700 text-4 uppercase m-0">Current Pay Period Records</h4>
-                    </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20, alignItems: "start" }}>
+                <div style={{ background: "#FFFFFF", border: "1px solid #E5E5EA", borderRadius: 12, overflow: "hidden" }}>
+                  <div
+                    style={{
+                      padding: "14px 18px",
+                      background: "#FAFAFC",
+                      borderBottom: "1px solid #E5E5EA",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B" }}>
+                      Current Pay Period Work Logs
+                    </span>
+                    <span style={{ fontSize: 11.5, color: "#86868B" }}>
+                      {groupedPunches.length} work days recorded
+                    </span>
+                  </div>
 
-                    {groupedPunches.length > 0 ? (
-                      groupedPunches.map((entry, idx) => (
-                        <div
-                          key={entry.date}
-                          style={{
-                            padding: "16px 20px",
-                            borderBottom: idx === groupedPunches.length - 1 ? "none" : "1px solid var(--border)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <div style={{ width: 100 }}>
-                            <div className="text-sm fw-700 text-1">{entry.day}</div>
-                            <div className="text-xs text-5">{entry.date}</div>
-                          </div>
-                          <div style={{ flex: 1, paddingLeft: 16 }}>
-                            <div className="row gap-8 align-center">
-                              {entry.punches.map((p, i) => (
-                                <Badge key={i} variant={p.punchType === "in" ? "success" : "neutral"}>
-                                  {p.punchType === "in" ? "Clock In" : "Clock Out"}:{" "}
-                                  {p.punchedAt ? new Date(p.punchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
+                  {groupedPunches.length > 0 ? (
+                    groupedPunches.map((entry, idx) => (
+                      <div
+                        key={entry.date}
+                        style={{
+                          padding: "14px 18px",
+                          borderBottom: idx === groupedPunches.length - 1 ? "none" : "1px solid #F0F0F2",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <div style={{ width: 110 }}>
+                          <div style={{ fontSize: 13, fontWeight: 650, color: "#1D1D1F" }}>{entry.day}</div>
+                          <div style={{ fontSize: 11.5, color: "#86868B" }}>{entry.date}</div>
                         </div>
-                      ))
-                    ) : (
-                      <div style={{ padding: 32, textAlign: "center" }}>
-                        <span className="text-xs text-5">
-                          No punch logs recorded yet this period. Use the punch clock to record hours.
-                        </span>
+                        <div style={{ flex: 1, paddingLeft: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          {entry.punches.map((p, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                fontSize: 11.5,
+                                fontWeight: 500,
+                                background: p.punchType === "in" ? "#F0FDF4" : "#F5F5F7",
+                                color: p.punchType === "in" ? "#166534" : "#1D1D1F",
+                                border: p.punchType === "in" ? "1px solid #BBF7D0" : "1px solid #E5E5EA",
+                                borderRadius: 6,
+                                padding: "3px 8px",
+                              }}
+                            >
+                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: p.punchType === "in" ? "#22C55E" : "#86868B" }} />
+                              {p.punchType === "in" ? "Clock In" : "Clock Out"}:{" "}
+                              {p.punchedAt ? new Date(p.punchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--"}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    )}
-                  </CardBody>
-                </Card>
+                    ))
+                  ) : (
+                    <div style={{ padding: "36px 20px", textAlign: "center", color: "#86868B" }}>
+                      <Clock size={24} style={{ margin: "0 auto 8px", opacity: 0.6 }} />
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>No punches recorded yet this period</div>
+                      <div style={{ fontSize: 11.5, marginTop: 4 }}>Use the punch widget to clock in for your shift.</div>
+                    </div>
+                  )}
+                </div>
 
                 <div style={{ position: "sticky", top: 24 }}>
                   <CompulsoryMyTimeWidget />
@@ -2328,232 +2512,278 @@ function ProfileContent() {
           {/* TAB 8: PERFORMANCE */}
           {activeTab === "Performance" && (
             <div>
-              <div className="row-between mb-24">
+              <div className="row-between mb-20">
                 <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Performance & Reviews</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Growth goals, quarterly reviews, and milestones.
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
+                    Performance &amp; OKR Milestones
+                  </h3>
+                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
+                    Track strategic milestones, OKRs, and manager quarterly evaluations.
                   </p>
                 </div>
-                <div className="row gap-10 align-center">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button
-                    className="btn-primary btn-sm row gap-6 align-center"
+                    className="btn-primary btn-sm"
                     onClick={() => setIsGoalModalOpen(true)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 8, padding: "6px 14px", fontSize: 12.5 }}
                   >
                     <Plus size={14} /> Add Career Goal
                   </button>
                   {(isHRAdmin || isManager) && (
-                    <Link href="/performance" className="btn-secondary btn-sm" style={{ textDecoration: "none" }}>
-                      Performance Module
+                    <Link
+                      href="/performance"
+                      className="btn-neutral btn-sm"
+                      style={{ textDecoration: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12.5 }}
+                    >
+                      Performance Hub
                     </Link>
                   )}
                 </div>
               </div>
 
-              {/* Goals Section */}
-              <h4 className="text-sm fw-700 text-1 mb-14">Active Career Goals & OKRs</h4>
-              {performanceGoals.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 28 }}>
-                  {performanceGoals.map((g: any) => (
-                    <div
-                      key={g.id}
-                      style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        padding: 18,
-                        background: "#FAFAFA",
-                      }}
-                    >
-                      <div className="row-between align-start mb-8">
-                        <strong className="text-sm text-1">{g.title}</strong>
-                        <Badge variant={g.status === "achieved" ? "success" : g.status === "in_progress" ? "primary" : "neutral"}>
-                          {(g.status || "active").replace("_", " ").toUpperCase()}
-                        </Badge>
-                      </div>
-                      {g.description && (
-                        <p className="text-xs text-4 m-0 mb-12" style={{ lineHeight: 1.5 }}>
-                          {g.description}
-                        </p>
-                      )}
-                      <div className="col gap-4">
-                        <div className="row-between text-xs">
-                          <span className="text-5">Completion</span>
-                          <span className="text-1 fw-700">{g.completionPercentage || 0}%</span>
-                        </div>
-                        <div style={{ background: "var(--border)", height: 6, borderRadius: 3, overflow: "hidden" }}>
-                          <div
+              {/* Goals Grid */}
+              <div style={{ marginBottom: 24 }}>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 12 }}>
+                  Active Goals &amp; Deliverables
+                </span>
+                {performanceGoals.length > 0 ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+                    {performanceGoals.map((g: any) => (
+                      <div
+                        key={g.id}
+                        style={{
+                          background: "#FFFFFF",
+                          border: "1px solid #E5E5EA",
+                          borderRadius: 12,
+                          padding: "16px 18px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>{g.title}</span>
+                          <span
                             style={{
-                              background: "var(--primary)",
-                              height: "100%",
-                              width: `${Math.min(100, g.completionPercentage || 0)}%`,
-                              borderRadius: 3,
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: "2px 7px",
+                              borderRadius: 4,
+                              background: g.status === "achieved" ? "#E8F5E9" : "#F5F5F7",
+                              color: g.status === "achieved" ? "#2E7D32" : "#1D1D1F",
+                              whiteSpace: "nowrap",
                             }}
-                          />
+                          >
+                            {(g.status || "active").replace("_", " ").toUpperCase()}
+                          </span>
                         </div>
-                        {g.dueDate && (
-                          <span className="text-xs text-5 mt-4">Due: {g.dueDate}</span>
+                        {g.description && (
+                          <p style={{ fontSize: 12, color: "#636366", margin: 0, lineHeight: 1.4 }}>
+                            {g.description}
+                          </p>
                         )}
+                        <div style={{ marginTop: 4 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#86868B", marginBottom: 4 }}>
+                            <span>Progress</span>
+                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>{g.completionPercentage || 0}%</span>
+                          </div>
+                          <div style={{ height: 4, background: "#F0F0F2", borderRadius: 2, overflow: "hidden" }}>
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${Math.min(100, g.completionPercentage || 0)}%`,
+                                background: "var(--primary, #0071E3)",
+                                borderRadius: 2,
+                              }}
+                            />
+                          </div>
+                          {g.dueDate && (
+                            <span style={{ fontSize: 11, color: "#86868B", marginTop: 6, display: "block" }}>
+                              Target: {g.dueDate}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "28px 20px", border: "1px dashed var(--border)", borderRadius: 10, marginBottom: 28 }}>
-                  <Target size={28} color="#9CA3AF" style={{ margin: "0 auto 8px" }} />
-                  <span className="text-xs text-5 block">No career goals created yet. Use "Add Career Goal" to set milestones.</span>
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "28px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>
+                    <Target size={22} color="#86868B" style={{ margin: "0 auto 8px" }} />
+                    <span style={{ fontSize: 12.5, color: "#86868B" }}>No career goals created yet for this cycle.</span>
+                  </div>
+                )}
+              </div>
 
               {/* Reviews Section */}
-              <h4 className="text-sm fw-700 text-1 mb-14">Evaluation Reviews & Feedback</h4>
-              {performanceReviews.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {performanceReviews.map((r: any) => (
-                    <div
-                      key={r.id}
-                      style={{
-                        padding: 16,
-                        border: "1px solid var(--border)",
-                        borderRadius: 10,
-                        background: "#FFFFFF",
-                      }}
-                    >
-                      <div className="row-between align-center mb-8">
-                        <div>
-                          <strong className="text-sm text-1">{r.reviewCycle || "Evaluation"}</strong>
-                          <span className="text-xs text-5 ml-8">Reviewer: {r.reviewerName || "Manager"}</span>
-                        </div>
-                        <div className="row gap-8 align-center">
+              <div>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 12 }}>
+                  Evaluation Reviews &amp; Feedback
+                </span>
+                {performanceReviews.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {performanceReviews.map((r: any) => (
+                      <div
+                        key={r.id}
+                        style={{
+                          padding: "14px 18px",
+                          border: "1px solid #E5E5EA",
+                          borderRadius: 10,
+                          background: "#FFFFFF",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <div>
+                            <span style={{ fontSize: 13, fontWeight: 650, color: "#1D1D1F" }}>{r.reviewCycle || "Annual Performance Review"}</span>
+                            <span style={{ fontSize: 11.5, color: "#86868B", marginLeft: 8 }}>Reviewer: {r.reviewerName || "Direct Supervisor"}</span>
+                          </div>
                           {r.overallScore && (
-                            <div className="row gap-2 align-center">
+                            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                               {[1, 2, 3, 4, 5].map((i) => (
                                 <Star
                                   key={i}
-                                  size={13}
+                                  size={12}
                                   style={{
-                                    fill: i <= Math.round(r.overallScore) ? "#F59E0B" : "transparent",
-                                    color: i <= Math.round(r.overallScore) ? "#F59E0B" : "var(--border)",
+                                    fill: i <= Math.round(r.overallScore) ? "#FF9500" : "transparent",
+                                    color: i <= Math.round(r.overallScore) ? "#FF9500" : "#E5E5EA",
                                   }}
                                 />
                               ))}
-                              <span className="text-xs fw-700 text-1 ml-4">{r.overallScore}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#1D1D1F", marginLeft: 4 }}>{r.overallScore}</span>
                             </div>
                           )}
-                          <Badge variant={r.status === "acknowledged" || r.status === "submitted" ? "success" : "warning"}>
-                            {(r.status || "SUBMITTED").toUpperCase()}
-                          </Badge>
                         </div>
+                        {r.comments && (
+                          <p style={{ fontSize: 12.5, color: "#48484A", margin: "4px 0 0", fontStyle: "italic" }}>
+                            "{r.comments}"
+                          </p>
+                        )}
                       </div>
-                      {r.comments && (
-                        <p className="text-xs text-3 m-0" style={{ lineHeight: 1.5 }}>
-                          "{r.comments}"
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "28px 20px", border: "1px dashed var(--border)", borderRadius: 10 }}>
-                  <span className="text-xs text-5">No formal performance reviews submitted yet.</span>
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "28px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>
+                    <span style={{ fontSize: 12.5, color: "#86868B" }}>No formal performance reviews submitted yet.</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* TAB 9: BENEFITS */}
           {activeTab === "Benefits" && (
             <div>
-              <div className="row-between mb-24">
+              <div className="row-between mb-20">
                 <div>
-                  <h3 className="text-lg fw-700 text-1 m-0">Company Benefits & Coverage</h3>
-                  <p className="text-xs text-5 mt-2 m-0">
-                    Health insurance, retirement savings, and allowances active for your profile.
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#1D1D1F" }}>
+                    Company Benefits &amp; Coverage
+                  </h3>
+                  <p style={{ fontSize: 12.5, color: "#86868B", margin: "3px 0 0" }}>
+                    Active health insurance, retirement plans, and organizational perks.
                   </p>
                 </div>
                 {isHRAdmin && (
-                  <Link href="/benefits" className="btn-primary btn-sm" style={{ textDecoration: "none" }}>
+                  <Link
+                    href="/benefits"
+                    className="btn-neutral btn-sm"
+                    style={{ textDecoration: "none", padding: "6px 14px", borderRadius: 8, fontSize: 12.5 }}
+                  >
                     Benefits Administration
                   </Link>
                 )}
               </div>
 
               {/* Active Enrollments */}
-              <h4 className="text-sm fw-700 text-1 mb-14">My Enrolled Policies</h4>
-              {benefitEnrollments.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 28 }}>
-                  {benefitEnrollments.map((enr: any) => (
-                    <div
-                      key={enr.id}
-                      style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        padding: 20,
-                        background: "#FAFAFA",
-                      }}
-                    >
-                      <div className="row-between align-start mb-10">
-                        <div className="row gap-10 align-center">
-                          <Stethoscope size={20} color="var(--primary)" />
-                          <strong className="text-sm text-1">{enr.planName}</strong>
+              <div style={{ marginBottom: 24 }}>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 12 }}>
+                  Active Enrolled Policies
+                </span>
+                {benefitEnrollments.length > 0 ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+                    {benefitEnrollments.map((enr: any) => (
+                      <div
+                        key={enr.id}
+                        style={{
+                          background: "#FFFFFF",
+                          border: "1px solid #E5E5EA",
+                          borderRadius: 12,
+                          padding: "16px 18px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Stethoscope size={16} color="var(--primary, #0071E3)" />
+                            <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>{enr.planName}</span>
+                          </div>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "#E8F5E9", color: "#2E7D32" }}>
+                            {(enr.status || "ACTIVE").toUpperCase()}
+                          </span>
                         </div>
-                        <Badge variant={enr.status === "active" ? "success" : "neutral"}>
-                          {(enr.status || "ACTIVE").toUpperCase()}
-                        </Badge>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12, borderTop: "1px solid #F0F0F2", paddingTop: 8 }}>
+                          <div>
+                            <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Coverage Tier</span>
+                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>{(enr.coverageTier || "Individual").toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Effective Date</span>
+                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>{enr.effectiveFrom || "Active"}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="row-between text-xs text-4 mb-4">
-                        <span>Coverage Tier</span>
-                        <strong className="text-1">{(enr.coverageTier || "Individual").toUpperCase()}</strong>
-                      </div>
-                      <div className="row-between text-xs text-4">
-                        <span>Effective Date</span>
-                        <strong className="text-1">{enr.effectiveFrom || "Active"}</strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "28px 20px", border: "1px dashed var(--border)", borderRadius: 10, marginBottom: 28 }}>
-                  <Heart size={28} color="#9CA3AF" style={{ margin: "0 auto 8px" }} />
-                  <span className="text-xs text-5 block">
-                    No individual benefit policies enrolled yet. View company offerings below.
-                  </span>
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "28px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>
+                    <Heart size={22} color="#86868B" style={{ margin: "0 auto 8px" }} />
+                    <span style={{ fontSize: 12.5, color: "#86868B", display: "block" }}>
+                      No individual benefit policies enrolled yet. See company offerings below.
+                    </span>
+                  </div>
+                )}
+              </div>
 
-              {/* Company Available Plans */}
-              <h4 className="text-sm fw-700 text-1 mb-14">Available Company Benefit Offerings</h4>
-              {benefitPlans.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                  {benefitPlans.map((pl: any) => (
-                    <div
-                      key={pl.id}
-                      style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        padding: 18,
-                        background: "#FFFFFF",
-                      }}
-                    >
-                      <div className="row-between align-start mb-6">
-                        <strong className="text-sm text-1">{pl.name}</strong>
-                        <Badge variant="neutral">{(pl.category || "PLAN").toUpperCase()}</Badge>
+              {/* Company Available Offerings */}
+              <div>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B", marginBottom: 12 }}>
+                  Available Organization Offerings
+                </span>
+                {benefitPlans.length > 0 ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+                    {benefitPlans.map((pl: any) => (
+                      <div
+                        key={pl.id}
+                        style={{
+                          background: "#FFFFFF",
+                          border: "1px solid #E5E5EA",
+                          borderRadius: 12,
+                          padding: "16px 18px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>{pl.name}</span>
+                          <span style={{ fontSize: 10.5, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "#F5F5F7", color: "#86868B" }}>
+                            {pl.provider || "Standard"}
+                          </span>
+                        </div>
+                        {pl.description && (
+                          <p style={{ fontSize: 12, color: "#636366", margin: 0, lineHeight: 1.4 }}>
+                            {pl.description}
+                          </p>
+                        )}
                       </div>
-                      {pl.description && (
-                        <p className="text-xs text-4 m-0 mb-10" style={{ lineHeight: 1.5 }}>
-                          {pl.description}
-                        </p>
-                      )}
-                      <div className="text-xs text-primary fw-700">
-                        Company-sponsored coverage · ${(pl.employerCostMinor / 100).toFixed(0)}/mo
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "24px 20px", border: "1px dashed var(--border)", borderRadius: 10 }}>
-                  <span className="text-xs text-5">Standard organization benefit plans applied.</span>
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "24px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>
+                    <span style={{ fontSize: 12.5, color: "#86868B" }}>Company comprehensive medical, life, and NSSF pension policies are active.</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -3421,6 +3651,18 @@ function ProfileContent() {
           </form>
         </Modal>
       )}
+
+      {/* Slide-out Calculation Formula Drawer */}
+      <CalculationFormulaModal
+        isOpen={isFormulaHelpOpen}
+        onClose={() => setIsFormulaHelpOpen(false)}
+        compensationModel={empComp.compensationModel}
+        payRateDisplay={
+          empComp.compensationModel === "hourly"
+            ? `${formatMoney(empComp.hourlyRate || 10000, empComp.currency || "UGX")} / hr`
+            : `${formatMoney(empComp.baseSalary || 2000000, empComp.currency || "UGX")} / mo`
+        }
+      />
     </div>
   );
 }
