@@ -22,7 +22,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { toast } from '@/components/ui/Toast';
 import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import { downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
+import { downloadPdfBlob, downloadPdfUrl, openPdfUrl, renderPdfDocument } from '@/lib/pdfDocument';
 import { PdfPreview } from '@/components/shared/PdfPreview';
 import { useDocumentActions } from '@/components/documents/DocumentViewer';
 
@@ -73,55 +73,81 @@ export default function MySignaturesPage() {
 
   const { view, download: downloadDoc, viewer } = useDocumentActions();
   const [viewingSignedDoc, setViewingSignedDoc] = useState<MySignatureDoc | null>(null);
+  const [viewingPdfUrl, setViewingPdfUrl] = useState<string>('');
+  const [isRenderingViewingPdf, setIsRenderingViewingPdf] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!viewingSignedDoc) {
+      setViewingPdfUrl((prev) => {
+        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return '';
+      });
+      return;
+    }
+
+    if (viewingSignedDoc.documentUrl) {
+      setViewingPdfUrl(viewingSignedDoc.documentUrl);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsRenderingViewingPdf(true);
+    const executedSignatureHtml = `<div style="font:italic 22px cursive;color:#1e3a8a;">Digitally Signed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:4px;font-family:sans-serif;">&#10003; EASYHR Cryptographic Verification Record</div>`;
+    const docHtml = signingDocumentHtml(viewingSignedDoc, executedSignatureHtml);
+
+    renderPdfDocument(docHtml)
+      .then((blob) => {
+        if (!isCurrent) return;
+        const nextUrl = URL.createObjectURL(blob);
+        setViewingPdfUrl((prev) => {
+          if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+          return nextUrl;
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to render PDF', err);
+        if (isCurrent) toast.error('PDF error', 'Could not render document as PDF.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsRenderingViewingPdf(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [viewingSignedDoc]);
 
   const handleViewSigned = (doc: MySignatureDoc) => {
-    if (doc.documentId) {
-      view(doc.documentId, doc.documentName);
-    } else if (doc.documentUrl) {
-      window.open(doc.documentUrl, '_blank');
-    } else {
-      setViewingSignedDoc(doc);
-    }
+    setViewingSignedDoc(doc);
   };
 
   const handleDownloadSigned = async (doc: MySignatureDoc) => {
-    if (doc.documentId) {
-      await downloadDoc(doc.documentId, doc.documentName);
-    } else if (doc.documentUrl) {
-      window.open(doc.documentUrl, '_blank');
+    const filename = `${(doc.documentName || 'Signed_Document').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+    if (doc.documentUrl) {
+      downloadPdfUrl(doc.documentUrl, filename);
+      toast.success('Downloaded', 'PDF document downloaded successfully.');
+      return;
+    }
+    toast.info('Preparing PDF', 'Generating signed PDF document…');
+    try {
+      const executedSignatureHtml = `<div style="font:italic 22px cursive;color:#1e3a8a;">Digitally Signed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:4px;font-family:sans-serif;">&#10003; EASYHR Cryptographic Verification Record</div>`;
+      const docHtml = signingDocumentHtml(doc, executedSignatureHtml);
+      const blob = await renderPdfDocument(docHtml);
+      downloadPdfBlob(blob, filename);
+      toast.success('Downloaded', 'Signed PDF document downloaded successfully.');
+    } catch (err: any) {
+      toast.error('Download failed', err.message || 'Could not generate PDF.');
+    }
+  };
+
+  const handleDownloadFromModal = () => {
+    if (!viewingSignedDoc) return;
+    const filename = `${(viewingSignedDoc.documentName || 'Signed_Document').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+    if (viewingPdfUrl) {
+      downloadPdfUrl(viewingPdfUrl, filename);
+      toast.success('Downloaded', 'Signed PDF document downloaded successfully.');
     } else {
-      const sanitized = (doc.documentName || 'Signed_Document').replace(/\s+/g, '_');
-      const lines = [
-        '================================================================================',
-        '                     EASYHR ENTERPRISE SIGNATURE RECORD                         ',
-        '================================================================================',
-        '',
-        `Document Title:    ${doc.documentName}`,
-        `Status:            COMPLETED & LEGALLY BINDING`,
-        `Sender:            ${doc.senderName} (${doc.senderRole})`,
-        `Date Completed:    ${doc.signedAt || 'Signed'}`,
-        '',
-        '--------------------------------------------------------------------------------',
-        'DOCUMENT BODY:',
-        '--------------------------------------------------------------------------------',
-        doc.body || doc.message || 'Executed document agreement.',
-        '',
-        '--------------------------------------------------------------------------------',
-        'SIGNATURE AUDIT VERIFICATION:',
-        '--------------------------------------------------------------------------------',
-        `Signer Status:     Digitally Executed & Verified`,
-        `Signature Record:  ${doc.id}`,
-        'System Seal:       EASYHR-CRYPTOGRAPHICALLY-VERIFIED',
-        '================================================================================',
-      ].join('\n');
-      const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${sanitized}_Executed.txt`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      toast.success('Downloaded', 'Executed document downloaded successfully.');
+      handleDownloadSigned(viewingSignedDoc);
     }
   };
 
@@ -724,8 +750,8 @@ export default function MySignaturesPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(6px)',
             zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
@@ -739,50 +765,118 @@ export default function MySignaturesPage() {
               background: '#FFFFFF',
               borderRadius: 16,
               width: '100%',
-              maxWidth: 720,
-              maxHeight: '90vh',
+              maxWidth: 960,
+              height: '90vh',
+              maxHeight: 900,
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 48px rgba(0,0,0,0.18)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
               border: '1px solid #E5E5EA',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #F0F0F2' }}>
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 24px',
+                borderBottom: '1px solid #F0F0F2',
+                background: '#FFFFFF',
+                flexShrink: 0,
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#ECFDF5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <CheckCircle2 size={22} color="#059669" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1D1D1F' }}>{viewingSignedDoc.documentName}</h3>
-                  <div style={{ fontSize: 12, color: '#6E6E73', marginTop: 2 }}>Executed Digital Document</div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1D1D1F' }}>
+                    {viewingSignedDoc.documentName}
+                  </h3>
+                  <div style={{ fontSize: 12, color: '#6E6E73', marginTop: 2 }}>
+                    Executed &amp; Verified Digital Agreement
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setViewingSignedDoc(null)}
-                style={{ background: '#F5F5F7', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <X size={16} color="#6E6E73" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={handleDownloadFromModal}
+                  disabled={isRenderingViewingPdf}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Download size={14} /> Download PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingSignedDoc(null)}
+                  style={{
+                    background: '#F5F5F7',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={16} color="#6E6E73" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Real PDF Document Preview */}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#333639' }}>
+              {isRenderingViewingPdf || !viewingPdfUrl ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', gap: 14 }}>
+                  <Loader2 size={32} className="animate-spin" color="#3B82F6" />
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Rendering official PDF document…</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Applying WYSIWYG formatting, styles, and cryptographic seal</div>
+                </div>
+              ) : (
+                <PdfPreview
+                  url={viewingPdfUrl}
+                  title={`${viewingSignedDoc.documentName} PDF`}
+                  style={{ width: '100%', height: '100%', flex: 1 }}
+                />
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 24px',
+                borderTop: '1px solid #E5E5EA',
+                background: '#FFFFFF',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ fontSize: 12.5, color: '#6E6E73' }}>
+                Signed by <strong>{viewingSignedDoc.senderName}</strong> · Completed on{' '}
+                <strong>{viewingSignedDoc.signedAt ? new Date(viewingSignedDoc.signedAt).toLocaleDateString() : 'Recorded'}</strong>
+              </div>
+              <button type="button" className="btn-neutral" onClick={() => setViewingSignedDoc(null)}>
+                Close
               </button>
-            </div>
-            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
-                  <div><span style={{ color: '#64748B' }}>Sender: </span><strong>{viewingSignedDoc.senderName}</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Department: </span><strong>{viewingSignedDoc.senderRole}</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Status: </span><span style={{ color: '#059669', fontWeight: 700 }}>COMPLETED & SIGNED</span></div>
-                  <div><span style={{ color: '#64748B' }}>Signed Date: </span><span>{viewingSignedDoc.signedAt || 'Verified'}</span></div>
-                </div>
-              </div>
-              <div style={{ background: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 10, padding: '20px 22px', fontSize: 13, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap', maxHeight: 380, overflowY: 'auto' }}>
-                {viewingSignedDoc.body || viewingSignedDoc.message || 'Executed Agreement Document'}
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid #F0F0F2', background: '#FAFAFC' }}>
-              <button type="button" className="btn-neutral" onClick={() => setViewingSignedDoc(null)}>Close</button>
-              <button type="button" className="btn-primary" onClick={() => handleDownloadSigned(viewingSignedDoc)}><Download size={14} /> Download Document</button>
             </div>
           </div>
         </div>

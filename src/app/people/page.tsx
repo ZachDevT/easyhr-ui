@@ -104,44 +104,46 @@ export default function PeopleDirectory() {
         subtitle="Find and connect with everyone across your organization."
         icon={<Users size={28} />}
         actions={
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button
-              type="button"
-              onClick={() => setIsAddHireOpen(true)}
-              className="btn-primary row gap-8 align-center"
-              style={{
-                background: "white",
-                color: "var(--primary)",
-                border: "none",
-                padding: "10px 20px",
-                fontSize: 14,
-                fontWeight: 700,
-                borderRadius: 20,
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-              }}
-            >
-              <UserPlus size={16} /> Add Hire Manually
-            </button>
-            <Link
-              href="/onboarding"
-              style={{
-                padding: "10px 18px",
-                borderRadius: 20,
-                fontSize: 14,
-                fontWeight: 600,
-                color: "white",
-                background: "rgba(255, 255, 255, 0.15)",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              Onboarding Pipeline
-            </Link>
-          </div>
+          isHRAdmin ? (
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => setIsAddHireOpen(true)}
+                className="btn-primary row gap-8 align-center"
+                style={{
+                  background: "white",
+                  color: "var(--primary)",
+                  border: "none",
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                }}
+              >
+                <UserPlus size={16} /> Add Hire Manually
+              </button>
+              <Link
+                href="/onboarding"
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 20,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "white",
+                  background: "rgba(255, 255, 255, 0.15)",
+                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                Onboarding Pipeline
+              </Link>
+            </div>
+          ) : undefined
         }
       />
 
@@ -249,7 +251,7 @@ export default function PeopleDirectory() {
                       ? "Try adjusting your search criteria or department filter."
                       : "Employees will appear here automatically when candidates are hired through the ATS and onboarded."}
                   </p>
-                  {!searchQuery && selectedDept === "All" && (
+                  {!searchQuery && selectedDept === "All" && isHRAdmin && (
                     <Link
                       href="/onboarding"
                       className="btn-primary"
@@ -339,7 +341,7 @@ export default function PeopleDirectory() {
                           >
                             {e.status}
                           </StatusPill>
-                          {(e.status?.toLowerCase().includes("onboard") || e.status?.toLowerCase() === "new" || e.status?.toLowerCase() === "pending") && (canViewDetails || isHRAdmin || isManager) && (
+                          {(e.status?.toLowerCase().includes("onboard") || e.status?.toLowerCase() === "new" || e.status?.toLowerCase() === "pending") && isHRAdmin && (
                             <button
                               type="button"
                               onClick={(ev) => {

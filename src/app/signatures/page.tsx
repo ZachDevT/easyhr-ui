@@ -39,7 +39,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAuth } from '@clerk/nextjs';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { RichTextEditor, RichTextRenderer } from '@/components/ui/RichTextEditor';
-import { downloadPdfBlob, openPdfBlob, renderPdfDocument } from '@/lib/pdfDocument';
+import { downloadPdfBlob, downloadPdfUrl, openPdfBlob, renderPdfDocument } from '@/lib/pdfDocument';
 import { PdfPreview } from '@/components/shared/PdfPreview';
 import { useDocumentActions } from '@/components/documents/DocumentViewer';
 
@@ -125,54 +125,87 @@ export default function SignaturesAdminPage() {
   const [dismissedDeclinedIds, setDismissedDeclinedIds] = useState<string[]>([]);
   const { view, download: downloadDoc, viewer } = useDocumentActions();
   const [viewingSignedRequest, setViewingSignedRequest] = useState<SignatureRequestItem | null>(null);
+  const [viewingPdfUrl, setViewingPdfUrl] = useState<string>('');
+  const [isRenderingViewingPdf, setIsRenderingViewingPdf] = useState<boolean>(false);
+
+  const generateRequestHtml = useCallback((req: SignatureRequestItem) => {
+    const rec = req.recipients?.[0];
+    const signerName = rec?.name || 'Authorized Recipient';
+    const body = req.body || (req.customMessage ? `<p>${req.customMessage}</p>` : '<p>Executed Document Agreement.</p>');
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${req.documentName}</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f4f7;color:#202124;font:14px/1.65 'Questrial',Inter,Arial,sans-serif}.page{width:210mm;min-height:297mm;margin:28px auto;padding:20mm 22mm;background:#fff;box-shadow:0 4px 24px #10182818;display:flex;flex-direction:column}.brand{height:7px;background:#4F46E5;margin:-20mm -22mm 25px}.doc-header{white-space:pre-wrap;color:#475467;font-size:11px;padding:0 0 14px;border-bottom:1px solid #d0d5dd}.title{text-align:center;margin:28px 0 24px}.title h1{font:700 24px/1.25 'Questrial',Inter,Arial,sans-serif;margin:0 0 8px}.muted{color:#667085;font-size:12px}.body{font:15px/1.75 'Questrial',Inter,Arial,sans-serif;min-height:360px;margin-bottom:30px}.body p{margin:0 0 1em}.body h1,.body h2,.body h3{line-height:1.25;margin:1.2em 0 .6em}.doc-footer{white-space:pre-wrap;border-top:1px solid #d0d5dd;padding-top:14px;margin-top:auto;color:#475467;font-size:11px}.signatures{display:grid;grid-template-columns:1fr 180px;gap:32px;margin-top:30px;break-inside:avoid}.signatures label{display:block;color:#667085;font-size:11px;margin-bottom:8px}.signature{height:58px;border-bottom:1px solid #98a2b3;display:flex;flex-direction:column;justify-content:center}.date{height:58px;border-bottom:1px solid #98a2b3;padding:24px 0 4px;font-family:monospace}@page{size:A4;margin:0}@media print{body{background:#fff}.page{margin:0;box-shadow:none;width:auto;min-height:297mm;page-break-after:always}}</style></head><body><article class="page"><div class="brand"></div><header class="doc-header">EasyHR Enterprise Signature Operations</header><div class="title"><h1>${req.documentName}</h1><div class="muted">Issued by ${req.createdByName} · Created ${req.createdAt}</div></div><main class="body">${body}</main><section class="signatures"><div><label>Authorized digital signature (${signerName})</label><div class="signature"><div style="font:italic 20px cursive;color:#1e3a8a;">Digitally Executed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:2px;">&#10003; EASYHR Cryptographic Verification Record</div></div></div><div><label>Status</label><div class="date">COMPLETED</div></div></section><footer class="doc-footer">Digitally Executed &amp; Recorded via EasyHR Enterprise Signatures</footer></article></body></html>`;
+  }, []);
+
+  useEffect(() => {
+    if (!viewingSignedRequest) {
+      setViewingPdfUrl((prev) => {
+        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return '';
+      });
+      return;
+    }
+
+    if (viewingSignedRequest.documentUrl) {
+      setViewingPdfUrl(viewingSignedRequest.documentUrl);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsRenderingViewingPdf(true);
+    const docHtml = generateRequestHtml(viewingSignedRequest);
+
+    renderPdfDocument(docHtml)
+      .then((blob) => {
+        if (!isCurrent) return;
+        const nextUrl = URL.createObjectURL(blob);
+        setViewingPdfUrl((prev) => {
+          if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+          return nextUrl;
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to render PDF', err);
+        if (isCurrent) toast.error('PDF error', 'Could not render document as PDF.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsRenderingViewingPdf(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [viewingSignedRequest, generateRequestHtml]);
 
   const handleViewRequest = (req: SignatureRequestItem) => {
-    if (req.documentId) {
-      view(req.documentId, req.documentName);
-    } else {
-      setViewingSignedRequest(req);
-    }
+    setViewingSignedRequest(req);
   };
 
   const handleDownloadRequest = async (req: SignatureRequestItem) => {
-    if (req.documentId) {
-      await downloadDoc(req.documentId, req.documentName);
+    const filename = `${(req.documentName || 'Signed_Document').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+    if (req.documentUrl) {
+      downloadPdfUrl(req.documentUrl, filename);
+      toast.success('Downloaded', 'PDF document downloaded successfully.');
+      return;
+    }
+    toast.info('Preparing PDF', 'Generating signed PDF document…');
+    try {
+      const docHtml = generateRequestHtml(req);
+      const blob = await renderPdfDocument(docHtml);
+      downloadPdfBlob(blob, filename);
+      toast.success('Downloaded', 'Signed PDF document downloaded successfully.');
+    } catch (err: any) {
+      toast.error('Download failed', err.message || 'Could not generate PDF.');
+    }
+  };
+
+  const handleDownloadFromRequestModal = () => {
+    if (!viewingSignedRequest) return;
+    const filename = `${(viewingSignedRequest.documentName || 'Signed_Document').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+    if (viewingPdfUrl) {
+      downloadPdfUrl(viewingPdfUrl, filename);
+      toast.success('Downloaded', 'Signed PDF document downloaded successfully.');
     } else {
-      const rec = req.recipients?.[0];
-      const sanitized = (req.documentName || 'Signed_Document').replace(/\s+/g, '_');
-      const lines = [
-        '================================================================================',
-        '                     EASYHR ENTERPRISE SIGNATURE RECORD                         ',
-        '================================================================================',
-        '',
-        `Document Title:    ${req.documentName}`,
-        `Status:            COMPLETED & LEGALLY BINDING`,
-        `Recipient:         ${rec?.name || 'Recipient'} (${rec?.email || ''})`,
-        `Created By:        ${req.createdByName}`,
-        `Date Created:      ${req.createdAt}`,
-        '',
-        '--------------------------------------------------------------------------------',
-        'DOCUMENT BODY:',
-        '--------------------------------------------------------------------------------',
-        req.body || req.customMessage || 'Document executed.',
-        '',
-        '--------------------------------------------------------------------------------',
-        'SIGNATURE AUDIT VERIFICATION:',
-        '--------------------------------------------------------------------------------',
-        `Signer:            ${rec?.name || 'Signer'}`,
-        `Status:            Digitally Executed & Verified`,
-        `Audit ID:          ${req.id}`,
-        'System Seal:       EASYHR-CRYPTOGRAPHICALLY-VERIFIED',
-        '================================================================================',
-      ].join('\n');
-      const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${sanitized}_Executed.txt`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      toast.success('Downloaded', 'Executed document downloaded successfully.');
+      handleDownloadRequest(viewingSignedRequest);
     }
   };
 
@@ -964,8 +997,8 @@ export default function SignaturesAdminPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(6px)',
             zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
@@ -979,50 +1012,118 @@ export default function SignaturesAdminPage() {
               background: '#FFFFFF',
               borderRadius: 16,
               width: '100%',
-              maxWidth: 720,
-              maxHeight: '90vh',
+              maxWidth: 960,
+              height: '90vh',
+              maxHeight: 900,
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 48px rgba(0,0,0,0.18)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
               border: '1px solid #E5E5EA',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #F0F0F2' }}>
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 24px',
+                borderBottom: '1px solid #F0F0F2',
+                background: '#FFFFFF',
+                flexShrink: 0,
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#ECFDF5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <CheckCircle2 size={22} color="#059669" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1D1D1F' }}>{viewingSignedRequest.documentName}</h3>
-                  <div style={{ fontSize: 12, color: '#6E6E73', marginTop: 2 }}>Executed Digital Document</div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1D1D1F' }}>
+                    {viewingSignedRequest.documentName}
+                  </h3>
+                  <div style={{ fontSize: 12, color: '#6E6E73', marginTop: 2 }}>
+                    Executed &amp; Verified Digital Agreement
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setViewingSignedRequest(null)}
-                style={{ background: '#F5F5F7', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <X size={16} color="#6E6E73" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={handleDownloadFromRequestModal}
+                  disabled={isRenderingViewingPdf}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Download size={14} /> Download PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingSignedRequest(null)}
+                  style={{
+                    background: '#F5F5F7',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={16} color="#6E6E73" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Real PDF Document Preview */}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#333639' }}>
+              {isRenderingViewingPdf || !viewingPdfUrl ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', gap: 14 }}>
+                  <Loader2 size={32} className="animate-spin" color="#3B82F6" />
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Rendering official PDF document…</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Applying WYSIWYG formatting, styles, and cryptographic seal</div>
+                </div>
+              ) : (
+                <PdfPreview
+                  url={viewingPdfUrl}
+                  title={`${viewingSignedRequest.documentName} PDF`}
+                  style={{ width: '100%', height: '100%', flex: 1 }}
+                />
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 24px',
+                borderTop: '1px solid #E5E5EA',
+                background: '#FFFFFF',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ fontSize: 12.5, color: '#6E6E73' }}>
+                Recipient: <strong>{viewingSignedRequest.recipients?.[0]?.name || 'Signer'}</strong> · Created on{' '}
+                <strong>{viewingSignedRequest.createdAt}</strong>
+              </div>
+              <button type="button" className="btn-neutral" onClick={() => setViewingSignedRequest(null)}>
+                Close
               </button>
-            </div>
-            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
-                  <div><span style={{ color: '#64748B' }}>Recipient: </span><strong>{viewingSignedRequest.recipients?.[0]?.name || 'Signer'}</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Email: </span><strong>{viewingSignedRequest.recipients?.[0]?.email || ''}</strong></div>
-                  <div><span style={{ color: '#64748B' }}>Status: </span><span style={{ color: '#059669', fontWeight: 700 }}>COMPLETED & VERIFIED</span></div>
-                  <div><span style={{ color: '#64748B' }}>Executed: </span><span>{viewingSignedRequest.createdAt}</span></div>
-                </div>
-              </div>
-              <div style={{ background: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 10, padding: '20px 22px', fontSize: 13, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap', maxHeight: 380, overflowY: 'auto' }}>
-                {viewingSignedRequest.body || viewingSignedRequest.customMessage || 'Executed Agreement Document'}
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid #F0F0F2', background: '#FAFAFC' }}>
-              <button type="button" className="btn-neutral" onClick={() => setViewingSignedRequest(null)}>Close</button>
-              <button type="button" className="btn-primary" onClick={() => handleDownloadRequest(viewingSignedRequest)}><Download size={14} /> Download Document</button>
             </div>
           </div>
         </div>

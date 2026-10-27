@@ -18,6 +18,8 @@ import {
 import { API_BASE_URL } from "@/lib/api";
 import { toast } from "@/components/ui/Toast";
 import { useDocumentActions } from "./DocumentViewer";
+import { downloadPdfBlob, downloadPdfUrl, renderPdfDocument } from "@/lib/pdfDocument";
+import { PdfPreview } from "@/components/shared/PdfPreview";
 
 interface EmployeeDocument {
   id: string;
@@ -51,6 +53,13 @@ interface SignedDocItem {
   documentName: string;
   documentUrl?: string;
   body?: string;
+  header?: string;
+  footer?: string;
+  logoUrl?: string;
+  brandColor?: string;
+  websiteUrl?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   senderName: string;
   senderRole?: string;
   status: string;
@@ -111,6 +120,8 @@ export function EmployeeDocumentList({
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
   const [signedDocs, setSignedDocs] = useState<SignedDocItem[]>([]);
   const [viewingSignedDoc, setViewingSignedDoc] = useState<SignedDocItem | null>(null);
+  const [viewingPdfUrl, setViewingPdfUrl] = useState<string>('');
+  const [isRenderingViewingPdf, setIsRenderingViewingPdf] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Handbook modal state
@@ -168,55 +179,87 @@ export function EmployeeDocumentList({
     loadDocuments();
   }, [loadDocuments]);
 
-  const handleViewSignedDoc = (doc: SignedDocItem) => {
-    if (doc.documentId) {
-      view(doc.documentId, doc.documentName);
-    } else if (doc.documentUrl) {
-      window.open(doc.documentUrl, "_blank");
-    } else {
-      setViewingSignedDoc(doc);
+  const generateSignedDocHtml = useCallback((doc: SignedDocItem) => {
+    const color = doc.brandColor || '#4F46E5';
+    const logo = doc.logoUrl ? `<img src="${doc.logoUrl}" alt="Logo" class="logo"/>` : '';
+    const header = doc.header || [doc.senderName, doc.contactEmail, doc.contactPhone].filter(Boolean).join('\n');
+    const footer = doc.footer || [doc.websiteUrl, doc.contactEmail, doc.contactPhone].filter(Boolean).join('\n');
+    const body = doc.body || (doc.message ? `<p>${doc.message}</p>` : '<p>Executed Document Agreement.</p>');
+    const signDate = doc.signedAt ? new Date(doc.signedAt).toLocaleDateString() : new Date().toLocaleDateString();
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${doc.documentName}</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f4f7;color:#202124;font:14px/1.65 'Questrial',Inter,Arial,sans-serif}.page{width:210mm;min-height:297mm;margin:28px auto;padding:20mm 22mm;background:#fff;box-shadow:0 4px 24px #10182818;display:flex;flex-direction:column}.brand{height:7px;background:${color};margin:-20mm -22mm 25px}.logo{display:block;max-width:180px;max-height:58px;object-fit:contain;margin:0 0 18px}.doc-header{white-space:pre-wrap;color:#475467;font-size:11px;padding:0 0 14px;border-bottom:1px solid #d0d5dd}.title{text-align:center;margin:28px 0 24px}.title h1{font:700 24px/1.25 'Questrial',Inter,Arial,sans-serif;margin:0 0 8px}.muted{color:#667085;font-size:12px}.body{font:15px/1.75 'Questrial',Inter,Arial,sans-serif;min-height:360px;margin-bottom:30px}.body p{margin:0 0 1em}.body h1,.body h2,.body h3{line-height:1.25;margin:1.2em 0 .6em}.doc-footer{white-space:pre-wrap;border-top:1px solid #d0d5dd;padding-top:14px;margin-top:auto;color:#475467;font-size:11px}.signatures{display:grid;grid-template-columns:1fr 180px;gap:32px;margin-top:30px;break-inside:avoid}.signatures label{display:block;color:#667085;font-size:11px;margin-bottom:8px}.signature{height:58px;border-bottom:1px solid #98a2b3;display:flex;flex-direction:column;justify-content:center}.date{height:58px;border-bottom:1px solid #98a2b3;padding:24px 0 4px;font-family:monospace}@page{size:A4;margin:0}@media print{body{background:#fff}.page{margin:0;box-shadow:none;width:auto;min-height:297mm;page-break-after:always}}</style></head><body><article class="page"><div class="brand"></div>${logo}<header class="doc-header">${header}</header><div class="title"><h1>${doc.documentName}</h1><div class="muted">Executed Agreement Record</div></div><main class="body">${body}</main><section class="signatures"><div><label>Authorized digital signature (${employeeName || 'Signer'})</label><div class="signature"><div style="font:italic 20px cursive;color:#1e3a8a;">Digitally Executed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:2px;">&#10003; EASYHR Cryptographic Verification Record</div></div></div><div><label>Date Executed</label><div class="date">${signDate}</div></div></section><footer class="doc-footer">${footer}</footer></article></body></html>`;
+  }, [employeeName]);
+
+  useEffect(() => {
+    if (!viewingSignedDoc) {
+      setViewingPdfUrl((prev) => {
+        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return '';
+      });
+      return;
     }
+
+    if (viewingSignedDoc.documentUrl) {
+      setViewingPdfUrl(viewingSignedDoc.documentUrl);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsRenderingViewingPdf(true);
+    const docHtml = generateSignedDocHtml(viewingSignedDoc);
+
+    renderPdfDocument(docHtml)
+      .then((blob) => {
+        if (!isCurrent) return;
+        const nextUrl = URL.createObjectURL(blob);
+        setViewingPdfUrl((prev) => {
+          if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+          return nextUrl;
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to render PDF', err);
+        if (isCurrent) toast.error('PDF error', 'Could not render document as PDF.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsRenderingViewingPdf(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [viewingSignedDoc, generateSignedDocHtml]);
+
+  const handleViewSignedDoc = (doc: SignedDocItem) => {
+    setViewingSignedDoc(doc);
   };
 
   const handleDownloadSignedDoc = async (doc: SignedDocItem) => {
-    if (doc.documentId) {
-      await download(doc.documentId, doc.documentName);
-    } else if (doc.documentUrl) {
-      window.open(doc.documentUrl, "_blank");
+    const filename = `${(doc.documentName || 'Signed_Document').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+    if (doc.documentUrl) {
+      downloadPdfUrl(doc.documentUrl, filename);
+      toast.success('Downloaded', 'PDF document downloaded successfully.');
+      return;
+    }
+    toast.info('Preparing PDF', 'Generating signed PDF document…');
+    try {
+      const docHtml = generateSignedDocHtml(doc);
+      const blob = await renderPdfDocument(docHtml);
+      downloadPdfBlob(blob, filename);
+      toast.success('Downloaded', 'Signed PDF document downloaded successfully.');
+    } catch (err: any) {
+      toast.error('Download failed', err.message || 'Could not generate PDF.');
+    }
+  };
+
+  const handleDownloadFromModal = () => {
+    if (!viewingSignedDoc) return;
+    const filename = `${(viewingSignedDoc.documentName || 'Signed_Document').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+    if (viewingPdfUrl) {
+      downloadPdfUrl(viewingPdfUrl, filename);
+      toast.success('Downloaded', 'Signed PDF document downloaded successfully.');
     } else {
-      const sanitized = (doc.documentName || "Signed_Document").replace(/\s+/g, "_");
-      const lines = [
-        "================================================================================",
-        "                     EASYHR ENTERPRISE SIGNATURE RECORD                         ",
-        "================================================================================",
-        "",
-        `Document Title:    ${doc.documentName}`,
-        `Status:            COMPLETED & LEGALLY BINDING`,
-        `Signatory:         ${employeeName || "Employee"}`,
-        `Issued By:         ${doc.senderName || "People Operations"}`,
-        `Date Completed:    ${doc.signedAt ? formatDate(doc.signedAt) : "Signed"}`,
-        "",
-        "--------------------------------------------------------------------------------",
-        "DOCUMENT BODY:",
-        "--------------------------------------------------------------------------------",
-        doc.body || doc.message || "Executed document agreement.",
-        "",
-        "--------------------------------------------------------------------------------",
-        "SIGNATURE AUDIT VERIFICATION:",
-        "--------------------------------------------------------------------------------",
-        `Signer Status:     Digitally Executed & Verified`,
-        `Signature Record:  ${doc.id}`,
-        "System Seal:       EASYHR-CRYPTOGRAPHICALLY-VERIFIED",
-        "================================================================================",
-      ].join("\n");
-      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${sanitized}_Executed.txt`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      toast.success("Downloaded", "Executed document downloaded successfully.");
+      handleDownloadSignedDoc(viewingSignedDoc);
     }
   };
 
@@ -730,8 +773,8 @@ export function EmployeeDocumentList({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            backdropFilter: "blur(4px)",
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(6px)",
             zIndex: 9999,
             display: "flex",
             alignItems: "center",
@@ -745,23 +788,27 @@ export function EmployeeDocumentList({
               background: "#FFFFFF",
               borderRadius: 16,
               width: "100%",
-              maxWidth: 720,
-              maxHeight: "90vh",
+              maxWidth: 960,
+              height: "90vh",
+              maxHeight: 900,
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "0 20px 48px rgba(0,0,0,0.18)",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
               border: "1px solid #E5E5EA",
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal Header */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "18px 24px",
+                padding: "16px 24px",
                 borderBottom: "1px solid #F0F0F2",
+                background: "#FFFFFF",
+                flexShrink: 0,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -783,94 +830,75 @@ export function EmployeeDocumentList({
                     {viewingSignedDoc.documentName}
                   </h3>
                   <div style={{ fontSize: 12, color: "#6E6E73", marginTop: 2 }}>
-                    Executed Digital Document
+                    Executed &amp; Verified Digital Agreement
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setViewingSignedDoc(null)}
-                style={{
-                  background: "#F5F5F7",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: 32,
-                  height: 32,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={16} color="#6E6E73" />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={handleDownloadFromModal}
+                  disabled={isRenderingViewingPdf}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <Download size={14} /> Download PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingSignedDoc(null)}
+                  style={{
+                    background: "#F5F5F7",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 32,
+                    height: 32,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={16} color="#6E6E73" />
+                </button>
+              </div>
             </div>
-            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
-              <div
-                style={{
-                  background: "#F8FAFC",
-                  border: "1px solid #E2E8F0",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 18,
-                }}
-              >
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12.5 }}>
-                  <div>
-                    <span style={{ color: "#64748B" }}>Signer: </span>
-                    <strong>{employeeName || "Employee"}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748B" }}>Issued By: </span>
-                    <strong>{viewingSignedDoc.senderName || "People Operations"}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748B" }}>Status: </span>
-                    <span style={{ color: "#059669", fontWeight: 700 }}>COMPLETED & VERIFIED</span>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748B" }}>Signed Date: </span>
-                    <span>{formatDate(viewingSignedDoc.signedAt)}</span>
-                  </div>
+
+            {/* Modal Body: Real PDF Document Preview */}
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "#333639" }}>
+              {isRenderingViewingPdf || !viewingPdfUrl ? (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#FFFFFF", gap: 14 }}>
+                  <Loader2 size={32} className="animate-spin" color="#3B82F6" />
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Rendering official PDF document…</div>
+                  <div style={{ fontSize: 12, color: "#94A3B8" }}>Applying WYSIWYG formatting, styles, and cryptographic seal</div>
                 </div>
-              </div>
-              <div
-                style={{
-                  background: "#FFFFFF",
-                  border: "1px solid #E5E5EA",
-                  borderRadius: 10,
-                  padding: "20px 22px",
-                  fontSize: 13,
-                  lineHeight: 1.7,
-                  color: "#374151",
-                  whiteSpace: "pre-wrap",
-                  maxHeight: 380,
-                  overflowY: "auto",
-                }}
-              >
-                {viewingSignedDoc.body || viewingSignedDoc.message || "Executed Agreement Document"}
-              </div>
+              ) : (
+                <PdfPreview
+                  url={viewingPdfUrl}
+                  title={`${viewingSignedDoc.documentName} PDF`}
+                  style={{ width: "100%", height: "100%", flex: 1 }}
+                />
+              )}
             </div>
+
+            {/* Modal Footer */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "flex-end",
-                gap: 10,
-                padding: "16px 24px",
-                borderTop: "1px solid #F0F0F2",
-                background: "#FAFAFC",
+                justifyContent: "space-between",
+                padding: "14px 24px",
+                borderTop: "1px solid #E5E5EA",
+                background: "#FFFFFF",
+                flexShrink: 0,
               }}
             >
+              <div style={{ fontSize: 12.5, color: "#6E6E73" }}>
+                Signatory: <strong>{employeeName || "Employee"}</strong> · Completed on{" "}
+                <strong>{viewingSignedDoc.signedAt ? formatDate(viewingSignedDoc.signedAt) : "Recorded"}</strong>
+              </div>
               <button type="button" className="btn-neutral" onClick={() => setViewingSignedDoc(null)}>
                 Close
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => handleDownloadSignedDoc(viewingSignedDoc)}
-              >
-                <Download size={14} /> Download Document
               </button>
             </div>
           </div>
