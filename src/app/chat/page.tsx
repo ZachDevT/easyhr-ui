@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Hash,
   Lock,
@@ -67,7 +68,7 @@ import {
 } from '@/utils/chatSound';
 import { downloadChatAttachment } from '@/utils/chatMedia';
 
-export default function GroupChatPage() {
+function GroupChatContent() {
   const {
     channels,
     activeChannel,
@@ -97,6 +98,11 @@ export default function GroupChatPage() {
     uploadAttachment,
   } = useChat();
 
+  const searchParams = useSearchParams();
+  const dmParam = searchParams?.get('dm');
+  const channelIdParam = searchParams?.get('channelId');
+  const tabParam = searchParams?.get('tab');
+
   const { currentUser, role, isHRAdmin } = useRole();
   const { company } = useCompany();
 
@@ -120,7 +126,9 @@ export default function GroupChatPage() {
   const [viewFilter, setViewFilter] = useState<'all' | 'threads' | 'pinned'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStartDMModal, setShowStartDMModal] = useState(false);
-  const [activeChatTab, setActiveChatTab] = useState<'channels' | 'dms'>('channels');
+  const [activeChatTab, setActiveChatTab] = useState<'channels' | 'dms'>(
+    tabParam === 'dms' ? 'dms' : 'channels'
+  );
   const [showPicker, setShowPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState<PickerTab>('emoji');
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMediaItem | null>(null);
@@ -131,6 +139,15 @@ export default function GroupChatPage() {
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [showThreadsPopover, setShowThreadsPopover] = useState(false);
+
+  // Sync tab parameter if changed dynamically
+  useEffect(() => {
+    if (tabParam === 'dms') {
+      setActiveChatTab('dms');
+    } else if (tabParam === 'channels') {
+      setActiveChatTab('channels');
+    }
+  }, [tabParam]);
 
   // Desktop Notifications & Audio Chime state
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
@@ -212,6 +229,72 @@ export default function GroupChatPage() {
   const [firstUnreadMsgId, setFirstUnreadMsgId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<WysiwygEditorRef>(null);
+
+  // Handle explicit ?channelId= param
+  useEffect(() => {
+    if (!channelIdParam || isLoadingChannels) return;
+    const targetChannel = channels.find((c) => c.id === channelIdParam);
+    if (targetChannel) {
+      setActiveChannelId(targetChannel.id);
+      if (targetChannel.channelType === 'dm' || targetChannel.channelType === 'group_dm') {
+        setActiveChatTab('dms');
+      } else {
+        setActiveChatTab('channels');
+      }
+      setTimeout(() => {
+        editorRef.current?.focus();
+      }, 100);
+    }
+  }, [channelIdParam, channels, isLoadingChannels, setActiveChannelId]);
+
+  // Handle ?dm=<employeeIdOrEmail> param
+  const handledDmParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!dmParam || isLoadingChannels || handledDmParamRef.current === dmParam) return;
+
+    const myId = String(currentUser?.id || '');
+    const myEmpId = (currentUser as any)?.employeeId ? String((currentUser as any).employeeId) : '';
+    const myIds = [myId, myEmpId, 'user'].filter(Boolean);
+
+    // Look for existing DM
+    const existing = channels.find((c) => {
+      if (c.channelType !== 'dm' && c.channelType !== 'group_dm') return false;
+      const others = c.memberIds.filter((id) => !myIds.includes(id));
+      return others.includes(dmParam) || c.memberIds.includes(dmParam);
+    });
+
+    if (existing) {
+      handledDmParamRef.current = dmParam;
+      setActiveChannelId(existing.id);
+      setActiveChatTab('dms');
+      setTimeout(() => {
+        editorRef.current?.focus();
+      }, 100);
+      return;
+    }
+
+    // If not found in loaded channels yet, initiate / create DM
+    handledDmParamRef.current = dmParam;
+    const targetEmp = allEmployees.find(
+      (e) =>
+        String(e.id) === String(dmParam) ||
+        e.email?.toLowerCase() === dmParam.toLowerCase() ||
+        (e as any).workEmail?.toLowerCase() === dmParam.toLowerCase()
+    );
+    const empName = targetEmp ? `${targetEmp.firstName} ${targetEmp.lastName}` : undefined;
+
+    openOrCreateDM(dmParam, empName)
+      .then((newCh) => {
+        setActiveChannelId(newCh.id);
+        setActiveChatTab('dms');
+        setTimeout(() => {
+          editorRef.current?.focus();
+        }, 150);
+      })
+      .catch((err) => {
+        console.error('Failed to open DM from parameter:', err);
+      });
+  }, [dmParam, isLoadingChannels, channels, allEmployees, currentUser, openOrCreateDM, setActiveChannelId]);
 
   // Identify first unread message when opening a channel with unread messages
   useEffect(() => {
@@ -5493,5 +5576,19 @@ export default function GroupChatPage() {
       {/* Full-Screen Media Lightbox (Images & Videos) */}
       <MediaLightbox item={lightboxMedia} onClose={() => setLightboxMedia(null)} />
     </div>
+  );
+}
+
+export default function GroupChatPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+          Loading chat...
+        </div>
+      }
+    >
+      <GroupChatContent />
+    </React.Suspense>
   );
 }

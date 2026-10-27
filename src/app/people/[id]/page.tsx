@@ -39,7 +39,9 @@ import {
   Stethoscope,
   HelpCircle,
   Calendar,
+  MessageSquare,
 } from "lucide-react";
+import { useChat } from "@/context/ChatContext";
 import { OnboardingLinkModal } from "@/components/people/OnboardingLinkModal";
 import { PaymentMethodModal } from "@/components/people/PaymentMethodModal";
 import { CalculationFormulaModal } from "@/components/payroll/CalculationFormulaModal";
@@ -129,6 +131,8 @@ export default function EmployeeProfile() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { getToken } = useAuth();
+  const { openOrCreateDM } = useChat();
+  const [isOpeningDM, setIsOpeningDM] = useState(false);
 
   const {
     getEmployeeCompensation,
@@ -301,6 +305,21 @@ export default function EmployeeProfile() {
       toast.error("Network error", "Unable to activate employee.");
     } finally {
       setIsActivating(false);
+    }
+  };
+
+  const handleStartDM = async () => {
+    if (!employee) return;
+    try {
+      setIsOpeningDM(true);
+      const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || 'Colleague';
+      const ch = await openOrCreateDM(employee.id, fullName);
+      router.push(`/chat?channelId=${ch.id}&tab=dms`);
+    } catch (err: any) {
+      console.error('Failed to open DM:', err);
+      router.push(`/chat?dm=${employee.id}&tab=dms`);
+    } finally {
+      setIsOpeningDM(false);
     }
   };
 
@@ -529,6 +548,35 @@ export default function EmployeeProfile() {
             >
               <Edit2 size={13} className="mr-4" /> Edit Details
             </button>
+            {!isOwnProfile && (
+              <button
+                type="button"
+                onClick={handleStartDM}
+                disabled={isOpeningDM}
+                className="btn-secondary btn-sm"
+                style={{
+                  background: "#FFFFFF",
+                  color: "var(--primary, #2563EB)",
+                  border: "none",
+                  padding: "7px 14px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+                title={`Send a direct message to ${employee.firstName}`}
+              >
+                {isOpeningDM ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <MessageSquare size={13} />
+                )}
+                <span>Message</span>
+              </button>
+            )}
             <Link
               href="/people"
               className="btn-secondary btn-sm"

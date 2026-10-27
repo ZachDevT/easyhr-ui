@@ -3,8 +3,10 @@
 import { API_BASE_URL } from "@/lib/api";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Building2, ChevronRight, MapPin, Search, Users, UserPlus, Link2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Building2, ChevronRight, MapPin, Search, Users, UserPlus, Link2, MessageSquare, Loader2 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
+import { useChat } from "@/context/ChatContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
@@ -36,8 +38,12 @@ interface Employee {
 }
 
 export default function PeopleDirectory() {
+  const router = useRouter();
   const { getToken } = useAuth();
   const { isHRAdmin, isManager, currentUser } = useRole();
+  const { openOrCreateDM } = useChat();
+  const [openingDmId, setOpeningDmId] = useState<string | null>(null);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<string[]>(["All"]);
   const [rawDepartments, setRawDepartments] = useState<{ id: string; name: string }[]>([]);
@@ -47,6 +53,22 @@ export default function PeopleDirectory() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddHireOpen, setIsAddHireOpen] = useState(false);
   const [onboardingLinkEmployee, setOnboardingLinkEmployee] = useState<Employee | null>(null);
+
+  const handleStartDM = async (ev: React.MouseEvent, emp: Employee) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    try {
+      setOpeningDmId(emp.id);
+      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Colleague';
+      const ch = await openOrCreateDM(emp.id, fullName);
+      router.push(`/chat?channelId=${ch.id}&tab=dms`);
+    } catch (err: any) {
+      console.error('Failed to open DM:', err);
+      router.push(`/chat?dm=${emp.id}&tab=dms`);
+    } finally {
+      setOpeningDmId(null);
+    }
+  };
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -341,31 +363,67 @@ export default function PeopleDirectory() {
                           >
                             {e.status}
                           </StatusPill>
-                          {(e.status?.toLowerCase().includes("onboard") || e.status?.toLowerCase() === "new" || e.status?.toLowerCase() === "pending") && isHRAdmin && (
-                            <button
-                              type="button"
-                              onClick={(ev) => {
-                                ev.preventDefault();
-                                ev.stopPropagation();
-                                setOnboardingLinkEmployee(e);
-                              }}
-                              className="btn-neutral btn-sm"
-                              style={{
-                                fontSize: 11.5,
-                                padding: "4px 10px",
-                                borderRadius: 8,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                color: "var(--primary, #2563EB)",
-                                fontWeight: 650,
-                              }}
-                              title="Resend or copy employee onboarding link"
-                            >
-                              <Link2 size={12} />
-                              <span>Resend Link</span>
-                            </button>
-                          )}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {!isSelf && (
+                              <button
+                                type="button"
+                                onClick={(ev) => handleStartDM(ev, e)}
+                                disabled={openingDmId === e.id}
+                                className="btn-secondary btn-sm"
+                                style={{
+                                  fontSize: 11.5,
+                                  padding: "5px 11px",
+                                  borderRadius: 8,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  color: "var(--text-1, #18181B)",
+                                  fontWeight: 650,
+                                  border: "1px solid var(--border, #E4E4E7)",
+                                  background: "#FFFFFF",
+                                  cursor: "pointer",
+                                }}
+                                title={`Send a direct message to ${e.firstName}`}
+                              >
+                                {openingDmId === e.id ? (
+                                  <>
+                                    <Loader2 size={12} className="animate-spin" />
+                                    <span>Opening...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <MessageSquare size={12} style={{ color: "var(--primary, #2563EB)" }} />
+                                    <span>Message</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            {(e.status?.toLowerCase().includes("onboard") || e.status?.toLowerCase() === "new" || e.status?.toLowerCase() === "pending") && isHRAdmin && (
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.preventDefault();
+                                  ev.stopPropagation();
+                                  setOnboardingLinkEmployee(e);
+                                }}
+                                className="btn-neutral btn-sm"
+                                style={{
+                                  fontSize: 11.5,
+                                  padding: "4px 10px",
+                                  borderRadius: 8,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  color: "var(--primary, #2563EB)",
+                                  fontWeight: 650,
+                                }}
+                                title="Resend or copy employee onboarding link"
+                              >
+                                <Link2 size={12} />
+                                <span>Resend Link</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </>
                     );
