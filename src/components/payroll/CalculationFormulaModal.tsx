@@ -117,150 +117,117 @@ export function CalculationFormulaModal({
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            gap: 20,
+            gap: 16,
             fontSize: 13,
-            lineHeight: 1.6,
+            lineHeight: 1.5,
             color: "#1D1D1F",
           }}
         >
-          {/* Section 1: Base Compensation */}
+          {/* Card 1: Calculation Formula */}
           <div
             style={{
-              background: "#FAFAFC",
+              background: "#FFFFFF",
               border: "1px solid #E5E5EA",
               borderRadius: 12,
-              padding: "16px 18px",
+              padding: "20px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Clock size={16} color="var(--primary, #0071E3)" />
-              <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B" }}>
-                1. Monthly Base Compensation
-              </span>
-            </div>
-            <div style={{ fontWeight: 600, color: "#1D1D1F", marginBottom: 6 }}>
-              {compensationModel.toUpperCase()} Model:
-            </div>
-            <div
-              style={{
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                background: "#FFFFFF",
-                border: "1px solid #E5E5EA",
-                borderRadius: 8,
-                padding: "8px 12px",
-                fontSize: 12.5,
-                color: "var(--primary, #0071E3)",
-                fontWeight: 600,
-              }}
-            >
-              Total Monthly Compensation = Pay Rate × Productive Hours
-            </div>
-            <p style={{ fontSize: 12, color: "#86868B", margin: "8px 0 0" }}>
-              Standard hourly rate applied to approved timesheet hours worked during the pay period.
-            </p>
-          </div>
-
-          {/* Section 2: Chargeable Gross Total */}
-          <div
-            style={{
-              background: "#FAFAFC",
-              border: "1px solid #E5E5EA",
-              borderRadius: 12,
-              padding: "16px 18px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <TrendingUp size={16} color="#34C759" />
-              <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B" }}>
-                2. Chargeable Gross Total
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                background: "#FFFFFF",
-                border: "1px solid #E5E5EA",
-                borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 12,
-                color: "#1D1D1F",
-                fontWeight: 600,
-                lineHeight: 1.5,
-              }}
-            >
-              Chargeable Gross Total = [Base Compensation] + [Total Bonuses] + [Higher Rates] + [Insurance] - [Total Penalties]
-            </div>
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#636366" }}>
-              <div>• <strong>Total Higher Rates</strong> = (Overtime hours × Pay Rate × 1.5) + (Sunday &amp; Public Holiday hours × Pay Rate × 2.0).</div>
-              <div>• <strong>Total Bonuses &amp; Penalties</strong> = Configured under Job section &gt; One-time Adjustments table.</div>
-            </div>
-          </div>
-
-          {/* Section 3: Statutory Deductions */}
-          <div
-            style={{
-              background: "#FAFAFC",
-              border: "1px solid #E5E5EA",
-              borderRadius: 12,
-              padding: "16px 18px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <ShieldCheck size={16} color="#FF9500" />
-              <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#86868B" }}>
-                3. Statutory Deductions
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                background: "#FFFFFF",
-                border: "1px solid #E5E5EA",
-                borderRadius: 8,
-                padding: "8px 12px",
-                fontSize: 12.5,
-                color: "#D70015",
-                fontWeight: 600,
-              }}
-            >
-              Statutory Deductions = PAYE + NSSF (5% Employee Pension)
-            </div>
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#636366" }}>
-              <div>• <strong>PAYE (Uganda Progressive Tax)</strong>: Tiered monthly tax brackets according to Uganda Revenue Authority regulations.</div>
-              <div>• <strong>NSSF Employee Pension</strong>: Exactly 5% of gross earnings deducted from employee pay.</div>
-              <div>• <strong>NSSF Employer Contribution</strong>: Organization adds an additional 10% (not deducted from employee pay).</div>
-            </div>
-          </div>
-
-          {/* Section 4: Net Pay Disbursed */}
-          <div
-            style={{
-              background: "#F5F9FF",
-              border: "1px solid rgba(0, 113, 227, 0.2)",
-              borderRadius: 12,
-              padding: "16px 18px",
-            }}
-          >
-            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--primary, #0071E3)", display: "block", marginBottom: 6 }}>
-              4. Net Take-Home Pay
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#6E6E73", display: "block", marginBottom: 12 }}>
+              Standard Calculation Engine
             </span>
-            <div
-              style={{
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                background: "#FFFFFF",
-                border: "1px solid rgba(0, 113, 227, 0.2)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 13,
-                color: "#1D1D1F",
-                fontWeight: 700,
-              }}
-            >
-              Net Pay = Gross Total - Statutory Deductions
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1D1D1F", marginBottom: 4 }}>
+                1. Monthly Base Compensation
+              </div>
+              <div
+                style={{
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  background: "#F5F5F7",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  color: "#1D1D1F",
+                  fontWeight: 600,
+                }}
+              >
+                Total Monthly Compensation = Pay Rate × Productive Hours
+              </div>
+              <p style={{ fontSize: 11.5, color: "#6E6E73", margin: "6px 0 0" }}>
+                Effective hourly pay rate applied to actual productive hours worked or contracted standard hours.
+              </p>
             </div>
-            <p style={{ fontSize: 12, color: "#636366", margin: "8px 0 0" }}>
-              Final verified amount transferred via your configured payout channel (Mobile Money or Direct Bank Deposit).
-            </p>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1D1D1F", marginBottom: 4 }}>
+                2. Chargeable Income Gross Total
+              </div>
+              <div
+                style={{
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  background: "#F5F5F7",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  color: "#1D1D1F",
+                  fontWeight: 600,
+                  lineHeight: 1.4,
+                }}
+              >
+                Chargeable Gross = [Base Compensation] + [Total Bonuses] + [Higher Rates] + [Insurance] - [Penalties]
+              </div>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: "#6E6E73" }}>
+                <div>• <strong>Higher Rates</strong>: Overtime (1.5× pay rate) + Sunday &amp; Public Holiday (2.0× pay rate).</div>
+                <div>• <strong>Bonuses &amp; Penalties</strong>: One-time adjustments configured in employee record.</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1D1D1F", marginBottom: 4 }}>
+                3. Statutory Deductions
+              </div>
+              <div
+                style={{
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  background: "#F5F5F7",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  color: "#1D1D1F",
+                  fontWeight: 600,
+                }}
+              >
+                Statutory Deductions = PAYE (Progressive Tax) + NSSF (5% Employee)
+              </div>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: "#6E6E73" }}>
+                <div>• <strong>PAYE (Uganda Progressive Tax)</strong>: Tiered monthly tax brackets per URA guidelines.</div>
+                <div>• <strong>NSSF Employee Pension</strong>: 5% employee pension contribution deducted from gross pay.</div>
+                <div>• <strong>NSSF Employer Contribution</strong>: Additional 10% organization contribution.</div>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1D1D1F", marginBottom: 4 }}>
+                4. Net Take-Home Pay
+              </div>
+              <div
+                style={{
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  background: "#F5F5F7",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  color: "#1D1D1F",
+                  fontWeight: 700,
+                }}
+              >
+                Net Pay = Chargeable Gross Total - Statutory Deductions
+              </div>
+              <p style={{ fontSize: 11.5, color: "#6E6E73", margin: "6px 0 0" }}>
+                Disbursed to verified employee payout method (Mobile Money or Bank Account).
+              </p>
+            </div>
           </div>
         </div>
 

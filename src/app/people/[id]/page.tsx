@@ -169,6 +169,8 @@ export default function EmployeeProfile() {
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [managers, setManagers] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
+  const [benefitPlans, setBenefitPlans] = useState<any[]>([]);
+  const [benefitEnrollments, setBenefitEnrollments] = useState<any[]>([]);
 
   const [selectedPayslipModal, setSelectedPayslipModal] = useState<PayrollCalculationResult | null>(null);
   const [isBonusPenaltyModalOpen, setIsBonusPenaltyModalOpen] = useState(false);
@@ -211,11 +213,13 @@ export default function EmployeeProfile() {
   useEffect(() => {
     getToken().then((token) => {
       if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
       Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/departments`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/v1/locations`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/v1/employees`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]).then(async ([deptRes, locRes, empRes]) => {
+        fetch(`${API_BASE_URL}/api/v1/departments`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/locations`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/employees`, { headers }),
+        fetch(`${API_BASE_URL}/api/v1/benefits/plans`, { headers }),
+      ]).then(async ([deptRes, locRes, empRes, planRes]) => {
         if (deptRes.ok) {
           const d = await deptRes.json();
           setDepartments(Array.isArray(d) ? d : d.data || []);
@@ -228,9 +232,22 @@ export default function EmployeeProfile() {
           const emps = await empRes.json();
           setManagers(Array.isArray(emps) ? emps : emps.data || []);
         }
+        if (planRes && planRes.ok) {
+          const p = await planRes.json();
+          if (Array.isArray(p)) setBenefitPlans(p);
+        }
       }).catch(() => {});
+
+      if (params?.id) {
+        fetch(`${API_BASE_URL}/api/v1/benefits/enrollments/${params.id}`, { headers })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (Array.isArray(data)) setBenefitEnrollments(data);
+          })
+          .catch(() => {});
+      }
     });
-  }, [getToken]);
+  }, [getToken, params?.id]);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -360,148 +377,80 @@ export default function EmployeeProfile() {
 
   return (
     <>
-      {/* EXECUTIVE HERO PROFILE HEADER (MATCHING /people/me) */}
-      <div
-        style={{
-          background: "#FFFFFF",
-          borderRadius: 16,
-          border: "1px solid var(--card-border, #E4E4E7)",
-          boxShadow: "0 2px 12px rgba(17, 17, 24, 0.04)",
-          overflow: "hidden",
-          marginBottom: 20,
-        }}
-      >
-        <div style={{ height: 4, background: "var(--gradient)" }} />
-        <div
-          style={{
-            padding: "24px 28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Left: Avatar + Identity + Metadata */}
-          <div style={{ display: "flex", alignItems: "center", gap: 20, minWidth: 0, flex: 1 }}>
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  width: 76,
-                  height: 76,
-                  minWidth: 76,
-                  minHeight: 76,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  border: "3.5px solid #FFFFFF",
-                  boxShadow: "0 4px 16px rgba(17, 17, 24, 0.12), 0 0 0 1px var(--card-border, #E4E4E7)",
-                  background: "var(--primary-tint, #EFF6FF)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                {avatarSrc ? (
-                  <img
-                    src={avatarSrc}
-                    alt={fullName}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  />
-                ) : (
-                  <span style={{ fontSize: 24, fontWeight: 700, color: "var(--primary, #2563EB)" }}>
-                    {employee.firstName.slice(0, 1).toUpperCase()}
-                    {employee.lastName.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 2,
-                  right: 2,
-                  width: 14,
-                  height: 14,
-                  borderRadius: "50%",
-                  background: employee.status === "active" ? "#10B981" : "#F59E0B",
-                  border: "2.5px solid #FFFFFF",
-                }}
-                title={employee.status === "active" ? "Active" : "Onboarding"}
-              />
+      {/* REUSABLE PAGE HEADER WITH INTEGRATED TABS & AVATAR */}
+      <PageHeader
+        icon={
+          avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt={fullName}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 12,
+                objectFit: "cover",
+                border: "2px solid rgba(255, 255, 255, 0.4)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                display: "block",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 12,
+                background: "rgba(255, 255, 255, 0.2)",
+                border: "2px solid rgba(255, 255, 255, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+                fontWeight: 700,
+                color: "#FFFFFF",
+              }}
+            >
+              {employee.firstName.slice(0, 1).toUpperCase()}
+              {employee.lastName.slice(0, 1).toUpperCase()}
             </div>
-
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <h1
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 800,
-                    color: "var(--text-1)",
-                    margin: 0,
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  {fullName}
-                </h1>
-                <StatusPill tone={employee.status === "active" ? "success" : "warning"}>
-                  {employee.status ? employee.status.toUpperCase() : "ACTIVE"}
-                </StatusPill>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 6,
-                    background: "#F4F4F5",
-                    color: "var(--text-2, #52525B)",
-                    border: "1px solid var(--card-border, #E4E4E7)",
-                  }}
-                >
-                  {employee.employeeNumber || "EMP-0001"}
-                </span>
-              </div>
-
-              <div style={{ fontSize: 13.5, color: "var(--text-2)", marginTop: 4, fontWeight: 500 }}>
-                {employee.jobTitle || "Team Member"} <span style={{ color: "var(--text-4)" }}>·</span> {employee.department || "General"}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  flexWrap: "wrap",
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: "var(--text-3)",
-                }}
-              >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <Building2 size={13} style={{ color: "var(--primary)" }} />
-                  <span>{employee.department || "General"}</span>
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <MapPin size={13} style={{ color: "var(--primary)" }} />
-                  <span>{employee.location || "Remote"}</span>
-                </span>
-                {employee.workEmail && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <Mail size={13} style={{ color: "var(--primary)" }} />
-                    <span>{employee.workEmail}</span>
-                  </span>
-                )}
-                {employee.startDate && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <CalendarDays size={13} style={{ color: "var(--primary)" }} />
-                    <span>Hired {employee.startDate}</span>
-                  </span>
-                )}
-              </div>
-            </div>
+          )
+        }
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span>{fullName}</span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 10,
+                background: employee.status === "active" ? "#10B981" : "#F59E0B",
+                color: "#FFFFFF",
+              }}
+            >
+              {employee.status ? employee.status.toUpperCase() : "ACTIVE"}
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "2px 8px",
+                borderRadius: 6,
+                background: "rgba(255, 255, 255, 0.18)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+              }}
+            >
+              {employee.employeeNumber || "EMP-0001"}
+            </span>
           </div>
-
-          {/* Right: Actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
+        }
+        subtitle={`${employee.jobTitle || "Team Member"} · ${employee.department || "General"} · ${employee.location || "Remote"}${employee.workEmail ? ` · ${employee.workEmail}` : ""}`}
+        tabs={dynamicTabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {isOnboarding && (
               <>
                 <button
@@ -509,20 +458,17 @@ export default function EmployeeProfile() {
                   onClick={() => setIsOnboardingLinkModalOpen(true)}
                   className="btn-secondary btn-sm"
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "8px 14px",
-                    borderRadius: 9,
+                    background: "rgba(255,255,255,0.15)",
+                    color: "#FFFFFF",
+                    border: "1px solid rgba(255,255,255,0.3)",
+                    padding: "7px 13px",
+                    borderRadius: 8,
                     fontSize: 12,
-                    color: "var(--primary)",
-                    borderColor: "var(--primary)",
                     fontWeight: 600,
                   }}
                   title="Generate a fresh non-expired onboarding link (7 days) or resend email"
                 >
-                  <Mail size={13.5} />
-                  <span>Resend Link</span>
+                  <Mail size={13} className="mr-4" /> Resend Link
                 </button>
                 <button
                   type="button"
@@ -530,116 +476,76 @@ export default function EmployeeProfile() {
                   disabled={isActivating}
                   className="btn-primary btn-sm"
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "8px 16px",
-                    borderRadius: 9,
+                    background: "#FFFFFF",
+                    color: "var(--primary)",
+                    border: "none",
+                    padding: "7px 14px",
+                    borderRadius: 8,
                     fontSize: 12,
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
-                  {isActivating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                  <span>Activate</span>
+                  {isActivating ? <Loader2 size={13} className="animate-spin mr-4" /> : <CheckCircle2 size={13} className="mr-4" />}
+                  Activate
                 </button>
               </>
             )}
             <button
               type="button"
               onClick={() => setIsPaymentModalOpen(true)}
-              className="btn-neutral btn-sm"
+              className="btn-secondary btn-sm"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                borderRadius: 9,
+                background: "rgba(255,255,255,0.15)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255,255,255,0.3)",
+                padding: "7px 13px",
+                borderRadius: 8,
                 fontSize: 12,
                 fontWeight: 600,
               }}
-              title="Configure or update disbursement payout method (Bank, Mobile Money, etc.)"
+              title="Configure or update disbursement payout method"
             >
-              <CreditCard size={13.5} />
-              <span>Payment Method</span>
+              <CreditCard size={13} className="mr-4" /> Payment Method
             </button>
             <button
               type="button"
               onClick={() => setIsEditModalOpen(true)}
-              className="btn-primary btn-sm"
+              className="btn-secondary btn-sm"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                borderRadius: 9,
+                background: "rgba(255,255,255,0.15)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255,255,255,0.3)",
+                padding: "7px 13px",
+                borderRadius: 8,
                 fontSize: 12,
                 fontWeight: 600,
               }}
               title="Edit job title, department, location, or personal details"
             >
-              <Edit2 size={13.5} />
-              <span>Edit Details</span>
+              <Edit2 size={13} className="mr-4" /> Edit Details
             </button>
             <Link
               href="/people"
-              className="btn-neutral btn-sm"
+              className="btn-secondary btn-sm"
               style={{
+                background: "#FFFFFF",
+                color: "var(--primary)",
+                border: "none",
+                padding: "7px 13px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: "none",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                borderRadius: 9,
-                fontSize: 12,
-                textDecoration: "none",
+                gap: 5,
               }}
             >
-              <ArrowLeft size={13.5} />
-              <span>Directory</span>
+              <ArrowLeft size={13} /> Directory
             </Link>
           </div>
-        </div>
-
-        {/* BOTTOM INTEGRATED TABS BAR */}
-        <div
-          className="hide-scrollbar"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "0 24px",
-            background: "#FAF9F7",
-            borderTop: "1px solid var(--card-border, #E4E4E7)",
-            overflowX: "auto",
-          }}
-        >
-          {dynamicTabs.map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "12px 18px",
-                  fontSize: 13,
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "var(--primary, #2563EB)" : "var(--text-2, #52525B)",
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: isActive
-                    ? "2.5px solid var(--primary, #2563EB)"
-                    : "2.5px solid transparent",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        }
+      />
 
       {/* MAIN TWO-COLUMN WORKSPACE */}
       <main style={{ padding: "0 0 32px" }}>
@@ -1632,13 +1538,14 @@ export default function EmployeeProfile() {
 
             {/* TAB: BENEFITS */}
             {activeTab === "Benefits" && (
-              <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {/* Active Enrolled Policies */}
                 <Card>
                   <CardBody>
                     <div className="row-between mb-16 align-center">
                       <SectionHeading
-                        title="Enrolled Benefits &amp; Insurance"
-                        description={`Active corporate medical, pension, and life coverage for ${fullName}`}
+                        title="Enrolled Benefits &amp; Policies"
+                        description={`Active corporate medical, pension, and life coverage assigned to ${fullName}`}
                       />
                       <Link
                         href="/benefits"
@@ -1646,58 +1553,137 @@ export default function EmployeeProfile() {
                         style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
                       >
                         <Stethoscope size={13} />
-                        <span>Benefits Directory</span>
+                        <span>Benefits Administration</span>
                       </Link>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-                      <div style={{ background: "#FFFFFF", border: "1px solid #E5E5EA", borderRadius: 12, padding: "16px 18px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <Stethoscope size={16} color="var(--primary, #0071E3)" />
-                            <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>Comprehensive Health Plan</span>
+                    {benefitEnrollments.length > 0 ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+                        {benefitEnrollments.map((enr: any) => (
+                          <div
+                            key={enr.id}
+                            style={{
+                              background: "#FFFFFF",
+                              border: "1px solid #E5E5EA",
+                              borderRadius: 12,
+                              padding: "16px 18px",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 10,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <Stethoscope size={16} color="var(--primary, #0071E3)" />
+                                <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>{enr.planName}</span>
+                              </div>
+                              <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "#E8F5E9", color: "#2E7D32" }}>
+                                {(enr.status || "ACTIVE").toUpperCase()}
+                              </span>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12, borderTop: "1px solid #F0F0F2", paddingTop: 8 }}>
+                              <div>
+                                <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Coverage Tier</span>
+                                <span style={{ fontWeight: 600, color: "#1D1D1F" }}>{(enr.coverageTier || "Individual").toUpperCase()}</span>
+                              </div>
+                              <div>
+                                <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Effective Date</span>
+                                <span style={{ fontWeight: 600, color: "#1D1D1F" }}>{enr.effectiveFrom || "Active"}</span>
+                              </div>
+                            </div>
                           </div>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "#E8F5E9", color: "#2E7D32" }}>
-                            ACTIVE
-                          </span>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12, borderTop: "1px solid #F0F0F2", paddingTop: 8 }}>
-                          <div>
-                            <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Coverage Tier</span>
-                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>INDIVIDUAL</span>
-                          </div>
-                          <div>
-                            <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Status</span>
-                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>Employer Sponsored</span>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-
-                      <div style={{ background: "#FFFFFF", border: "1px solid #E5E5EA", borderRadius: 12, padding: "16px 18px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <ShieldCheck size={16} color="#34C759" />
-                            <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>NSSF National Pension</span>
-                          </div>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "#E8F5E9", color: "#2E7D32" }}>
-                            STATUTORY
-                          </span>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12, borderTop: "1px solid #F0F0F2", paddingTop: 8 }}>
-                          <div>
-                            <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Employee Deduction</span>
-                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>5% Gross Pay</span>
-                          </div>
-                          <div>
-                            <span style={{ color: "#86868B", display: "block", fontSize: 11 }}>Employer Share</span>
-                            <span style={{ fontWeight: 600, color: "#1D1D1F" }}>10% Org Contribution</span>
-                          </div>
-                        </div>
+                    ) : (
+                      <div style={{ textAlign: "center", padding: "28px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>
+                        <Heart size={22} color="#86868B" style={{ margin: "0 auto 8px" }} />
+                        <span style={{ fontSize: 12.5, color: "#86868B", display: "block" }}>
+                          No individual benefit policies enrolled yet for {fullName}. See organization plans below.
+                        </span>
                       </div>
-                    </div>
+                    )}
                   </CardBody>
                 </Card>
-              </>
+
+                {/* Organization Available Offerings */}
+                <Card>
+                  <CardBody>
+                    <div className="row-between mb-16 align-center">
+                      <SectionHeading
+                        title="Available Company Offerings"
+                        description="Comprehensive benefits catalog provided by the organization"
+                      />
+                    </div>
+
+                    {benefitPlans.length > 0 ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+                        {benefitPlans.map((pl: any) => {
+                          const isEnrolled = benefitEnrollments.some((e: any) => e.planId === pl.id || e.plan_id === pl.id);
+                          const costDisplay = pl.employerCostMinor ? `${formatMoney(pl.employerCostMinor, pl.currency)}/mo` : "Company Paid";
+                          const empCostDisplay = pl.employeeCostMinor > 0 ? `${formatMoney(pl.employeeCostMinor, pl.currency)}/mo` : "Fully Employer Covered";
+                          return (
+                            <div
+                              key={pl.id}
+                              style={{
+                                background: "#FFFFFF",
+                                border: "1px solid #E5E5EA",
+                                borderRadius: 12,
+                                padding: "16px 18px",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 10,
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                                <div>
+                                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "#1D1D1F", margin: 0 }}>{pl.name}</h4>
+                                  <span style={{ fontSize: 10.5, fontWeight: 650, color: "#6E6E73", background: "#F2F2F7", padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 4 }}>
+                                    {(pl.category || "General").toUpperCase()} · {pl.currency || "UGX"}
+                                  </span>
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    padding: "3px 8px",
+                                    borderRadius: 6,
+                                    background: isEnrolled ? "#DCFCE7" : "#F4F4F5",
+                                    color: isEnrolled ? "#15803D" : "#52525B",
+                                  }}
+                                >
+                                  {isEnrolled ? "ENROLLED" : "AVAILABLE"}
+                                </span>
+                              </div>
+
+                              {pl.description && (
+                                <p style={{ fontSize: 12, color: "#6E6E73", margin: 0, lineHeight: 1.5 }}>
+                                  {pl.description}
+                                </p>
+                              )}
+
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11.5, borderTop: "1px solid #F0F0F2", paddingTop: 8 }}>
+                                <div>
+                                  <span style={{ color: "#8E8E93", display: "block", fontSize: 10.5 }}>Employer Outlay</span>
+                                  <strong style={{ color: "#1D1D1F" }}>{costDisplay}</strong>
+                                </div>
+                                <div>
+                                  <span style={{ color: "#8E8E93", display: "block", fontSize: 10.5 }}>Employee Share</span>
+                                  <strong style={{ color: "#1D1D1F" }}>{empCostDisplay}</strong>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: "center", padding: "24px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>
+                        <span style={{ fontSize: 12.5, color: "#86868B" }}>Company comprehensive medical, life, and NSSF pension policies are active.</span>
+                      </div>
+                    )}
+                  </CardBody>
+                </Card>
+              </div>
             )}
 
             {/* TAB: EMERGENCY */}

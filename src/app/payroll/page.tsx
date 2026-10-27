@@ -1400,6 +1400,7 @@ export default function PayrollPage() {
               isHourly: parsed.model === "hourly",
               monthlyBaseMinor: item.basePay,
               productiveHours: adj.productiveHours,
+              standardMonthlyHours: parsed.standardHours || (activeConfig ? activeConfig.standardMonthlyMinutes / 60 : (settings.standardMonthlyHours || 173.33)),
               overtimeHours: adj.overtimeHours,
               holidayHours: adj.holidayHours,
               bonusesMinor: adj.bonusesMinor,
@@ -1551,13 +1552,26 @@ export default function PayrollPage() {
 
                               {/* Pay Model & Baseline Rate */}
                               <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                                <Badge variant={parsed.model === "hourly" ? "warning" : "neutral"}>
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: 4,
+                                    background: parsed.model === "hourly" ? "#FEF3C7" : "#F4F4F5",
+                                    color: parsed.model === "hourly" ? "#D97706" : "#52525B",
+                                    display: "inline-block",
+                                  }}
+                                >
                                   {parsed.model === "hourly" ? "HOURLY" : "SALARIED"}
-                                </Badge>
+                                </span>
                                 <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 4 }}>
-                                  {parsed.model === "hourly"
-                                    ? `${formatMoney(parsed.hourlyRateMinor, currentCurrency)}/hr`
-                                    : `${formatMoney(item.basePay, currentCurrency)}/mo`}
+                                  <strong>{formatMoney(calc.effectiveHourlyRateMinor, currentCurrency)}</strong>/hr
+                                  {parsed.model !== "hourly" && (
+                                    <span style={{ color: "var(--text-4)", fontSize: 10.5, display: "block" }}>
+                                      {formatMoney(item.basePay, currentCurrency)}/mo base
+                                    </span>
+                                  )}
                                 </div>
                               </td>
 
@@ -2628,6 +2642,7 @@ export default function PayrollPage() {
               isHourly: parsed.model === "hourly",
               monthlyBaseMinor: editingAdjItem.basePay,
               productiveHours: pHours,
+              standardMonthlyHours: parsed.standardHours || (activeConfig ? activeConfig.standardMonthlyMinutes / 60 : (settings.standardMonthlyHours || 173.33)),
               overtimeHours: otHours,
               holidayHours: holHours,
               bonusesMinor: bonMinor,

@@ -726,323 +726,149 @@ function ProfileContent() {
 
   return (
     <div style={{ height: "100%", overflowY: "auto", background: "var(--bg-page)", display: "flex", flexDirection: "column" }}>
-      {/* Executive Employee Profile Header Card */}
-      <div
-        style={{
-          background: "#FFFFFF",
-          borderRadius: 16,
-          border: "1px solid var(--card-border, #E4E4E7)",
-          boxShadow: "0 2px 12px rgba(17, 17, 24, 0.04)",
-          overflow: "hidden",
-          marginBottom: 20,
-          flexShrink: 0,
-        }}
-      >
-        {/* Top Accent Strip */}
-        <div style={{ height: 4, background: "var(--gradient)" }} />
-
-        {/* Main Identity & Actions Row */}
-        <div
-          style={{
-            padding: "20px 24px 18px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Left: 1:1 Undistorted Avatar + Identity Details */}
-          <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0, flex: 1 }}>
+      {/* REUSABLE BRAND PAGE HEADER WITH INTEGRATED TABS & AVATAR */}
+      <PageHeader
+        icon={
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            title="Click to change profile photo"
+            style={{ position: "relative", cursor: "pointer" }}
+          >
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt={displayFullName}
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 12,
+                  objectFit: "cover",
+                  border: "2px solid rgba(255, 255, 255, 0.4)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 12,
+                  background: "rgba(255, 255, 255, 0.2)",
+                  border: "2px solid rgba(255, 255, 255, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#FFFFFF",
+                }}
+              >
+                {displayFirstName.slice(0, 1).toUpperCase()}
+                {displayLastName.slice(0, 1).toUpperCase()}
+              </div>
+            )}
             <div
-              onClick={() => fileInputRef.current?.click()}
-              title="Click to change profile photo"
               style={{
-                position: "relative",
-                width: 76,
-                height: 76,
-                minWidth: 76,
-                minHeight: 76,
-                flexShrink: 0,
-                cursor: "pointer",
+                position: "absolute",
+                bottom: -2,
+                right: -2,
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                background: "var(--primary, #2563EB)",
+                color: "#FFFFFF",
+                border: "1.5px solid #FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <div
-                className="avatar-hover-container"
-                style={{
-                  width: 76,
-                  height: 76,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  border: "3px solid #FFFFFF",
-                  boxShadow: "0 4px 14px rgba(17, 17, 24, 0.1), 0 0 0 1px var(--card-border, #E4E4E7)",
-                  background: "var(--primary-tint, #F5EBFF)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "relative",
-                }}
-              >
-                {avatarSrc ? (
-                  <img
-                    src={avatarSrc}
-                    alt={displayFullName}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      fontSize: 24,
-                      fontWeight: 700,
-                      color: "var(--primary, #2563EB)",
-                    }}
-                  >
-                    {displayFirstName.slice(0, 1).toUpperCase()}
-                    {displayLastName.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-
-                <div
-                  className="avatar-hover-overlay"
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "rgba(9, 9, 11, 0.6)",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#FFFFFF",
-                    opacity: 0,
-                    transition: "opacity 0.18s ease",
-                    userSelect: "none",
-                  }}
-                >
-                  {isUploadingAvatar ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    <Camera size={18} />
-                  )}
-                </div>
-              </div>
-
-              {/* Small Camera Badge */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  right: 0,
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  background: "var(--primary, #2563EB)",
-                  color: "#FFFFFF",
-                  border: "2px solid #FFFFFF",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                }}
-              >
-                <Camera size={11} />
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                style={{ display: "none" }}
-                onChange={handleAvatarFileChange}
-              />
+              <Camera size={9} />
             </div>
-
-            {/* Name, Role, Badges & Vitals Strip */}
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <h1
-                  style={{
-                    fontSize: 21,
-                    fontWeight: 700,
-                    color: "var(--text-1, #18181B)",
-                    margin: 0,
-                    letterSpacing: "-0.02em",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {displayFullName}
-                </h1>
-
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: "2px 9px",
-                    borderRadius: 999,
-                    background: employee?.status === "active" ? "#ECFDF5" : "#FEF3C7",
-                    color: employee?.status === "active" ? "#059669" : "#D97706",
-                    border:
-                      employee?.status === "active"
-                        ? "1px solid rgba(16, 185, 129, 0.25)"
-                        : "1px solid rgba(245, 158, 11, 0.25)",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: employee?.status === "active" ? "#10B981" : "#F59E0B",
-                    }}
-                  />
-                  {employee?.status ? employee.status.toUpperCase() : "ACTIVE"}
-                </span>
-
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 6,
-                    background: "#F4F4F5",
-                    color: "var(--text-2, #52525B)",
-                    border: "1px solid var(--card-border, #E4E4E7)",
-                  }}
-                >
-                  {employee?.employeeNumber || "EMP-0001"}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  fontSize: 13.5,
-                  color: "var(--text-2, #52525B)",
-                  marginTop: 4,
-                  fontWeight: 500,
-                }}
-              >
-                {displayRole} <span style={{ color: "var(--text-3, #A1A1AA)" }}>·</span> {displayCompany}
-              </div>
-
-              {/* Compact Metadata Pills */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  flexWrap: "wrap",
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: "var(--text-3, #71717A)",
-                }}
-              >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <Building size={13} style={{ color: "var(--primary, #2563EB)" }} />
-                  <span>{employee?.department || "General"}</span>
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <MapPin size={13} style={{ color: "var(--primary, #2563EB)" }} />
-                  <span>{displayLocation}</span>
-                </span>
-                {displayEmail && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <Mail size={13} style={{ color: "var(--primary, #2563EB)" }} />
-                    <span>{displayEmail}</span>
-                  </span>
-                )}
-              </div>
-            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              onChange={handleAvatarFileChange}
+            />
           </div>
-
-          {/* Right: Header Quick Actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        }
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span>{displayFullName}</span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 10,
+                background: employee?.status === "active" ? "#10B981" : "#F59E0B",
+                color: "#FFFFFF",
+              }}
+            >
+              {employee?.status ? employee.status.toUpperCase() : "ACTIVE"}
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "2px 8px",
+                borderRadius: 6,
+                background: "rgba(255, 255, 255, 0.18)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+              }}
+            >
+              {employee?.employeeNumber || "EMP-0001"}
+            </span>
+          </div>
+        }
+        subtitle={`${displayRole} · ${displayCompany} · ${employee?.department || "General"} · ${displayLocation}`}
+        tabs={dynamicTabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="btn-neutral btn-sm"
+              className="btn-secondary btn-sm"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
+                background: "rgba(255,255,255,0.15)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255,255,255,0.3)",
                 padding: "7px 13px",
-                borderRadius: 9,
+                borderRadius: 8,
                 fontSize: 12,
+                fontWeight: 600,
               }}
             >
-              <Camera size={13.5} />
-              <span>Change Photo</span>
+              <Camera size={13} className="mr-4" /> Change Photo
             </button>
-
             <button
               type="button"
               onClick={() => {
                 setActiveTab("Personal");
                 setIsEditingPersonal(true);
               }}
-              className="btn-primary btn-sm"
+              className="btn-secondary btn-sm"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
+                background: "#FFFFFF",
+                color: "var(--primary)",
+                border: "none",
                 padding: "7px 14px",
-                borderRadius: 9,
+                borderRadius: 8,
                 fontSize: 12,
+                fontWeight: 700,
               }}
             >
-              <Edit2 size={13} />
-              <span>Edit Profile</span>
+              <Edit2 size={13} className="mr-4" /> Edit Profile
             </button>
           </div>
-        </div>
-
-        {/* Bottom Integrated Navigation Tabs */}
-        <div
-          className="hide-scrollbar"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "0 20px",
-            background: "#FAF9F7",
-            borderTop: "1px solid var(--card-border, #E4E4E7)",
-            overflowX: "auto",
-          }}
-        >
-          {dynamicTabs.map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "11px 14px",
-                  fontSize: 12.5,
-                  fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "var(--primary, #2563EB)" : "var(--text-2, #52525B)",
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: isActive
-                    ? "2.5px solid var(--primary, #2563EB)"
-                    : "2.5px solid transparent",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Grid Area */}
       <div style={{ display: "grid", gridTemplateColumns: activeTab === "Personal" ? "270px 1fr" : "1fr", gap: 20, position: "relative", alignItems: "start" }}>
@@ -2751,32 +2577,64 @@ function ProfileContent() {
                 </span>
                 {benefitPlans.length > 0 ? (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-                    {benefitPlans.map((pl: any) => (
-                      <div
-                        key={pl.id}
-                        style={{
-                          background: "#FFFFFF",
-                          border: "1px solid #E5E5EA",
-                          borderRadius: 12,
-                          padding: "16px 18px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 8,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: 13.5, fontWeight: 650, color: "#1D1D1F" }}>{pl.name}</span>
-                          <span style={{ fontSize: 10.5, fontWeight: 600, padding: "2px 6px", borderRadius: 4, background: "#F5F5F7", color: "#86868B" }}>
-                            {pl.provider || "Standard"}
-                          </span>
+                    {benefitPlans.map((pl: any) => {
+                      const isEnrolled = benefitEnrollments.some((e: any) => e.planId === pl.id || e.plan_id === pl.id);
+                      const costDisplay = pl.employerCostMinor ? `${formatMoney(pl.employerCostMinor, pl.currency)}/mo` : "Company Paid";
+                      const empCostDisplay = pl.employeeCostMinor > 0 ? `${formatMoney(pl.employeeCostMinor, pl.currency)}/mo` : "Fully Employer Covered";
+                      return (
+                        <div
+                          key={pl.id}
+                          style={{
+                            background: "#FFFFFF",
+                            border: "1px solid #E5E5EA",
+                            borderRadius: 12,
+                            padding: "16px 18px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                            <div>
+                              <h4 style={{ fontSize: 14, fontWeight: 700, color: "#1D1D1F", margin: 0 }}>{pl.name}</h4>
+                              <span style={{ fontSize: 10.5, fontWeight: 650, color: "#6E6E73", background: "#F2F2F7", padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 4 }}>
+                                {(pl.category || "General").toUpperCase()} · {pl.currency || "UGX"}
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: "3px 8px",
+                                borderRadius: 6,
+                                background: isEnrolled ? "#DCFCE7" : "#F4F4F5",
+                                color: isEnrolled ? "#15803D" : "#52525B",
+                              }}
+                            >
+                              {isEnrolled ? "ENROLLED" : "AVAILABLE"}
+                            </span>
+                          </div>
+
+                          {pl.description && (
+                            <p style={{ fontSize: 12, color: "#6E6E73", margin: 0, lineHeight: 1.5 }}>
+                              {pl.description}
+                            </p>
+                          )}
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11.5, borderTop: "1px solid #F0F0F2", paddingTop: 8 }}>
+                            <div>
+                              <span style={{ color: "#8E8E93", display: "block", fontSize: 10.5 }}>Employer Outlay</span>
+                              <strong style={{ color: "#1D1D1F" }}>{costDisplay}</strong>
+                            </div>
+                            <div>
+                              <span style={{ color: "#8E8E93", display: "block", fontSize: 10.5 }}>Employee Share</span>
+                              <strong style={{ color: "#1D1D1F" }}>{empCostDisplay}</strong>
+                            </div>
+                          </div>
                         </div>
-                        {pl.description && (
-                          <p style={{ fontSize: 12, color: "#636366", margin: 0, lineHeight: 1.4 }}>
-                            {pl.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ textAlign: "center", padding: "24px 20px", border: "1px solid #E5E5EA", borderRadius: 10, background: "#FAFAFC" }}>

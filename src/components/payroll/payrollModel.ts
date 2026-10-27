@@ -384,7 +384,8 @@ export interface GrossCalculationParams {
   payRateMinor: number; // Hourly rate (or monthly equivalent / standardMonthlyHours)
   isHourly: boolean;
   monthlyBaseMinor: number;
-  productiveHours: number; // e.g. 173.33, 160
+  productiveHours: number; // e.g. 173.33, 160, 2.4, 22.4
+  standardMonthlyHours?: number; // e.g. 173.33
   overtimeHours?: number; // Overtime hours
   holidayHours?: number; // Public holidays & Sundays
   overtimeMultiplier?: number; // Dynamic overtime multiplier (e.g. 1.5x)
@@ -396,6 +397,7 @@ export interface GrossCalculationParams {
 
 export interface GrossCalculationResult {
   baseMonthlyCompensationMinor: number;
+  effectiveHourlyRateMinor: number;
   totalHigherRatesMinor: number;
   overtimeMinor: number;
   holidayMinor: number;
@@ -419,6 +421,7 @@ export function calculateChargeableGross(params: GrossCalculationParams): GrossC
     isHourly,
     monthlyBaseMinor,
     productiveHours,
+    standardMonthlyHours = 173.33,
     overtimeHours = 0,
     holidayHours = 0,
     overtimeMultiplier = 1.5,
@@ -428,16 +431,24 @@ export function calculateChargeableGross(params: GrossCalculationParams): GrossC
     penaltiesMinor = 0,
   } = params;
 
-  let baseMonthlyCompensationMinor = 0;
-  if (isHourly && payRateMinor > 0) {
-    baseMonthlyCompensationMinor = Math.round(payRateMinor * Math.max(0, productiveHours));
-  } else {
-    baseMonthlyCompensationMinor = monthlyBaseMinor;
-  }
-
+  const stdHours = standardMonthlyHours > 0 ? standardMonthlyHours : 173.33;
   const effectiveHourlyRateMinor = isHourly
-    ? payRateMinor
-    : Math.round(monthlyBaseMinor / 173.33);
+    ? (payRateMinor > 0 ? payRateMinor : Math.round(monthlyBaseMinor / stdHours))
+    : (payRateMinor > 0 ? payRateMinor : Math.round(monthlyBaseMinor / stdHours));
+
+  let baseMonthlyCompensationMinor = 0;
+  if (isHourly) {
+    baseMonthlyCompensationMinor = Math.round(effectiveHourlyRateMinor * Math.max(0, productiveHours));
+  } else {
+    // Salaried compensation:
+    // If productive hours >= standard contracted hours, pay full contracted monthly salary.
+    // If actual tracked/synced productive hours < standard hours, prorate based on hours worked.
+    if (productiveHours >= stdHours) {
+      baseMonthlyCompensationMinor = monthlyBaseMinor;
+    } else {
+      baseMonthlyCompensationMinor = Math.round(effectiveHourlyRateMinor * Math.max(0, productiveHours));
+    }
+  }
 
   const otMultiplier = overtimeMultiplier > 0 ? overtimeMultiplier : 1.5;
   const holMultiplier = holidayMultiplier > 0 ? holidayMultiplier : 2.0;
@@ -464,6 +475,7 @@ export function calculateChargeableGross(params: GrossCalculationParams): GrossC
 
   return {
     baseMonthlyCompensationMinor,
+    effectiveHourlyRateMinor,
     totalHigherRatesMinor,
     overtimeMinor,
     holidayMinor,

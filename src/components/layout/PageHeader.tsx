@@ -61,15 +61,10 @@ export function PageHeader({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
-          {icon && typeof title === 'string' && (
+          {icon && (
             <div
               className="page-header-icon-box"
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: 10,
-                background: 'rgba(255, 255, 255, 0.14)',
-                border: '1px solid rgba(255, 255, 255, 0.22)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

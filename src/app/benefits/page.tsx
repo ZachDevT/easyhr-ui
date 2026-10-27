@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Users,
   DollarSign,
+  Edit2,
   Edit3,
+  Trash2,
   Loader2,
   UserCheck,
   Calendar,
@@ -32,6 +34,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { toast } from "@/components/ui/Toast";
+import { formatMoney } from "@/components/payroll/payrollModel";
 
 interface BenefitPlan {
   id: string;
@@ -89,6 +92,8 @@ export default function BenefitsPage() {
 
   // Modals
   const [showAddPlanModal, setShowAddPlanModal] = useState(false);
+  const [showEditPlanModal, setShowEditPlanModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<BenefitPlan | null>(null);
   const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
   const [planForm, setPlanForm] = useState({
     name: "",
@@ -96,7 +101,15 @@ export default function BenefitsPage() {
     description: "",
     employerCost: 0,
     employeeCost: 0,
-    currency: "",
+    currency: "UGX",
+  });
+  const [editPlanForm, setEditPlanForm] = useState({
+    name: "",
+    category: "Health & Medical",
+    description: "",
+    employerCost: 0,
+    employeeCost: 0,
+    currency: "UGX",
   });
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -109,35 +122,34 @@ export default function BenefitsPage() {
   });
 
   const fetchData = useCallback(async () => {
-    if (role === "Employee") {
-      setIsLoading(false);
-      return;
-    }
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
 
+      const headers = { Authorization: `Bearer ${token}` };
       const [plansRes, enrollRes, empRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/benefits/plans`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE_URL}/api/v1/benefits/enrollments`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE_URL}/api/v1/employees`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        fetch(`${API_BASE_URL}/api/v1/benefits/plans`, { headers }).catch(() => null),
+        fetch(
+          role === "Employee" && currentUser?.id
+            ? `${API_BASE_URL}/api/v1/benefits/enrollments/${currentUser.id}`
+            : `${API_BASE_URL}/api/v1/benefits/enrollments`,
+          { headers }
+        ).catch(() => null),
+        fetch(`${API_BASE_URL}/api/v1/employees`, { headers }).catch(() => null),
       ]);
 
-      if (plansRes.ok) {
+      if (plansRes && plansRes.ok) {
         const data = await plansRes.json();
         setPlans(Array.isArray(data) ? data : []);
       }
-      if (enrollRes.ok) {
+      if (enrollRes && enrollRes.ok) {
         const data = await enrollRes.json();
         setEnrollments(Array.isArray(data) ? data : []);
       }
-      if (empRes.ok) {
+      if (empRes && empRes.ok) {
         const data = await empRes.json();
         const emps = Array.isArray(data) ? data : data.data || [];
         setEmployees(
@@ -154,7 +166,7 @@ export default function BenefitsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, role, currentUser?.id]);
 
   useEffect(() => {
     fetchData();
@@ -193,7 +205,7 @@ export default function BenefitsPage() {
           description: planForm.description || null,
           employerCostMinor: Math.round(Number(planForm.employerCost) * 100),
           employeeCostMinor: Math.round(Number(planForm.employeeCost) * 100),
-          currency: planForm.currency,
+          currency: planForm.currency.toUpperCase(),
         }),
       });
 
@@ -206,7 +218,7 @@ export default function BenefitsPage() {
           description: "",
           employerCost: 0,
           employeeCost: 0,
-          currency: "",
+          currency: "UGX",
         });
         await fetchData();
       } else {
@@ -218,6 +230,89 @@ export default function BenefitsPage() {
       toast.error("Network error", "Unable to reach server.");
     } finally {
       setIsSubmittingPlan(false);
+    }
+  };
+
+  // Handle Update Plan
+  const handleOpenEditPlan = (plan: BenefitPlan) => {
+    setEditingPlan(plan);
+    setEditPlanForm({
+      name: plan.name,
+      category: plan.category || "Health & Medical",
+      description: plan.description || "",
+      employerCost: plan.employerCostMinor / 100,
+      employeeCost: plan.employeeCostMinor / 100,
+      currency: plan.currency || "UGX",
+    });
+    setShowEditPlanModal(true);
+  };
+
+  const handleUpdatePlan = async () => {
+    if (!editingPlan) return;
+    if (!editPlanForm.name.trim() || !/^[A-Za-z]{3}$/.test(editPlanForm.currency)) {
+      toast.error("Plan details required", "Enter a plan name and a three-letter currency code.");
+      return;
+    }
+    setIsSubmittingPlan(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/benefits/plans/${editingPlan.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editPlanForm.name,
+          category: editPlanForm.category,
+          description: editPlanForm.description || null,
+          employerCostMinor: Math.round(Number(editPlanForm.employerCost) * 100),
+          employeeCostMinor: Math.round(Number(editPlanForm.employeeCost) * 100),
+          currency: editPlanForm.currency.toUpperCase(),
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Benefit plan updated", `Changes to ${editPlanForm.name} saved.`);
+        setShowEditPlanModal(false);
+        setEditingPlan(null);
+        await fetchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error("Update failed", err.detail || err.title || "Unable to update benefit plan.");
+      }
+    } catch (err) {
+      console.error("Error updating benefit plan", err);
+      toast.error("Network error", "Unable to update benefit plan.");
+    } finally {
+      setIsSubmittingPlan(false);
+    }
+  };
+
+  // Handle Delete Plan
+  const handleDeletePlan = async (plan: BenefitPlan) => {
+    if (!confirm(`Are you sure you want to delete the plan "${plan.name}"? Active employee enrollments under this policy will also be removed.`)) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/benefits/plans/${plan.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok || res.status === 204) {
+        toast.success("Plan removed", `Deleted "${plan.name}".`);
+        await fetchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error("Delete failed", err.detail || "Unable to delete plan.");
+      }
+    } catch (err) {
+      console.error("Error deleting plan", err);
+      toast.error("Network error", "Unable to delete plan.");
     }
   };
 
@@ -275,58 +370,7 @@ export default function BenefitsPage() {
   const totalEnrolled = enrollments.length;
   const totalMonthlyCost = plans.reduce((acc, p) => acc + (p.employerCostMinor / 100) * (p.enrolledCount || 0), 0);
   const avgCostPerEmp = totalEnrolled > 0 ? Math.round(totalMonthlyCost / totalEnrolled) : 0;
-
-  if (role === "Employee") {
-    return (
-      <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
-        <PageHeader
-          title="Benefits Portal"
-          subtitle="Health, wellness, and retirement plans"
-          icon={<Gift size={28} className="text-white" />}
-        />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 48, textAlign: "center" }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 16,
-              background: "var(--accent-subtle, #f1f5f9)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--primary)",
-              marginBottom: 20,
-            }}
-          >
-            <Shield size={32} />
-          </div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px 0", color: "var(--text-1)" }}>
-            Benefits Administration Restricted
-          </h2>
-          <p style={{ maxWidth: 480, color: "var(--text-4)", fontSize: 14, margin: "0 0 24px 0", lineHeight: 1.6 }}>
-            Plan configuration and company-wide enrollment administration are reserved for HR Administrators.
-            To view your individual enrolled benefits and total compensation, access your personal profile.
-          </p>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Link
-              href="/dashboard"
-              className="btn-neutral"
-              style={{ textDecoration: "none", padding: "10px 20px" }}
-            >
-              Return to Dashboard
-            </Link>
-            <Link
-              href="/people/me?tab=Benefits"
-              className="btn-primary"
-              style={{ textDecoration: "none", padding: "10px 20px" }}
-            >
-              My Profile & Benefits
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const primaryCurrency = plans[0]?.currency || "UGX";
 
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
@@ -338,47 +382,67 @@ export default function BenefitsPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         actions={
-          <div className="row gap-12 align-center">
-            {activeTab === "Enrollment" ? (
-              <button
-                className="btn-primary row gap-8 align-center"
-                style={{
-                  background: "var(--gradient)",
-                  border: "none",
-                  padding: "10px 20px",
-                  borderRadius: 20,
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowEnrollModal(true)}
-              >
-                <Plus size={16} /> Enroll Employee
-              </button>
-            ) : (
-              <button
-                className="btn-secondary row gap-8 align-center"
-                style={{
-                  background: "white",
-                  color: "var(--primary)",
-                  border: "none",
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  borderRadius: 20,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowAddPlanModal(true)}
-              >
-                <Plus size={16} /> Add Benefit Plan
-              </button>
-            )}
-          </div>
+          role !== "Employee" ? (
+            <div className="row gap-12 align-center">
+              {activeTab === "Enrollment" ? (
+                <button
+                  className="btn-primary row gap-8 align-center"
+                  style={{
+                    background: "var(--gradient)",
+                    border: "none",
+                    padding: "9px 18px",
+                    borderRadius: 10,
+                    color: "white",
+                    fontWeight: 650,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setShowEnrollModal(true)}
+                >
+                  <Plus size={15} /> Enroll Employee
+                </button>
+              ) : (
+                <button
+                  className="btn-secondary row gap-8 align-center"
+                  style={{
+                    background: "white",
+                    color: "var(--primary)",
+                    border: "none",
+                    padding: "9px 18px",
+                    fontSize: 13,
+                    fontWeight: 650,
+                    borderRadius: 10,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setShowAddPlanModal(true)}
+                >
+                  <Plus size={15} /> Add Benefit Plan
+                </button>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/people/me?tab=Benefits"
+              className="btn-secondary btn-sm"
+              style={{
+                background: "rgba(255,255,255,0.18)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255,255,255,0.3)",
+                padding: "8px 14px",
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              My Enrolled Coverage
+            </Link>
+          )
         }
       />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "32px 40px", background: "var(--bg-page)" }}>
-        <div className="col gap-32">
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px", background: "var(--bg-page)" }}>
+        <div className="col gap-28">
           <StatRibbon
             stats={[
               {
@@ -399,10 +463,10 @@ export default function BenefitsPage() {
               },
               {
                 label: "Average Cost / Enrollee",
-                value: `$${avgCostPerEmp}/mo`,
+                value: plans.length > 0 ? `${formatMoney(avgCostPerEmp * 100, primaryCurrency)}/mo` : "0/mo",
                 icon: <DollarSign size={18} />,
                 color: "var(--warning)",
-                trend: `$${Math.round(totalMonthlyCost)} total / mo`,
+                trend: plans.length > 0 ? `${formatMoney(totalMonthlyCost * 100, primaryCurrency)} total / mo` : "0 total / mo",
                 trendType: "neutral",
                 description: "Employer expenditure",
               },
@@ -411,7 +475,7 @@ export default function BenefitsPage() {
 
           {/* TAB 1: BENEFITS CATALOG */}
           {activeTab === "Benefits" && (
-            <div className="col gap-24">
+            <div className="col gap-20">
               <div className="row-between align-center">
                 <div>
                   <h2 className="text-xl fw-800 text-1 m-0">Benefit Plans Catalog</h2>
@@ -419,13 +483,15 @@ export default function BenefitsPage() {
                     Comprehensive offerings provided by your organization.
                   </span>
                 </div>
-                <button
-                  className="btn-primary row gap-8 align-center"
-                  onClick={() => setShowAddPlanModal(true)}
-                  style={{ padding: "10px 20px", borderRadius: 20 }}
-                >
-                  <Plus size={15} /> Add Plan
-                </button>
+                {role !== "Employee" && (
+                  <button
+                    className="btn-primary row gap-8 align-center"
+                    onClick={() => setShowAddPlanModal(true)}
+                    style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13 }}
+                  >
+                    <Plus size={14} /> Add Plan
+                  </button>
+                )}
               </div>
 
               {isLoading ? (
@@ -434,31 +500,33 @@ export default function BenefitsPage() {
                   <span className="text-sm text-4">Loading benefit offerings...</span>
                 </div>
               ) : plans.length > 0 ? (
-                <div className="grid-2 gap-24">
+                <div className="grid-2 gap-20">
                   {plans.map((b) => {
                     const catStyle = CATEGORY_ICONS[b.category] || CATEGORY_ICONS.other;
                     const eligible = b.eligibleCount || 1;
                     const enrolled = b.enrolledCount || 0;
                     const pct = Math.min(100, Math.round((enrolled / eligible) * 100));
-                    const costDisplay = `$${(b.employerCostMinor / 100).toFixed(0)}/mo`;
+                    const costDisplay = `${formatMoney(b.employerCostMinor, b.currency)}/mo`;
+                    const employeeCostDisplay = b.employeeCostMinor > 0 ? `${formatMoney(b.employeeCostMinor, b.currency)}/mo` : "Fully Employer Funded";
 
                     return (
                       <Card
                         key={b.id}
                         style={{
-                          borderRadius: 16,
-                          border: "1px solid var(--border)",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+                          borderRadius: 14,
+                          border: "1px solid #E5E5EA",
+                          boxShadow: "0 1px 4px rgba(0,0,0,0.02)",
+                          background: "#FFFFFF",
                         }}
                       >
-                        <CardBody className="p-28 col gap-20">
+                        <CardBody className="p-24 col gap-16">
                           <div className="row-between align-start">
-                            <div className="row gap-16 align-center">
+                            <div className="row gap-14 align-center">
                               <div
                                 style={{
-                                  width: 52,
-                                  height: 52,
-                                  borderRadius: 14,
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 10,
                                   background: catStyle.bg,
                                   color: catStyle.color,
                                   display: "flex",
@@ -470,50 +538,101 @@ export default function BenefitsPage() {
                                 {catStyle.icon}
                               </div>
                               <div>
-                                <h3 className="m-0 text-base fw-700 text-1">{b.name}</h3>
-                                <Badge variant="neutral" style={{ marginTop: 4, fontSize: 11 }}>
-                                  {b.category.toUpperCase()}
-                                </Badge>
+                                <h3 className="m-0 text-base fw-700 text-1" style={{ fontSize: 15 }}>{b.name}</h3>
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    marginTop: 4,
+                                    fontSize: 10.5,
+                                    fontWeight: 650,
+                                    padding: "2px 7px",
+                                    borderRadius: 4,
+                                    background: "#F2F2F7",
+                                    color: "#6E6E73",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.03em",
+                                  }}
+                                >
+                                  {b.category} · {b.currency}
+                                </span>
                               </div>
                             </div>
-                            <button
-                              className="btn-neutral btn-sm"
-                              onClick={() => {
-                                setEnrollForm({ ...enrollForm, planId: b.id });
-                                setShowEnrollModal(true);
-                              }}
-                            >
-                              Enroll Staff
-                            </button>
+
+                            {/* Plan Card Actions */}
+                            <div className="row gap-6 align-center">
+                              {role !== "Employee" ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    onClick={() => handleOpenEditPlan(b)}
+                                    title="Edit benefit plan details and contribution costs"
+                                    style={{ padding: "6px 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}
+                                  >
+                                    <Edit2 size={12} /> Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-neutral btn-sm"
+                                    onClick={() => handleDeletePlan(b)}
+                                    title="Delete benefit plan"
+                                    style={{ padding: "6px 8px", color: "#DC2626" }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-primary btn-sm"
+                                    onClick={() => {
+                                      setEnrollForm({ ...enrollForm, planId: b.id });
+                                      setShowEnrollModal(true);
+                                    }}
+                                    style={{ padding: "6px 12px", fontSize: 12 }}
+                                  >
+                                    Enroll Staff
+                                  </button>
+                                </>
+                              ) : (
+                                <span style={{ fontSize: 11, fontWeight: 600, color: "#16A34A", background: "#DCFCE7", padding: "3px 8px", borderRadius: 6 }}>
+                                  Available
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {b.description && (
-                            <p className="m-0 text-sm text-4" style={{ lineHeight: 1.6 }}>
+                            <p className="m-0 text-sm text-4" style={{ lineHeight: 1.5, color: "#6E6E73", fontSize: 12.5 }}>
                               {b.description}
                             </p>
                           )}
 
-                          <div className="col gap-8 pt-16" style={{ borderTop: "1px dashed var(--border)" }}>
-                            <div className="row-between text-sm">
-                              <span className="text-4 fw-600">Enrollment</span>
-                              <span className="text-1 fw-700">
+                          <div className="col gap-10 pt-12" style={{ borderTop: "1px solid #F0F0F2" }}>
+                            <div className="row-between text-xs" style={{ color: "#6E6E73" }}>
+                              <span className="fw-600">Company Enrollment</span>
+                              <span className="fw-700 text-1">
                                 {enrolled} / {eligible} ({pct}%)
                               </span>
                             </div>
-                            <div style={{ background: "var(--border)", height: 6, borderRadius: 3, overflow: "hidden" }}>
+                            <div style={{ background: "#F2F2F7", height: 5, borderRadius: 3, overflow: "hidden" }}>
                               <div
                                 style={{
-                                  background: catStyle.color,
+                                  background: "var(--primary, #2563EB)",
                                   height: "100%",
                                   width: `${pct}%`,
                                   borderRadius: 3,
-                                  transition: "width 0.5s ease",
+                                  transition: "width 0.4s ease",
                                 }}
                               />
                             </div>
-                            <div className="row-between text-sm">
-                              <span className="text-4 fw-600">Employer Cost</span>
-                              <span className="text-1 fw-700">{costDisplay}</span>
+                            <div className="grid-2 gap-12 pt-4">
+                              <div style={{ background: "#F9F9FB", padding: "8px 12px", borderRadius: 8, border: "1px solid #F0F0F2" }}>
+                                <span style={{ fontSize: 10.5, color: "#8E8E93", display: "block" }}>Employer Contribution</span>
+                                <strong style={{ fontSize: 13, color: "#1D1D1F" }}>{costDisplay}</strong>
+                              </div>
+                              <div style={{ background: "#F9F9FB", padding: "8px 12px", borderRadius: 8, border: "1px solid #F0F0F2" }}>
+                                <span style={{ fontSize: 10.5, color: "#8E8E93", display: "block" }}>Employee Contribution</span>
+                                <strong style={{ fontSize: 13, color: "#1D1D1F" }}>{employeeCostDisplay}</strong>
+                              </div>
                             </div>
                           </div>
                         </CardBody>
@@ -527,7 +646,7 @@ export default function BenefitsPage() {
                     textAlign: "center",
                     padding: "48px 24px",
                     background: "white",
-                    borderRadius: 16,
+                    borderRadius: 14,
                     border: "1px dashed var(--border)",
                   }}
                 >
@@ -536,13 +655,15 @@ export default function BenefitsPage() {
                   <p className="text-sm text-4 m-0 mb-20">
                     Add medical, retirement, or wellness plans to offer comprehensive coverage.
                   </p>
-                  <button
-                    className="btn-primary"
-                    onClick={() => setShowAddPlanModal(true)}
-                    style={{ padding: "10px 24px", borderRadius: 20 }}
-                  >
-                    Add First Benefit Plan
-                  </button>
+                  {role !== "Employee" && (
+                    <button
+                      className="btn-primary"
+                      onClick={() => setShowAddPlanModal(true)}
+                      style={{ padding: "8px 20px", borderRadius: 8 }}
+                    >
+                      Add First Benefit Plan
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -558,13 +679,15 @@ export default function BenefitsPage() {
                     Active coverage policies assigned to individual staff members.
                   </span>
                 </div>
-                <button
-                  className="btn-primary row gap-8 align-center"
-                  onClick={() => setShowEnrollModal(true)}
-                  style={{ padding: "10px 20px", borderRadius: 20 }}
-                >
-                  <Plus size={15} /> Enroll Employee
-                </button>
+                {role !== "Employee" && (
+                  <button
+                    className="btn-primary row gap-8 align-center"
+                    onClick={() => setShowEnrollModal(true)}
+                    style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13 }}
+                  >
+                    <Plus size={14} /> Enroll Employee
+                  </button>
+                )}
               </div>
 
               {isLoading ? (
@@ -575,32 +698,32 @@ export default function BenefitsPage() {
               ) : enrollments.length > 0 ? (
                 <div className="col gap-12">
                   {enrollments.map((enr) => (
-                    <Card key={enr.id} style={{ borderRadius: 14, border: "1px solid var(--border)" }}>
-                      <CardBody style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div className="row gap-16 align-center">
+                    <Card key={enr.id} style={{ borderRadius: 12, border: "1px solid #E5E5EA", background: "#FFFFFF" }}>
+                      <CardBody style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="row gap-14 align-center">
                           <div
                             style={{
-                              width: 44,
-                              height: 44,
-                              borderRadius: 12,
+                              width: 40,
+                              height: 40,
+                              borderRadius: 10,
                               background: "var(--primary-tint)",
                               color: "var(--primary)",
                               display: "grid",
                               placeItems: "center",
                             }}
                           >
-                            <Shield size={20} />
+                            <Shield size={18} />
                           </div>
                           <div>
-                            <h4 className="m-0 text-base fw-700 text-1">{enr.employeeName}</h4>
-                            <span className="text-xs text-5">
+                            <h4 className="m-0 text-base fw-700 text-1" style={{ fontSize: 14 }}>{enr.employeeName}</h4>
+                            <span className="text-xs text-4">
                               {enr.department} · Plan: <strong>{enr.planName}</strong> ({enr.coverageTier})
                             </span>
                           </div>
                         </div>
-                        <div className="row gap-24 align-center">
+                        <div className="row gap-20 align-center">
                           <div className="col gap-2 align-end">
-                            <span className="text-xs text-4 fw-600">Coverage Effective</span>
+                            <span className="text-xs text-4 fw-600">Effective Date</span>
                             <span className="text-sm fw-700 text-1">{enr.effectiveFrom}</span>
                           </div>
                           <Badge variant={enr.status === "active" ? "success" : "neutral"}>
@@ -617,7 +740,7 @@ export default function BenefitsPage() {
                     textAlign: "center",
                     padding: "48px 24px",
                     background: "white",
-                    borderRadius: 16,
+                    borderRadius: 14,
                     border: "1px dashed var(--border)",
                   }}
                 >
@@ -626,13 +749,15 @@ export default function BenefitsPage() {
                   <p className="text-sm text-4 m-0 mb-20">
                     Enroll team members in health, retirement, or wellness plans to activate benefits.
                   </p>
-                  <button
-                    className="btn-primary"
-                    onClick={() => setShowEnrollModal(true)}
-                    style={{ padding: "10px 24px", borderRadius: 20 }}
-                  >
-                    Enroll First Employee
-                  </button>
+                  {role !== "Employee" && (
+                    <button
+                      className="btn-primary"
+                      onClick={() => setShowEnrollModal(true)}
+                      style={{ padding: "8px 20px", borderRadius: 8 }}
+                    >
+                      Enroll First Employee
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -640,13 +765,13 @@ export default function BenefitsPage() {
 
           {/* TAB 3: REPORTS */}
           {activeTab === "Reports" && (
-            <div className="col gap-24">
+            <div className="col gap-20">
               <h2 className="text-xl fw-800 text-1 m-0">Benefits Cost & Distribution</h2>
-              <div className="grid-2 gap-24">
-                <Card style={{ borderRadius: 16, border: "1px solid var(--border)" }}>
-                  <CardBody className="p-24 col gap-16">
+              <div className="grid-2 gap-20">
+                <Card style={{ borderRadius: 14, border: "1px solid #E5E5EA", background: "#FFFFFF" }}>
+                  <CardBody className="p-20 col gap-14">
                     <h3 className="m-0 text-base fw-700 text-1">Plan Distribution</h3>
-                    <div className="col gap-12">
+                    <div className="col gap-10">
                       {plans.map((p) => (
                         <div key={p.id} className="row-between align-center text-sm">
                           <span className="text-2 fw-600">{p.name}</span>
@@ -657,8 +782,8 @@ export default function BenefitsPage() {
                   </CardBody>
                 </Card>
 
-                <Card style={{ borderRadius: 16, border: "1px solid var(--border)" }}>
-                  <CardBody className="p-24 col gap-16">
+                <Card style={{ borderRadius: 14, border: "1px solid #E5E5EA", background: "#FFFFFF" }}>
+                  <CardBody className="p-20 col gap-14">
                     <h3 className="m-0 text-base fw-700 text-1">Monthly Cost Summary</h3>
                     <div className="row-between text-sm pt-8 border-b border-border pb-8">
                       <span className="text-4">Total Active Policies</span>
@@ -666,11 +791,11 @@ export default function BenefitsPage() {
                     </div>
                     <div className="row-between text-sm pt-8 border-b border-border pb-8">
                       <span className="text-4">Estimated Monthly Outlay</span>
-                      <strong className="text-1">${Math.round(totalMonthlyCost)} USD</strong>
+                      <strong className="text-1">{formatMoney(totalMonthlyCost * 100, primaryCurrency)}</strong>
                     </div>
                     <div className="row-between text-sm pt-8">
                       <span className="text-4">Per-Employee Average</span>
-                      <strong className="text-1">${avgCostPerEmp} USD / month</strong>
+                      <strong className="text-1">{formatMoney(avgCostPerEmp * 100, primaryCurrency)} / month</strong>
                     </div>
                   </CardBody>
                 </Card>
@@ -765,6 +890,106 @@ export default function BenefitsPage() {
             >
               {isSubmittingPlan ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
               <span>Create Plan</span>
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Edit Benefit Plan */}
+      <Modal
+        isOpen={showEditPlanModal}
+        onClose={() => {
+          setShowEditPlanModal(false);
+          setEditingPlan(null);
+        }}
+        title="Edit Benefit Plan"
+        subtitle="Update plan coverage terms, contribution rates, and eligible currency."
+      >
+        <div className="col gap-20 p-24">
+          <div className="col gap-6">
+            <label className="text-xs fw-700 text-2">Plan Name</label>
+            <Input
+              type="text"
+              placeholder="e.g. Comprehensive Health Cover"
+              value={editPlanForm.name}
+              onChange={(e) => setEditPlanForm({ ...editPlanForm, name: e.target.value })}
+            />
+          </div>
+
+          <div className="grid-2 gap-16">
+            <div className="col gap-6">
+              <label className="text-xs fw-700 text-2">Category</label>
+              <Input
+                type="text"
+                maxLength={80}
+                placeholder="e.g. Health cover, lunch stipend, pension"
+                value={editPlanForm.category}
+                onChange={(e) => setEditPlanForm({ ...editPlanForm, category: e.target.value })}
+              />
+            </div>
+            <div className="col gap-6">
+              <label className="text-xs fw-700 text-2">Currency (ISO code)</label>
+              <Input
+                type="text"
+                maxLength={3}
+                placeholder="e.g. UGX"
+                value={editPlanForm.currency}
+                onChange={(e) => setEditPlanForm({ ...editPlanForm, currency: e.target.value.toUpperCase() })}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2 gap-16">
+            <div className="col gap-6">
+              <label className="text-xs fw-700 text-2">Employer Cost / Month ({editPlanForm.currency || "currency"})</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={String(editPlanForm.employerCost)}
+                onChange={(e) => setEditPlanForm({ ...editPlanForm, employerCost: Number(e.target.value) })}
+              />
+            </div>
+            <div className="col gap-6">
+              <label className="text-xs fw-700 text-2">Employee Cost / Month ({editPlanForm.currency || "currency"})</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={String(editPlanForm.employeeCost)}
+                onChange={(e) => setEditPlanForm({ ...editPlanForm, employeeCost: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="col gap-6">
+            <label className="text-xs fw-700 text-2">Plan Description</label>
+            <Textarea
+              placeholder="Describe coverage details, eligibility rules, and reimbursement terms..."
+              value={editPlanForm.description}
+              onChange={(e) => setEditPlanForm({ ...editPlanForm, description: e.target.value })}
+              style={{ minHeight: 90 }}
+            />
+          </div>
+
+          <div className="row-end gap-12 pt-12 border-t border-border">
+            <button
+              className="btn-neutral"
+              onClick={() => {
+                setShowEditPlanModal(false);
+                setEditingPlan(null);
+              }}
+              disabled={isSubmittingPlan}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-primary row gap-8 align-center"
+              onClick={handleUpdatePlan}
+              disabled={isSubmittingPlan}
+            >
+              {isSubmittingPlan ? <Loader2 size={16} className="animate-spin" /> : <Edit2 size={16} />}
+              <span>Save Changes</span>
             </button>
           </div>
         </div>
