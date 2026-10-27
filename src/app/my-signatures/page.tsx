@@ -46,6 +46,8 @@ interface MySignatureDoc {
   sentAt: string;
   signedAt?: string | null;
   message?: string;
+  signatureType?: string;
+  signatureData?: string;
 }
 
 export default function MySignaturesPage() {
@@ -76,6 +78,20 @@ export default function MySignaturesPage() {
   const [viewingPdfUrl, setViewingPdfUrl] = useState<string>('');
   const [isRenderingViewingPdf, setIsRenderingViewingPdf] = useState<boolean>(false);
 
+  const getExecutedSignatureHtml = useCallback((doc: MySignatureDoc) => {
+    const dateStr = doc.signedAt ? new Date(doc.signedAt).toLocaleDateString() : new Date().toLocaleDateString();
+    const subtext = `<div style="font-size:10px;color:#059669;margin-top:4px;font-family:sans-serif;font-weight:600;">&#10003; Digitally Signed &amp; Verified (${dateStr})</div>`;
+
+    if (doc.signatureData) {
+      if (doc.signatureType === 'drawn' || doc.signatureType === 'uploaded' || doc.signatureData.startsWith('data:image')) {
+        return `<img src="${doc.signatureData}" alt="Digital Signature" style="max-height:52px;max-width:220px;object-fit:contain;display:block;" />${subtext}`;
+      }
+      return `<div style="font:italic 26px cursive;color:#172554;line-height:1.2;">${escapeHtml(doc.signatureData)}</div>${subtext}`;
+    }
+
+    return `<div style="font:italic 22px cursive;color:#172554;">${escapeHtml(doc.senderName || 'Authorized Signatory')}</div>${subtext}`;
+  }, []);
+
   useEffect(() => {
     if (!viewingSignedDoc) {
       setViewingPdfUrl((prev) => {
@@ -92,7 +108,7 @@ export default function MySignaturesPage() {
 
     let isCurrent = true;
     setIsRenderingViewingPdf(true);
-    const executedSignatureHtml = `<div style="font:italic 22px cursive;color:#1e3a8a;">Digitally Signed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:4px;font-family:sans-serif;">&#10003; EASYHR Cryptographic Verification Record</div>`;
+    const executedSignatureHtml = getExecutedSignatureHtml(viewingSignedDoc);
     const docHtml = signingDocumentHtml(viewingSignedDoc, executedSignatureHtml);
 
     renderPdfDocument(docHtml)
@@ -115,7 +131,7 @@ export default function MySignaturesPage() {
     return () => {
       isCurrent = false;
     };
-  }, [viewingSignedDoc]);
+  }, [viewingSignedDoc, getExecutedSignatureHtml]);
 
   const handleViewSigned = (doc: MySignatureDoc) => {
     setViewingSignedDoc(doc);
@@ -130,7 +146,7 @@ export default function MySignaturesPage() {
     }
     toast.info('Preparing PDF', 'Generating signed PDF document…');
     try {
-      const executedSignatureHtml = `<div style="font:italic 22px cursive;color:#1e3a8a;">Digitally Signed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:4px;font-family:sans-serif;">&#10003; EASYHR Cryptographic Verification Record</div>`;
+      const executedSignatureHtml = getExecutedSignatureHtml(doc);
       const docHtml = signingDocumentHtml(doc, executedSignatureHtml);
       const blob = await renderPdfDocument(docHtml);
       downloadPdfBlob(blob, filename);

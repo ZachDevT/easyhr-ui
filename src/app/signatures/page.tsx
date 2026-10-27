@@ -50,6 +50,8 @@ interface SignatureRecipient {
   status: 'pending' | 'signed' | 'declined';
   signedAt?: string | null;
   declineReason?: string | null;
+  signatureType?: string;
+  signatureData?: string;
 }
 
 interface SignatureRequestItem {
@@ -132,8 +134,20 @@ export default function SignaturesAdminPage() {
     const rec = req.recipients?.[0];
     const signerName = rec?.name || 'Authorized Recipient';
     const body = req.body || (req.customMessage ? `<p>${req.customMessage}</p>` : '<p>Executed Document Agreement.</p>');
+    const signDate = rec?.signedAt || req.createdAt;
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>${req.documentName}</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f4f7;color:#202124;font:14px/1.65 'Questrial',Inter,Arial,sans-serif}.page{width:210mm;min-height:297mm;margin:28px auto;padding:20mm 22mm;background:#fff;box-shadow:0 4px 24px #10182818;display:flex;flex-direction:column}.brand{height:7px;background:#4F46E5;margin:-20mm -22mm 25px}.doc-header{white-space:pre-wrap;color:#475467;font-size:11px;padding:0 0 14px;border-bottom:1px solid #d0d5dd}.title{text-align:center;margin:28px 0 24px}.title h1{font:700 24px/1.25 'Questrial',Inter,Arial,sans-serif;margin:0 0 8px}.muted{color:#667085;font-size:12px}.body{font:15px/1.75 'Questrial',Inter,Arial,sans-serif;min-height:360px;margin-bottom:30px}.body p{margin:0 0 1em}.body h1,.body h2,.body h3{line-height:1.25;margin:1.2em 0 .6em}.doc-footer{white-space:pre-wrap;border-top:1px solid #d0d5dd;padding-top:14px;margin-top:auto;color:#475467;font-size:11px}.signatures{display:grid;grid-template-columns:1fr 180px;gap:32px;margin-top:30px;break-inside:avoid}.signatures label{display:block;color:#667085;font-size:11px;margin-bottom:8px}.signature{height:58px;border-bottom:1px solid #98a2b3;display:flex;flex-direction:column;justify-content:center}.date{height:58px;border-bottom:1px solid #98a2b3;padding:24px 0 4px;font-family:monospace}@page{size:A4;margin:0}@media print{body{background:#fff}.page{margin:0;box-shadow:none;width:auto;min-height:297mm;page-break-after:always}}</style></head><body><article class="page"><div class="brand"></div><header class="doc-header">EasyHR Enterprise Signature Operations</header><div class="title"><h1>${req.documentName}</h1><div class="muted">Issued by ${req.createdByName} · Created ${req.createdAt}</div></div><main class="body">${body}</main><section class="signatures"><div><label>Authorized digital signature (${signerName})</label><div class="signature"><div style="font:italic 20px cursive;color:#1e3a8a;">Digitally Executed &amp; Verified</div><div style="font-size:10px;color:#059669;margin-top:2px;">&#10003; EASYHR Cryptographic Verification Record</div></div></div><div><label>Status</label><div class="date">COMPLETED</div></div></section><footer class="doc-footer">Digitally Executed &amp; Recorded via EasyHR Enterprise Signatures</footer></article></body></html>`;
+    const signatureContent = (() => {
+      const subtext = `<div style="font-size:10px;color:#059669;margin-top:4px;font-family:sans-serif;font-weight:600;">&#10003; Digitally Signed &amp; Verified (${signDate})</div>`;
+      if (rec?.signatureData) {
+        if (rec.signatureType === 'drawn' || rec.signatureType === 'uploaded' || rec.signatureData.startsWith('data:image')) {
+          return `<img src="${rec.signatureData}" alt="Digital Signature" style="max-height:52px;max-width:220px;object-fit:contain;display:block;" />${subtext}`;
+        }
+        return `<div style="font:italic 26px cursive;color:#172554;line-height:1.2;">${rec.signatureData}</div>${subtext}`;
+      }
+      return `<div style="font:italic 22px cursive;color:#172554;">${signerName}</div>${subtext}`;
+    })();
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${req.documentName}</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f4f7;color:#202124;font:14px/1.65 'Questrial',Inter,Arial,sans-serif}.page{width:210mm;min-height:297mm;margin:28px auto;padding:20mm 22mm;background:#fff;box-shadow:0 4px 24px #10182818;display:flex;flex-direction:column}.brand{height:7px;background:#4F46E5;margin:-20mm -22mm 25px}.doc-header{white-space:pre-wrap;color:#475467;font-size:11px;padding:0 0 14px;border-bottom:1px solid #d0d5dd}.title{text-align:center;margin:28px 0 24px}.title h1{font:700 24px/1.25 'Questrial',Inter,Arial,sans-serif;margin:0 0 8px}.muted{color:#667085;font-size:12px}.body{font:15px/1.75 'Questrial',Inter,Arial,sans-serif;min-height:360px;margin-bottom:30px}.body p{margin:0 0 1em}.body h1,.body h2,.body h3{line-height:1.25;margin:1.2em 0 .6em}.doc-footer{white-space:pre-wrap;border-top:1px solid #d0d5dd;padding-top:14px;margin-top:auto;color:#475467;font-size:11px}.signatures{display:grid;grid-template-columns:1fr 180px;gap:32px;margin-top:30px;break-inside:avoid}.signatures label{display:block;color:#667085;font-size:11px;margin-bottom:8px}.signature{height:58px;border-bottom:1px solid #98a2b3;display:flex;flex-direction:column;justify-content:center}.date{height:58px;border-bottom:1px solid #98a2b3;padding:24px 0 4px;font-family:monospace}@page{size:A4;margin:0}@media print{body{background:#fff}.page{margin:0;box-shadow:none;width:auto;min-height:297mm;page-break-after:always}}</style></head><body><article class="page"><div class="brand"></div><header class="doc-header">EasyHR Enterprise Signature Operations</header><div class="title"><h1>${req.documentName}</h1><div class="muted">Issued by ${req.createdByName} · Created ${req.createdAt}</div></div><main class="body">${body}</main><section class="signatures"><div><label>Authorized digital signature (${signerName})</label><div class="signature">${signatureContent}</div></div><div><label>Status</label><div class="date">COMPLETED</div></div></section><footer class="doc-footer">Digitally Executed &amp; Recorded via EasyHR Enterprise Signatures</footer></article></body></html>`;
   }, []);
 
   useEffect(() => {
