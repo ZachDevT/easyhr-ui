@@ -1707,6 +1707,7 @@ function ProfileContent() {
             <EmployeeDocumentList
               employeeId={employee?.id}
               handbookSignedAt={employee?.handbookSignedAt}
+              employeeName={employeeFullName}
             />
           )}
 

@@ -1235,6 +1235,7 @@ export default function EmployeeProfile() {
               <EmployeeDocumentList
                 employeeId={params.id}
                 handbookSignedAt={employee.handbookSignedAt}
+                employeeName={fullName}
               />
             )}
 
