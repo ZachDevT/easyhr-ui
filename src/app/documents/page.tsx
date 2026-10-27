@@ -151,13 +151,18 @@ export default function DocumentsPage() {
 
       const intent = await res.json();
       const docId = intent.document?.id || intent.id;
-      const uploadUrl = intent.uploadUrl;
+      if (!docId) throw new Error("Storage did not return a valid document ID.");
+      const targetUploadUrl = intent.uploadUrl && !intent.uploadUrl.includes("r2.cloudflarestorage.com")
+        ? intent.uploadUrl
+        : `${API_BASE_URL}/api/v1/documents/${docId}/content`;
 
-      // 2. If user selected a file and uploadUrl exists, stream bytes to cloud storage
-      if (!docId || !uploadUrl) throw new Error("Storage did not return an upload location.");
-      const uploaded = await fetch(uploadUrl, {
+      // 2. Stream bytes to storage via backend proxy (guaranteeing zero CORS errors)
+      const uploaded = await fetch(targetUploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": contentType },
+        headers: {
+          "Content-Type": contentType,
+          Authorization: `Bearer ${token}`,
+        },
         body: selectedFile,
       });
       if (!uploaded.ok) throw new Error("The document could not be uploaded to storage.");

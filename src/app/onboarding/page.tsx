@@ -962,16 +962,23 @@ export default function HrOnboardingPage() {
                                     throw new Error(error.detail || "Could not create handbook upload.");
                                   }
                                   const intent = await res.json();
-                                  if (!intent.uploadUrl || !intent.document?.id) throw new Error("Storage did not return an upload location.");
-                                  const uploaded = await fetch(intent.uploadUrl, {
+                                  const docId = intent.document?.id || intent.id;
+                                  if (!docId) throw new Error("Storage did not return a valid document ID.");
+                                  const targetUploadUrl = intent.uploadUrl && !intent.uploadUrl.includes("r2.cloudflarestorage.com")
+                                    ? intent.uploadUrl
+                                    : `${API_BASE_URL}/api/v1/documents/${docId}/content`;
+
+                                  const uploaded = await fetch(targetUploadUrl, {
                                     method: "PUT",
-                                    headers: { "Content-Type": file.type || "application/pdf" },
+                                    headers: {
+                                      "Content-Type": file.type || "application/pdf",
+                                      Authorization: `Bearer ${token}`,
+                                    },
                                     body: file,
                                   });
                                   if (!uploaded.ok) throw new Error("The handbook file could not be uploaded to storage.");
                                   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
                                   const checksumSha256 = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-                                  const docId = intent.document?.id;
                                   const completed = await fetch(`${API_BASE_URL}/api/v1/documents/${docId}/complete`, {
                                     method: "POST",
                                     headers: {

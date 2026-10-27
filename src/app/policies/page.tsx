@@ -95,8 +95,16 @@ export default function PoliciesPage() {
       if (!intentRes.ok) { const e = await intentRes.json().catch(() => ({})); throw new Error(e.detail || "Could not prepare policy upload."); }
       const intent = await intentRes.json();
       const docId = intent.document?.id || intent.id;
-      if (!docId || !intent.uploadUrl) throw new Error("Storage did not return an upload location.");
-      const uploaded = await fetch(intent.uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: selectedFile });
+      if (!docId) throw new Error("Storage did not return a valid document ID.");
+      const targetUploadUrl = intent.uploadUrl && !intent.uploadUrl.includes("r2.cloudflarestorage.com")
+        ? intent.uploadUrl
+        : `${API_BASE_URL}/api/v1/documents/${docId}/content`;
+
+      const uploaded = await fetch(targetUploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType, Authorization: `Bearer ${token}` },
+        body: selectedFile,
+      });
       if (!uploaded.ok) throw new Error("The policy file could not be uploaded.");
       const digest = await crypto.subtle.digest("SHA-256", await selectedFile.arrayBuffer());
       const checksumSha256 = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");

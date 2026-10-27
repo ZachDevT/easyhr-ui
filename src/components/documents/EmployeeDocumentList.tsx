@@ -297,16 +297,18 @@ export function EmployeeDocumentList({
 
       const intent = await res.json();
       const docId = intent.document?.id || intent.id;
-      const uploadUrl = intent.uploadUrl;
+      if (!docId) throw new Error("Storage did not return a valid document ID.");
+      const targetUploadUrl = intent.uploadUrl && !intent.uploadUrl.includes("r2.cloudflarestorage.com")
+        ? intent.uploadUrl
+        : `${API_BASE_URL}/api/v1/documents/${docId}/content`;
 
-      if (!docId || !uploadUrl) {
-        throw new Error("Storage did not return a valid upload location.");
-      }
-
-      // 2. Upload file bytes to cloud storage
-      const uploaded = await fetch(uploadUrl, {
+      // 2. Upload file bytes to storage via backend proxy
+      const uploaded = await fetch(targetUploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": contentType },
+        headers: {
+          "Content-Type": contentType,
+          Authorization: `Bearer ${token}`,
+        },
         body: selectedFile,
       });
 
